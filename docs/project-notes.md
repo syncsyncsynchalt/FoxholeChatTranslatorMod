@@ -120,6 +120,44 @@ TTSエンジン: Windows OneCore (Neural) — SAPI5 経由
 制約:
 - ゲームプロセスのメモリは書き換えない
 
+## Stage 8 実装計画 — デモメッセージのリアルタイム翻訳 + Ollamaメモリ削減
+
+目的: Stage 6 のハードコード翻訳をやめ、Stage 5 の Ollama 翻訳で実際に翻訳する。
+合わせて gemma3:4b のメモリ使用量を削減する。
+実装内容:
+- デモメッセージ切替時に `translate::Sync()` (または非同期キュー) で原文を翻訳し、
+  2行目「翻訳:」の行に結果を表示する
+- DemoMessage 構造体から `translated` フィールドを削除し、`original` のみにする
+- 翻訳中は「翻訳中...」を表示
+- 翻訳完了後に `g_translatedText` を更新
+- 翻訳は別スレッド (translate ワーカー) で行い、描画スレッドをブロックしない
+Ollamaメモリ削減:
+- Ollama API `options` パラメータで以下を指定:
+  - `num_ctx=256` — チャットは短文のためコンテキスト長を最小化 (デフォルト2048の1/8)
+  - `num_gpu=0` — GPU VRAM を一切使わない (ゲームが3-4GB VRAM消費するため)
+  - `num_thread=2` — CPU スレッド数を制限しゲーム描画への影響を最小化
+- メモリ見積もり (16GB RAM / RTX 3050 Ti 4GB VRAM):
+  - gemma3:4b Q4: ~2.5GB RAM (CPU-only)
+  - KVキャッシュ (num_ctx=256): ~50MB
+  - Foxhole: ~4-6GB RAM + 3-4GB VRAM
+  - OS: ~3GB → 合計 ~12GB / 16GB で余裕あり
+- config.ini [Translation] セクションに `NumCtx=256`, `NumGpu=0`, `NumThread=2` 追加
+制約:
+- Python 不使用、純粋 C++ (WinHTTP)
+- ゲーム描画を妨げない (翻訳は非同期)
+Ollamaヘルスチェック & 自動復旧:
+- 定期的に Ollama の死活を監視 (GET /api/tags または /api/version, 数秒間隔)
+- ラジオアイコンの3状態:
+  - 通常ON (不透明) — Ollama正常稼働中
+  - 通常OFF (半透明) — ユーザーがOFFにした状態
+  - 赤色 (エラー) — Ollamaがダウンしている状態
+- 赤色アイコン用の radio_icon テクスチャを追加 (赤色版、32×32px)
+- 赤色アイコンをクリック → Ollama再起動 (`translate::RestartOllama()` 等)
+  - 再起動中はアイコンを点滅させるなどフィードバックを表示
+  - 再起動成功 → 通常アイコンに戻る
+  - 再起動失敗 → 赤色のまま + ログに警告
+- translate.h/cpp に `translate::IsHealthy()` と `translate::Restart()` API 追加
+
 ## トラブルシューティング
 
 - チャット未検出: コンソールで "GNames: FNamePool 発見!" 確認 → "ProcessEvent フック: N/M 成功" 確認 → ProcessEventVtableIndex=66 確認 → InitDelayMs を増やす
