@@ -11,7 +11,6 @@
 #include <mutex>
 #include <string>
 
-#include "scanner.h"
 #include "ue4.h"
 #include "hooks.h"
 

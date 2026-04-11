@@ -107,11 +107,8 @@
 
 ### アーキテクチャ
 - **version.dll** (永続): プロキシ17関数 + MinHookフック + ワーカーDLL管理
-  - 診断コード削除済み: GetTickCount64テスト、HWBP(VEH+デバッグレジスタ+スレッド列挙)は整理時に除去
 - **chat_translator.dll** (ホットリロード可能): GNames検出 + OnProcessEventコールバック
-  - flat GNamesパス削除済み: Foxholeは常にchunked FNamePool
-  - ServerChat監視削除済み: 送信RPCであり不正parmsからゴミデータが出力されたため除外
-  - TryDetectShift / ResolveFNameWithShift: ゲーム更新時のFNameBlockOffsetBits自動検出（残存）
+  - TryDetectShift / ResolveFNameWithShift: ゲーム更新時のFNameBlockOffsetBits自動検出
 - ワーカーリロード: version.dllが2秒ごとにFILETIMEを比較、変更検知で自動リロード
 
 ### 犯した間違い・教訓 (Stage 1 全記録)

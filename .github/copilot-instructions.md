@@ -88,15 +88,11 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\Mods\ChatTranslator"
 
 ## 開発ロードマップ (3段階)
 
-### Stage 1: チャットキャプチャ + テキストファイル出力 ✅ 完了・整理済み
+### Stage 1: チャットキャプチャ + テキストファイル出力 ✅ 完了
 - ProcessEventフックで3種のチャットRPCを検出:
   - ClientChatMessage, ClientChatMessageWithTag, ClientWorldChatMessage
 - Dumper-7 SDK準拠の構造体でparms直接キャスト（FString探索不要）
 - 検出メッセージをコンソール表示 + chat_log.txt にUTF-8で記録
-- 整理で削除済み: 診断A/B/C(HWBP)、flat GNamesパス、ServerChat監視(送信RPCでゴミデータ原因)、
-  未使用ue4.hヘルパー(FNameEntry/GetObjectFName/ue4::ProcessEventFn)、initDelayMs(hooks.cpp側)、未使用includes
-- 整理で残存: TryDetectShift(ゲーム更新対応)、GNames遅延リトライ、自動リロード、整合性チェック、
-  scanner::FindAllPatternsInModule/ResolveRIPRelative(調査ユーティリティ)
 
 ### Stage 2: Ollama連携による自動翻訳 (未着手)
 - Ollama API (localhost:11434/api/generate) でローカルLLM翻訳
