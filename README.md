@@ -11,9 +11,11 @@ Foxholeのゲーム内チャットを自動翻訳するDLLモジュール。
 
 ## 動作原理
 
-1. `version.dll` プロキシとしてゲームに自動ロードされる
-2. UE4の `ProcessEvent` をフックしてチャットメッセージを検出
-3. 検出したメッセージをテキストファイルに記録
+1. `version.dll` プロキシとしてゲームに自動ロードされる（17関数転送）
+2. .rdataセクション内の全vtableを走査し、`ProcessEvent`(vtable[66]) の全実装をMinHookでフック
+3. `chat_translator.dll`（ホットリロード対応）がGNamesを検出し、チャット関連UFunctionのFName CIを照合
+4. 重複排除（500ms窓）+ FUNC_Net検証で正確にチャットメッセージを判定
+5. 検出したメッセージをコンソール表示 + `chat_log.txt` に記録
 
 ## ビルド方法
 
@@ -67,66 +69,50 @@ del "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64\ve
 4. デバッグコンソールが表示される
 5. チャットメッセージが `chat_log.txt` に記録される
 
-### ProcessEvent アドレスの調査
+### トラブルシューティング
 
-パターンスキャンが失敗した場合、手動でアドレスを特定する必要があります：
-
-1. **x64dbg** でゲームを起動
-2. モジュール `War-Win64-Shipping.exe` を開く
-3. 文字列検索で以下を探す：
-   - `"Script Msg:"`
-   - `"ProcessEvent"`
-   - `"BlueprintVMError"`
-4. 見つかった文字列の参照元にブレークポイントを設定
-5. チャットを送信/受信してブレークポイントがヒットする関数を特定
-6. その関数のアドレスを `config.ini` の `ProcessEventAddress` に設定
-
-### GNames アドレスの調査
-
-1. x64dbg でメモリパターンを検索
-2. または文字列 `"None"` を検索し、その参照元から GNames 構造体を追跡
-3. アドレスを `config.ini` の `GNamesAddress` に設定
-
-### 探索モードの使用
-
-`config.ini` で `DumpAllEvents=1` に設定すると、
-すべての ProcessEvent 呼び出しをコンソールに出力します。
-
-⚠️ 大量の出力が発生するため、チャット関連の関数名を特定したら
-すぐに `DumpAllEvents=0` に戻してください。
+チャットが検出されない場合：
+1. コンソールに `GNames: FNamePool 発見!` と表示されているか確認
+2. `ProcessEvent フック: N/M 成功` の数を確認
+3. `config.ini` の `ProcessEventVtableIndex` が正しいか確認 (デフォルト: 66)
+4. `InitDelayMs` を増やしてUE4初期化完了を待つ時間を延長
 
 ## 設定ファイル (config.ini)
 
-| セクション | キー | 説明 |
-|-----------|------|------|
-| General | EnableConsole | デバッグコンソールの表示 |
-| General | LogFilePath | ログ出力先パス |
-| General | InitDelayMs | 初期化待機時間(ms) |
-| Discovery | DumpAllEvents | 全イベントログモード |
-| Discovery | FunctionNameFilter | 関数名フィルタ |
-| Addresses | ProcessEventAddress | 手動アドレス(16進) |
-| Addresses | GNamesAddress | 手動アドレス(16進) |
-| Patterns | Pattern1-10 | ProcessEventパターン |
-| Patterns | GNamesPattern1-5 | GNamesパターン |
+| セクション | キー | 説明 | 読み込み元 |
+|-----------|------|------|----------|
+| General | EnableConsole | デバッグコンソールの表示 (1/0) | hooks.cpp |
+| General | LogFilePath | チャットログ出力先パス (空=DLL同階層) | hooks.cpp |
+| General | InitDelayMs | UE4初期化待機時間 (ms) | dllmain.cpp |
+| Addresses | ProcessEventVtableIndex | ProcessEvent vtableインデックス (デフォルト: 66) | dllmain.cpp |
+
+> **注**: config.ini には Discovery, Patterns, Stage2, Stage3 セクションもありますが、
+> 現在のコードでは読み込まれていません（将来のStage 2/3実装用プレースホルダー）。
 
 ## 開発ロードマップ
 
-- [x] **Stage 1**: チャットメッセージのテキストファイル出力
-- [ ] **Stage 2**: チャット表示に接頭辞を追加
-- [ ] **Stage 3**: Ollama連携による自動翻訳
+- [x] **Stage 1**: チャットメッセージのキャプチャ + テキストファイル出力
+- [ ] **Stage 2**: Ollama連携による自動翻訳
+- [ ] **Stage 3**: 翻訳結果のゲーム内表示
 
 ## ファイル構成
 
 ```
 Mods/ChatTranslator/
-├── CMakeLists.txt          # ビルド構成
-├── version.def             # DLLエクスポート定義
+├── CMakeLists.txt          # ビルド構成 (version.dll + chat_translator.dll + test_loader)
+├── version.def             # DLLエクスポート定義 (17関数)
 ├── config.ini              # ランタイム設定
 ├── README.md               # このファイル
+├── docs/
+│   ├── project-notes.md    # プロジェクトメモ
+│   └── ue4-reversing-foxhole.md  # UE4リバースエンジニアリング知見
+├── test/
+│   └── test_loader.cpp     # DLL動作確認テスト
 └── src/
-    ├── dllmain.cpp         # エントリポイント + プロキシ
-    ├── scanner.h/cpp       # パターンスキャナー
-    ├── ue4.h               # UE4内部型定義
-    ├── hooks.h/cpp         # ProcessEventフック + チャットログ
+    ├── dllmain.cpp         # version.dll: プロキシ + vtableフック + ワーカーローダー
+    ├── scanner.h/cpp       # パターンスキャナー (.text/.rdataセクション走査)
+    ├── ue4.h               # UE4内部型定義 (Dumper-7 SDK準拠)
+    ├── hooks.h/cpp         # chat_translator.dll: GNames検出 + チャットキャプチャ
+    ├── worker_main.cpp     # chat_translator.dll エントリポイント
     └── (Stage 2/3 で追加予定)
 ```

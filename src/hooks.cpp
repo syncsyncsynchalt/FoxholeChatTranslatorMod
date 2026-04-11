@@ -10,9 +10,6 @@
 #include <ctime>
 #include <mutex>
 #include <string>
-#include <vector>
-#include <fstream>
-#include <sstream>
 
 #include "scanner.h"
 #include "ue4.h"
@@ -23,7 +20,6 @@
 // ============================================================
 struct Config {
     bool        enableConsole = true;
-    int         initDelayMs   = 10000;
     std::string logFilePath;
 };
 
@@ -55,7 +51,6 @@ static void LoadConfig() {
     };
 
     g_config.enableConsole = readIniInt("General", "EnableConsole", 1) != 0;
-    g_config.initDelayMs   = readIniInt("General", "InitDelayMs", 10000);
 
     std::string logPath = readIniStr("General", "LogFilePath", "");
     if (!logPath.empty()) g_config.logFilePath = logPath;
@@ -191,7 +186,6 @@ static std::string GetPlayerName(void* playerState) {
 // GNames
 // ============================================================
 static uintptr_t g_gnamesAddr = 0;
-static bool      g_gnamesChunked = true;
 static int       g_gnamesBlockArrayOffset = 0;
 static int       g_gnamesNameOffset = 2;
 static int       g_gnamesStride = 2;
@@ -209,24 +203,19 @@ void hooks::SetHookedPEAddress(uintptr_t addr) {
 bool hooks::ResolveFName(int32_t comparisonIndex, char* buf, int bufSize) {
     if (!g_gnamesAddr || bufSize <= 0) return false;
     __try {
-        if (g_gnamesChunked) {
-            int mask = (1 << g_fnameBlockOffsetBits) - 1;
-            int block  = comparisonIndex >> g_fnameBlockOffsetBits;
-            int offset = comparisonIndex & mask;
-            uintptr_t* blocks = reinterpret_cast<uintptr_t*>(g_gnamesAddr + g_gnamesBlockArrayOffset);
-            if (block < 0 || block > g_gnamesCurrentBlock || !blocks[block]) return false;
-            uintptr_t entryAddr = blocks[block] + static_cast<uintptr_t>(offset) * g_gnamesStride;
-            const char* namePtr = reinterpret_cast<const char*>(entryAddr + g_gnamesNameOffset);
-            uint16_t hdrData = *reinterpret_cast<const uint16_t*>(entryAddr);
-            int len = hdrData >> g_gnamesHeaderShift;
-            if (len <= 0 || len >= bufSize) return false;
-            memcpy(buf, namePtr, len);
-            buf[len] = 0;
-            return true;
-        } else {
-            const FNameEntry* entry = ResolveFNameFlat(g_gnamesAddr, comparisonIndex);
-            if (entry) return entry->GetName(buf, bufSize);
-        }
+        int mask = (1 << g_fnameBlockOffsetBits) - 1;
+        int block  = comparisonIndex >> g_fnameBlockOffsetBits;
+        int offset = comparisonIndex & mask;
+        uintptr_t* blocks = reinterpret_cast<uintptr_t*>(g_gnamesAddr + g_gnamesBlockArrayOffset);
+        if (block < 0 || block > g_gnamesCurrentBlock || !blocks[block]) return false;
+        uintptr_t entryAddr = blocks[block] + static_cast<uintptr_t>(offset) * g_gnamesStride;
+        const char* namePtr = reinterpret_cast<const char*>(entryAddr + g_gnamesNameOffset);
+        uint16_t hdrData = *reinterpret_cast<const uint16_t*>(entryAddr);
+        int len = hdrData >> g_gnamesHeaderShift;
+        if (len <= 0 || len >= bufSize) return false;
+        memcpy(buf, namePtr, len);
+        buf[len] = 0;
+        return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {}
     return false;
 }
@@ -333,7 +322,6 @@ static bool FindGNames() {
 
                 g_gnamesAddr = s;
                 g_gnamesBlockArrayOffset = 0;
-                g_gnamesChunked = true;
                 g_gnamesNameOffset = candidate.nameOffset;
                 g_gnamesStride = 2;
                 g_gnamesCurrentBlock = curBlock;
@@ -401,7 +389,6 @@ enum ChatFuncId {
     CHAT_FUNC_CLIENT_CHAT_MESSAGE = 0,
     CHAT_FUNC_CLIENT_CHAT_MESSAGE_WITH_TAG,
     CHAT_FUNC_CLIENT_WORLD_CHAT_MESSAGE,
-    CHAT_FUNC_SERVER_CHAT,
     CHAT_FUNC_COUNT
 };
 
@@ -409,10 +396,9 @@ static const char* g_chatFuncNames[CHAT_FUNC_COUNT] = {
     "ClientChatMessage",
     "ClientChatMessageWithTag",
     "ClientWorldChatMessage",
-    "ServerChat",
 };
 
-static int32_t g_chatFuncCIs[CHAT_FUNC_COUNT] = { -1, -1, -1, -1 };
+static int32_t g_chatFuncCIs[CHAT_FUNC_COUNT] = { -1, -1, -1 };
 static bool    g_chatCIsReady = false;
 
 static void SearchChatFNames() {
@@ -485,7 +471,6 @@ struct ChatData {
     EChatChannel channel;
     bool hasSender;
     bool hasRegTag;
-    bool isSelf;
     void* senderPlayerState;
 };
 
@@ -520,13 +505,6 @@ static bool ReadChatParamsSafe(int chatFunc, void* parms, ChatData* out) {
             out->regTagStr = p->SenderRegimentTag;
             out->channel = p->Channel;
             out->hasRegTag = true;
-            break;
-        }
-        case CHAT_FUNC_SERVER_CHAT: {
-            auto p = reinterpret_cast<Parms_ServerChat*>(parms);
-            out->msgStr = p->Message;
-            out->channel = p->ChatChannel;
-            out->isSelf = true;
             break;
         }
         default:
@@ -652,9 +630,7 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
     if (msg.empty()) return;
 
     std::string sender;
-    if (data.isSelf) {
-        sender = "(self)";
-    } else if (data.hasSender) {
+    if (data.hasSender) {
         sender = GetPlayerName(data.senderPlayerState);
     } else {
         sender = FStringToUtf8(data.senderStr);

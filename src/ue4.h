@@ -107,75 +107,8 @@ struct Parms_ClientWorldChatMessage {
 };
 static_assert(sizeof(Parms_ClientWorldChatMessage) == 0x48);
 
-// War.SimPlayerController.ServerChat (0x18 bytes)
-struct Parms_ServerChat {
-    FString       Message;                  // 0x00
-    EChatChannel  ChatChannel;              // 0x10
-    EChatLanguage BroadcastLanguage;        // 0x11
-    uint8_t       _pad[6];                  // 0x12
-};
-static_assert(sizeof(Parms_ServerChat) == 0x18);
-
 // APlayerState::PlayerNamePrivate オフセット (Dumper-7: Engine_classes.hpp)
 constexpr int PLAYERSTATE_PLAYERNAME_OFFSET = 0x328;
-
-// ============================================================
-// FNameEntry - GNames テーブル内のエントリ
-// ============================================================
-
-struct FNameEntryHeader {
-    uint16_t Data;
-    bool IsWide() const { return Data & 1; }
-    int  GetLength() const { return Data >> 1; }
-};
-
-struct FNameEntry {
-    FNameEntryHeader Header;
-    union {
-        char    AnsiName[1];
-        wchar_t WideName[1];
-    };
-
-    bool GetName(char* buf, int bufSize) const {
-        if (Header.IsWide()) {
-            int len = Header.GetLength();
-            if (len >= bufSize) len = bufSize - 1;
-            for (int i = 0; i < len; i++) buf[i] = static_cast<char>(WideName[i]);
-            buf[len] = 0;
-        } else {
-            int len = Header.GetLength();
-            if (len >= bufSize) len = bufSize - 1;
-            memcpy(buf, AnsiName, len);
-            buf[len] = 0;
-        }
-        return true;
-    }
-};
-
-// ============================================================
-// GNames アクセス
-// ============================================================
-
-inline const FNameEntry* ResolveFNameChunked(
-    uintptr_t gnamesBase, int32_t comparisonIndex,
-    int blockArrayOffset = 0x40, int stride = 2)
-{
-    int block  = comparisonIndex >> 16;
-    int offset = comparisonIndex & 0xFFFF;
-    uintptr_t* blocks = reinterpret_cast<uintptr_t*>(gnamesBase + blockArrayOffset);
-    if (!blocks[block]) return nullptr;
-    uintptr_t entryAddr = blocks[block] + static_cast<uintptr_t>(offset) * stride;
-    return reinterpret_cast<const FNameEntry*>(entryAddr);
-}
-
-inline const FNameEntry* ResolveFNameFlat(
-    uintptr_t gnamesBase, int32_t comparisonIndex)
-{
-    struct FNameArray { uintptr_t* Data; int32_t Count; int32_t Max; };
-    auto arr = reinterpret_cast<FNameArray*>(gnamesBase);
-    if (comparisonIndex < 0 || comparisonIndex >= arr->Count) return nullptr;
-    return reinterpret_cast<const FNameEntry*>(arr->Data[comparisonIndex]);
-}
 
 // ============================================================
 // UObject オフセット (Foxhole UE4 4.24.3 x64)
@@ -186,11 +119,5 @@ namespace ue4 {
 constexpr int UOBJECT_NAME_OFFSET  = 0x18;
 constexpr int UOBJECT_CLASS_OFFSET = 0x10;
 constexpr int UOBJECT_OUTER_OFFSET = 0x20;
-
-inline FName GetObjectFName(void* obj) {
-    return *reinterpret_cast<FName*>(reinterpret_cast<uintptr_t>(obj) + UOBJECT_NAME_OFFSET);
-}
-
-using ProcessEventFn = void(__thiscall*)(void* thisObj, void* function, void* parms);
 
 } // namespace ue4

@@ -1,12 +1,6 @@
 // ============================================================
-// dllmain.cpp - version.dll プロキシ + 診断付き永続フック + ワーカーローダー
+// dllmain.cpp - version.dll プロキシ + ProcessEvent永続フック + ワーカーローダー
 // Foxhole Chat Translator
-//
-// 診断フロー:
-//   A) MinHook テスト: GetTickCount64 フック → MinHook動作確認
-//   B) ハードウェアブレークポイントテスト → VEH+HWBP動作確認
-//   C) vtable候補にHWBP設定 → ProcessEventの正しいvtableインデックス特定
-//   D) 特定された関数をMinHookでフック → 実運用
 // ============================================================
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -18,8 +12,6 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
-#include <vector>
-#include <tlhelp32.h>
 #include <MinHook.h>
 #include "scanner.h"
 
@@ -161,142 +153,10 @@ static ProcessEventFn   g_originalPEs[MAX_PE_HOOKS] = {};
 static uintptr_t        g_hookedPeAddrs[MAX_PE_HOOKS] = {};
 static int              g_peHookCount = 0;
 
-static ProcessEventFn   g_originalProcessEvent = nullptr; // 最初に発見したPE (互換性)
 static volatile WorkerCallbackFn g_workerCallback = nullptr;
 static FILE* g_loaderLogFile = nullptr;
 
 static uintptr_t g_hookedPeAddr = 0;  // フックしたProcessEventのアドレス
-
-// ============================================================
-// 診断A: MinHook サニティテスト (GetTickCount64)
-// ============================================================
-typedef ULONGLONG (WINAPI *PFN_GetTickCount64)();
-static PFN_GetTickCount64 g_originalGetTickCount64 = nullptr;
-static volatile long g_tickCount64Calls = 0;
-
-static ULONGLONG WINAPI HookedGetTickCount64() {
-    InterlockedIncrement(&g_tickCount64Calls);
-    return g_originalGetTickCount64();
-}
-
-// ============================================================
-// 診断B/C: ハードウェアブレークポイント (VEH + デバッグレジスタ)
-// ============================================================
-static uintptr_t g_hwbpTargets[4] = {};
-static volatile long g_hwbpHits[4] = {};
-static volatile bool g_hwbpActive = false;
-
-static LONG CALLBACK VehHandler(PEXCEPTION_POINTERS info) {
-    if (!g_hwbpActive) return EXCEPTION_CONTINUE_SEARCH;
-
-    if (info->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP) {
-        uintptr_t addr = (uintptr_t)info->ExceptionRecord->ExceptionAddress;
-        for (int i = 0; i < 4; i++) {
-            if (g_hwbpTargets[i] != 0 && addr == g_hwbpTargets[i]) {
-                InterlockedIncrement(&g_hwbpHits[i]);
-                // RF (Resume Flag) で再トリガー防止、ブレークポイントは維持
-                info->ContextRecord->EFlags |= 0x10000;
-                return EXCEPTION_CONTINUE_EXECUTION;
-            }
-        }
-    }
-    return EXCEPTION_CONTINUE_SEARCH;
-}
-
-// 全スレッドにハードウェアブレークポイントを設定
-static void SetHardwareBreakpoints(uintptr_t targets[4]) {
-    for (int i = 0; i < 4; i++) {
-        g_hwbpTargets[i] = targets[i];
-        g_hwbpHits[i] = 0;
-    }
-
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (snap == INVALID_HANDLE_VALUE) return;
-
-    THREADENTRY32 te;
-    te.dwSize = sizeof(te);
-    DWORD pid = GetCurrentProcessId();
-    DWORD myTid = GetCurrentThreadId();
-    int threadCount = 0;
-
-    for (BOOL ok = Thread32First(snap, &te); ok; ok = Thread32Next(snap, &te)) {
-        if (te.th32OwnerProcessID != pid) continue;
-        if (te.th32ThreadID == myTid) continue;
-
-        HANDLE thread = OpenThread(
-            THREAD_SET_CONTEXT | THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,
-            FALSE, te.th32ThreadID);
-        if (!thread) continue;
-
-        SuspendThread(thread);
-
-        CONTEXT ctx = {};
-        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-        if (GetThreadContext(thread, &ctx)) {
-            ctx.Dr0 = targets[0];
-            ctx.Dr1 = targets[1];
-            ctx.Dr2 = targets[2];
-            ctx.Dr3 = targets[3];
-            // DR7: 各DRn有効化 (execution breakpoint, 1byte)
-            // L0=bit0, L1=bit2, L2=bit4, L3=bit6
-            // R/W0-3 = 00 (execute), LEN0-3 = 00 (1byte)
-            DWORD64 dr7 = 0;
-            if (targets[0]) dr7 |= (1ULL << 0);
-            if (targets[1]) dr7 |= (1ULL << 2);
-            if (targets[2]) dr7 |= (1ULL << 4);
-            if (targets[3]) dr7 |= (1ULL << 6);
-            ctx.Dr7 = dr7;
-            SetThreadContext(thread, &ctx);
-            threadCount++;
-        }
-
-        ResumeThread(thread);
-        CloseHandle(thread);
-    }
-    CloseHandle(snap);
-
-    if (g_loaderLogFile) {
-        fprintf(g_loaderLogFile, "[Loader] HWBP設定完了: %d スレッドに設定\n", threadCount);
-        for (int i = 0; i < 4; i++) {
-            if (targets[i])
-                fprintf(g_loaderLogFile, "[Loader]   DR%d = 0x%llX\n", i, (unsigned long long)targets[i]);
-        }
-        fflush(g_loaderLogFile);
-    }
-}
-
-// 全スレッドのハードウェアブレークポイントを解除
-static void ClearHardwareBreakpoints() {
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (snap == INVALID_HANDLE_VALUE) return;
-
-    THREADENTRY32 te;
-    te.dwSize = sizeof(te);
-    DWORD pid = GetCurrentProcessId();
-    DWORD myTid = GetCurrentThreadId();
-
-    for (BOOL ok = Thread32First(snap, &te); ok; ok = Thread32Next(snap, &te)) {
-        if (te.th32OwnerProcessID != pid) continue;
-        if (te.th32ThreadID == myTid) continue;
-
-        HANDLE thread = OpenThread(
-            THREAD_SET_CONTEXT | THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,
-            FALSE, te.th32ThreadID);
-        if (!thread) continue;
-
-        SuspendThread(thread);
-        CONTEXT ctx = {};
-        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-        if (GetThreadContext(thread, &ctx)) {
-            ctx.Dr0 = ctx.Dr1 = ctx.Dr2 = ctx.Dr3 = 0;
-            ctx.Dr7 = 0;
-            SetThreadContext(thread, &ctx);
-        }
-        ResumeThread(thread);
-        CloseHandle(thread);
-    }
-    CloseHandle(snap);
-}
 
 // ============================================================
 // ProcessEvent フック (MinHook 版 - 診断後に使用)
@@ -363,12 +223,6 @@ static PEHookFn g_peHookFns[] = {
     HookedPE_56, HookedPE_57, HookedPE_58, HookedPE_59,
     HookedPE_60, HookedPE_61, HookedPE_62, HookedPE_63,
 };
-
-// 互換性のための旧フック関数
-static void __fastcall HookedProcessEvent(void* thisObj, void* function, void* parms) {
-    InvokeWorkerCallback(thisObj, function, parms);
-    g_originalProcessEvent(thisObj, function, parms);
-}
 
 // ============================================================
 // ワーカーDLL ロード/アンロード
@@ -672,8 +526,6 @@ static DWORD WINAPI InitThread(LPVOID param) {
                 g_peHookCount = i + 1;
                 hookedCount++;
                 if (i == 0) {
-                    // 互換性: 最初のPEアドレスを旧グローバルにも設定
-                    g_originalProcessEvent = g_originalPEs[0];
                     g_hookedPeAddr = addr;
                 }
                 LogLoader("  PE[%d] フック成功: +0x%llX", i, addr - moduleBase);
@@ -805,8 +657,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         break;
 
     case DLL_PROCESS_DETACH:
-        g_hwbpActive = false;
-        ClearHardwareBreakpoints();
         UnloadWorker();
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();

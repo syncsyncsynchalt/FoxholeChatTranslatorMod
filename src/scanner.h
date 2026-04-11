@@ -7,7 +7,6 @@
 #include <windows.h>
 #include <cstdint>
 #include <vector>
-#include <string>
 
 namespace scanner {
 
