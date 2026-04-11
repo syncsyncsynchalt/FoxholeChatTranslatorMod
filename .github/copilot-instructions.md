@@ -2,8 +2,9 @@
 
 ## プロジェクト概要
 
-FoxholeのゲームチャットをリアルタイムOllama連携で自動翻訳するC++ DLLモジュール。
+Foxholeのゲームチャットを傍受し、翻訳結果を音声(ラジオ)で流すC++ DLLモジュール。
 version.dllプロキシ方式でUE4ゲームに自動ロードされ、ProcessEventをフックしてチャットメッセージを傍受する。
+ゲームクライアントのメモリは書き換えない方針。
 
 ## アーキテクチャ
 
@@ -86,7 +87,7 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\Mods\ChatTranslator"
 > Discovery, Patterns, Stage2, Stage3 セクションはconfig.iniに存在するが、
 > 現在のコードでは読み込まれない（将来のStage 2/3実装用プレースホルダー）。
 
-## 開発ロードマップ (3段階)
+## 開発ロードマップ (6段階)
 
 ### Stage 1: チャットキャプチャ + テキストファイル出力 ✅ 完了
 - ProcessEventフックで3種のチャットRPCを検出:
@@ -94,10 +95,21 @@ cd "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\Mods\ChatTranslator"
 - Dumper-7 SDK準拠の構造体でparms直接キャスト（FString探索不要）
 - 検出メッセージをコンソール表示 + chat_log.txt にUTF-8で記録
 
-### Stage 2: Ollama連携による自動翻訳 (未着手)
-- Ollama API (localhost:11434/api/generate) でローカルLLM翻訳
-- モデル: gemma3:4b、ターゲット言語: ja
-- WinHTTP でHTTPクライアント実装 (chat_translator.dll内)
+### Stage 2: ラジオオーバーレイ表示 (未着手)
+- 画面右上にラジオアイコン (32×32px) を常時オーバーレイ表示
+- ゲームクライアントのメモリは書き換えない
+
+### Stage 3: ショートカットキーでラジオON/OFF (未着手)
+- Pキーでラジオアイコンを半透明トグル (ON/OFF表現)
+
+### Stage 4: ラジオON/OFFボイス再生 (未着手)
+- 状態切り替え時に "Radio ON" / "Radio OFF" ボイスを再生
+
+### Stage 5: ローカル自動翻訳テスト (未着手)
+- 固定メッセージを英/露/韓/中/日に翻訳 (ローカル完結、GPU不使用)
+
+### Stage 6: ローカル多言語読み上げテスト (未着手)
+- 固定メッセージを多言語TTS読み上げ (ローカル完結)
 - 非同期リクエスト + キャッシュで遅延を最小化する設計が必要
 
 ### Stage 3: 翻訳結果のゲーム内表示 (未着手)
