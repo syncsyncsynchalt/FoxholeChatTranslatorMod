@@ -69,7 +69,7 @@ static const DemoMessage g_demoMessages[] = {
 static const int   g_demoCount    = sizeof(g_demoMessages) / sizeof(g_demoMessages[0]);
 static int         g_demoIndex    = 0;
 static float       g_demoTimer    = 0.0f;
-static const float g_demoInterval = 4.0f; // 秒
+static const float g_demoInterval = 10.0f; // 秒
 
 // ============================================================
 // テクスチャ作成 (埋め込み RGBA データから)
