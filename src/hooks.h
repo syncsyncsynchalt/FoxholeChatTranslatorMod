@@ -1,24 +1,30 @@
 #pragma once
 // ============================================================
-// hooks.h - UE4 フック管理
+// hooks.h - チャット処理ロジック (ワーカーDLL側)
+// ProcessEventフックはversion.dll側で永続管理される。
+// このモジュールはGNames解決とイベント処理を担当。
 // ============================================================
 
 #include <cstdint>
 
 namespace hooks {
 
-// フックの初期化 (ProcessEvent等のフック設定)
+// GNames検出 + 設定読み込み (ProcessEventフックは行わない)
 bool Init();
 
-// フックの解除
+// ログファイル等のクリーンアップ (フック解除は行わない)
 void Shutdown();
+
+// ProcessEventから呼ばれるコールバック (version.dll側のフックから呼び出される)
+void OnProcessEvent(void* thisObj, void* function, void* parms);
 
 // GNamesが使用可能かどうか
 bool IsGNamesAvailable();
 
 // FNameを文字列に解決
-// buf: 出力バッファ, bufSize: バッファサイズ
-// 成功時 true
 bool ResolveFName(int32_t comparisonIndex, char* buf, int bufSize);
+
+// フック済みProcessEventアドレスを設定 (version.dll側から呼ばれる)
+void SetHookedPEAddress(uintptr_t addr);
 
 } // namespace hooks

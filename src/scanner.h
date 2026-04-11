@@ -30,6 +30,9 @@ uintptr_t FindPattern(uintptr_t base, size_t size, const char* pattern);
 // モジュール全体からパターンを検索
 uintptr_t FindPatternInModule(const char* moduleName, const char* pattern);
 
+// モジュール全体からパターンに一致するすべてのアドレスを返す
+std::vector<uintptr_t> FindAllPatternsInModule(const char* moduleName, const char* pattern);
+
 // RIP相対アドレスを解決 (lea/mov命令用)
 // instructionAddr: 命令のアドレス
 // offset: RIP相対オフセットの位置 (命令先頭からのバイト数)

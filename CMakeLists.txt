@@ -29,12 +29,13 @@ if(NOT minhook_POPULATED)
 endif()
 
 # ============================================================
-# Main DLL target (outputs version.dll)
+# ============================================================
+# Loader DLL (version.dll) - プロキシ + ワーカーローダー
+# ゲーム起動中は変更不要。安定版。
 # ============================================================
 add_library(version SHARED
     src/dllmain.cpp
     src/scanner.cpp
-    src/hooks.cpp
     version.def
 )
 
@@ -46,7 +47,6 @@ target_compile_definitions(version PRIVATE
     NOMINMAX
 )
 
-# MSVC: ソースファイルをUTF-8として扱う
 target_compile_options(version PRIVATE /utf-8)
 
 set_target_properties(version PROPERTIES
@@ -56,9 +56,36 @@ set_target_properties(version PROPERTIES
 )
 
 # ============================================================
-# Post-build: copy DLL to game binary directory
+# Worker DLL (chat_translator.dll) - 実ロジック
+# F9 キーでホットリロード可能。
+# ============================================================
+add_library(chat_translator SHARED
+    src/worker_main.cpp
+    src/hooks.cpp
+    src/scanner.cpp
+)
+
+target_include_directories(chat_translator PRIVATE src)
+
+target_compile_definitions(chat_translator PRIVATE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_compile_options(chat_translator PRIVATE /utf-8)
+
+set_target_properties(chat_translator PROPERTIES
+    OUTPUT_NAME "chat_translator"
+    PREFIX ""
+    SUFFIX ".dll"
+)
+
+# ============================================================
+# Post-build: copy DLLs to game binary directory
 # ============================================================
 set(GAME_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../War/Binaries/Win64")
+
+# version.dll はゲーム起動前にコピー必要 (ゲーム中は更新不可)
 add_custom_command(TARGET version POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:version>"
@@ -69,6 +96,17 @@ add_custom_command(TARGET version POST_BUILD
     COMMENT "Copying version.dll and config.ini to ${GAME_BIN_DIR}"
 )
 
+# chat_translator.dll はゲーム起動中でもコピー可能 (ホットリロード対応)
+add_custom_command(TARGET chat_translator POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:chat_translator>"
+        "${GAME_BIN_DIR}/chat_translator.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
+        "${GAME_BIN_DIR}/config.ini"
+    COMMENT "Copying chat_translator.dll to ${GAME_BIN_DIR} (F9でリロード可能)"
+)
+
 # ============================================================
 # テスト用ローダー (DLL動作確認)
 # ============================================================
@@ -76,13 +114,15 @@ add_executable(test_loader test/test_loader.cpp)
 target_compile_definitions(test_loader PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(test_loader PRIVATE /utf-8)
 
-# テスト実行時にversion.dllとconfig.iniを同じディレクトリに配置
 add_custom_command(TARGET test_loader POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:version>"
         "$<TARGET_FILE_DIR:test_loader>/version.dll"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:chat_translator>"
+        "$<TARGET_FILE_DIR:test_loader>/chat_translator.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
         "$<TARGET_FILE_DIR:test_loader>/config.ini"
-    COMMENT "Copying version.dll and config.ini for test_loader"
+    COMMENT "Copying DLLs and config.ini for test_loader"
 )

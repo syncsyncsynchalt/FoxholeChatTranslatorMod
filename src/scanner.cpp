@@ -108,6 +108,46 @@ uintptr_t FindPatternInModule(const char* moduleName, const char* pattern) {
     return FindPattern(info.base, info.size, pattern);
 }
 
+std::vector<uintptr_t> FindAllPatternsInModule(const char* moduleName, const char* pattern) {
+    std::vector<uintptr_t> results;
+    ModuleInfo info;
+    if (!GetModuleInfo(moduleName, info)) return results;
+
+    uintptr_t scanBase = info.base;
+    size_t scanSize = info.size;
+
+    uintptr_t textBase;
+    size_t textSize;
+    if (GetTextSection(info.base, textBase, textSize)) {
+        scanBase = textBase;
+        scanSize = textSize;
+    }
+
+    std::vector<uint8_t> bytes;
+    std::vector<bool> matchMask;
+    if (!ParsePattern(pattern, bytes, matchMask)) return results;
+
+    size_t patternLen = bytes.size();
+    if (patternLen == 0 || patternLen > scanSize) return results;
+
+    const uint8_t* mem = reinterpret_cast<const uint8_t*>(scanBase);
+    size_t scanEnd = scanSize - patternLen;
+
+    for (size_t i = 0; i <= scanEnd; i++) {
+        bool found = true;
+        for (size_t j = 0; j < patternLen; j++) {
+            if (matchMask[j] && mem[i + j] != bytes[j]) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            results.push_back(scanBase + i);
+        }
+    }
+    return results;
+}
+
 uintptr_t ResolveRIPRelative(uintptr_t instructionAddr, int offset, int instructionSize) {
     int32_t ripOffset = *reinterpret_cast<int32_t*>(instructionAddr + offset);
     return instructionAddr + instructionSize + ripOffset;
