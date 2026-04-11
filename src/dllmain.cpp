@@ -335,6 +335,14 @@ DEFINE_PE_HOOK(16) DEFINE_PE_HOOK(17) DEFINE_PE_HOOK(18) DEFINE_PE_HOOK(19)
 DEFINE_PE_HOOK(20) DEFINE_PE_HOOK(21) DEFINE_PE_HOOK(22) DEFINE_PE_HOOK(23)
 DEFINE_PE_HOOK(24) DEFINE_PE_HOOK(25) DEFINE_PE_HOOK(26) DEFINE_PE_HOOK(27)
 DEFINE_PE_HOOK(28) DEFINE_PE_HOOK(29) DEFINE_PE_HOOK(30) DEFINE_PE_HOOK(31)
+DEFINE_PE_HOOK(32) DEFINE_PE_HOOK(33) DEFINE_PE_HOOK(34) DEFINE_PE_HOOK(35)
+DEFINE_PE_HOOK(36) DEFINE_PE_HOOK(37) DEFINE_PE_HOOK(38) DEFINE_PE_HOOK(39)
+DEFINE_PE_HOOK(40) DEFINE_PE_HOOK(41) DEFINE_PE_HOOK(42) DEFINE_PE_HOOK(43)
+DEFINE_PE_HOOK(44) DEFINE_PE_HOOK(45) DEFINE_PE_HOOK(46) DEFINE_PE_HOOK(47)
+DEFINE_PE_HOOK(48) DEFINE_PE_HOOK(49) DEFINE_PE_HOOK(50) DEFINE_PE_HOOK(51)
+DEFINE_PE_HOOK(52) DEFINE_PE_HOOK(53) DEFINE_PE_HOOK(54) DEFINE_PE_HOOK(55)
+DEFINE_PE_HOOK(56) DEFINE_PE_HOOK(57) DEFINE_PE_HOOK(58) DEFINE_PE_HOOK(59)
+DEFINE_PE_HOOK(60) DEFINE_PE_HOOK(61) DEFINE_PE_HOOK(62) DEFINE_PE_HOOK(63)
 
 typedef void (__fastcall *PEHookFn)(void*, void*, void*);
 static PEHookFn g_peHookFns[] = {
@@ -346,6 +354,14 @@ static PEHookFn g_peHookFns[] = {
     HookedPE_20, HookedPE_21, HookedPE_22, HookedPE_23,
     HookedPE_24, HookedPE_25, HookedPE_26, HookedPE_27,
     HookedPE_28, HookedPE_29, HookedPE_30, HookedPE_31,
+    HookedPE_32, HookedPE_33, HookedPE_34, HookedPE_35,
+    HookedPE_36, HookedPE_37, HookedPE_38, HookedPE_39,
+    HookedPE_40, HookedPE_41, HookedPE_42, HookedPE_43,
+    HookedPE_44, HookedPE_45, HookedPE_46, HookedPE_47,
+    HookedPE_48, HookedPE_49, HookedPE_50, HookedPE_51,
+    HookedPE_52, HookedPE_53, HookedPE_54, HookedPE_55,
+    HookedPE_56, HookedPE_57, HookedPE_58, HookedPE_59,
+    HookedPE_60, HookedPE_61, HookedPE_62, HookedPE_63,
 };
 
 // 互換性のための旧フック関数
@@ -564,13 +580,14 @@ static DWORD WINAPI InitThread(LPVOID param) {
         return 1;
     }
 
-    int peIndex = GetPrivateProfileIntA("Addresses", "ProcessEventVtableIndex", 77, configPath);
+    int peIndex = GetPrivateProfileIntA("Addresses", "ProcessEventVtableIndex", 66, configPath);
     uintptr_t peAddr = reinterpret_cast<uintptr_t>(vtable[peIndex]);
     LogLoader("ProcessEvent: vtable[%d] = 0x%llX (+0x%llX)",
               peIndex, peAddr, peAddr - moduleBase);
 
     // ============================================================
     // .rdata セクション内の全vtableから異なるvtable[peIndex]を収集
+    // 改良版: vtable先頭を検出して偽陽性を除去
     // ============================================================
     uintptr_t uniquePEs[MAX_PE_HOOKS] = {};
     int uniquePECount = 0;
@@ -594,21 +611,33 @@ static DWORD WINAPI InitThread(LPVOID param) {
             LogLoader(".rdata: 0x%llX - 0x%llX (%llu KB)",
                       rdataStart, rdataEnd, (rdataEnd - rdataStart) / 1024);
 
-            // .rdata内の全ポインタを走査してvtable候補を探す
-            // vtable候補: 連続するポインタがモジュール内のコード(.text)を指す
-            // vtable[peIndex]の値がユニークなものを収集
+            // 改良版vtable検出:
+            // vtableの先頭を検出するため、直前のエントリがモジュール内コードを
+            // 指さない位置を探す（vtableの境界）
             for (uintptr_t addr = rdataStart; addr + (peIndex + 1) * 8 <= rdataEnd; addr += 8) {
                 __try {
-                    // この位置がvtableの先頭だと仮定して、vtable[peIndex]を読む
+                    // vtable先頭判定: addr[-1] (直前の8バイト) が
+                    // モジュール内コードを指していない場合、vtable先頭の可能性
+                    if (addr > rdataStart) {
+                        uintptr_t prevVal = *reinterpret_cast<uintptr_t*>(addr - 8);
+                        if (prevVal >= moduleBase && prevVal < moduleBase + moduleSize) {
+                            // 直前もモジュール内 → vtable途中 → スキップ
+                            continue;
+                        }
+                    }
+
+                    // vtableらしさチェック: [0],[1],[2]がモジュール内コードを指すか
+                    uintptr_t v0 = *reinterpret_cast<uintptr_t*>(addr);
+                    uintptr_t v1 = *reinterpret_cast<uintptr_t*>(addr + 8);
+                    uintptr_t v2 = *reinterpret_cast<uintptr_t*>(addr + 16);
+                    if (v0 < moduleBase || v0 >= moduleBase + moduleSize) continue;
+                    if (v1 < moduleBase || v1 >= moduleBase + moduleSize) continue;
+                    if (v2 < moduleBase || v2 >= moduleBase + moduleSize) continue;
+
+                    // vtable[peIndex]を読む
                     uintptr_t candidate = *reinterpret_cast<uintptr_t*>(addr + peIndex * 8);
                     if (candidate < moduleBase || candidate >= moduleBase + moduleSize) continue;
                     if (candidate == 0) continue;
-
-                    // vtableらしさチェック: [0]と[1]もモジュール内コードを指すか
-                    uintptr_t v0 = *reinterpret_cast<uintptr_t*>(addr);
-                    uintptr_t v1 = *reinterpret_cast<uintptr_t*>(addr + 8);
-                    if (v0 < moduleBase || v0 >= moduleBase + moduleSize) continue;
-                    if (v1 < moduleBase || v1 >= moduleBase + moduleSize) continue;
 
                     // 既知のアドレスか確認
                     bool known = false;
@@ -629,7 +658,7 @@ static DWORD WINAPI InitThread(LPVOID param) {
     // 全ユニークPEアドレスをフック
     // ============================================================
     int hookedCount = 0;
-    for (int i = 0; i < uniquePECount && i < 32; i++) {
+    for (int i = 0; i < uniquePECount && i < MAX_PE_HOOKS; i++) {
         uintptr_t addr = uniquePEs[i];
         MH_STATUS st = MH_CreateHook(
             reinterpret_cast<void*>(addr),
