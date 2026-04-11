@@ -21,32 +21,52 @@
 #endif
 
 #include <windows.h>
+#include <shellapi.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <fstream>
+#include <vector>
 
 #include "translate.h"
 #include "log.h"
 
-int main(int argc, char* argv[]) {
+// wchar_t → UTF-8 変換
+static std::string WideToUtf8(const wchar_t* w) {
+    if (!w || !*w) return "";
+    int len = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+    if (len <= 0) return "";
+    std::string s(len - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w, -1, &s[0], len, nullptr, nullptr);
+    return s;
+}
+
+int main(int /*argc*/, char* /*argv*/[]) {
+    // Unicode コマンドライン取得
+    int wargc = 0;
+    LPWSTR* wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+    std::vector<std::string> args;
+    for (int i = 0; i < wargc; i++)
+        args.push_back(WideToUtf8(wargv[i]));
+    LocalFree(wargv);
+
     // デフォルト設定
     translate::TranslateConfig cfg;
     std::string inputText;
     std::string inputFile;
 
     // 引数パース
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--endpoint") == 0 && i + 1 < argc) {
-            cfg.endpoint = argv[++i];
-        } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
-            cfg.model = argv[++i];
-        } else if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
-            cfg.targetLang = argv[++i];
-        } else if (strcmp(argv[i], "--file") == 0 && i + 1 < argc) {
-            inputFile = argv[++i];
-        } else if (argv[i][0] != '-') {
-            inputText = argv[i];
+    for (int i = 1; i < (int)args.size(); i++) {
+        if (args[i] == "--endpoint" && i + 1 < (int)args.size()) {
+            cfg.endpoint = args[++i];
+        } else if (args[i] == "--model" && i + 1 < (int)args.size()) {
+            cfg.model = args[++i];
+        } else if (args[i] == "--lang" && i + 1 < (int)args.size()) {
+            cfg.targetLang = args[++i];
+        } else if (args[i] == "--file" && i + 1 < (int)args.size()) {
+            inputFile = args[++i];
+        } else if (args[i][0] != '-') {
+            inputText = args[i];
         }
     }
 

@@ -143,7 +143,10 @@ add_custom_command(TARGET chat_translator POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/radio_off.wav"
         "${GAME_BIN_DIR}/assets/radio_off.wav"
-    COMMENT "Copying chat_translator.dll + assets to ${GAME_BIN_DIR} (F9でリロード可能)"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/ollama"
+        "${GAME_BIN_DIR}/tools/ollama"
+    COMMENT "Copying chat_translator.dll + assets + tools to ${GAME_BIN_DIR} (F9でリロード可能)"
 )
 
 # ============================================================

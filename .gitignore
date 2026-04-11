@@ -1,0 +1,8 @@
+# Ollama バイナリ (同梱版、~47MB)
+tools/ollama/
+
+# Ollama モデルデータ (pull したモデル)
+tools/ollama/models/
+
+# ビルド出力
+build/

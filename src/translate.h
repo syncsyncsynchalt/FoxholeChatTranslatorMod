@@ -12,6 +12,7 @@ struct TranslateConfig {
     std::string endpoint   = "http://localhost:11434/api/generate";
     std::string model      = "gemma3:4b";
     std::string targetLang = "Japanese";
+    std::string ollamaDir;  // 同梱 ollama.exe のディレクトリ (空=自動検出)
 };
 
 // WinHTTP セッション初期化 + ワーカースレッド起動
