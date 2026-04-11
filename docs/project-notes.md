@@ -29,11 +29,10 @@ ProcessEvent呼び出し → hooks::OnProcessEvent(thisObj, function, parms)
 
 ## Stage 2 実装計画 — ラジオオーバーレイ表示
 
-目的: ゲームクライアントのメモリ書き換えを避け、翻訳結果を音声(ラジオ)で流す方式に変更。Stage 2 ではまずオーバーレイの基盤を作る。
+目的: オーバーレイの基盤を作る。
 実装内容:
 - 画面右上にラジオアイコン (32×32px) を常時オーバーレイ表示する
-- ゲームウインドウに対して DirectX/GDI オーバーレイ、または透明ウインドウを重ねる方式を検討
-- ゲームクライアントのメモリは書き換えない
+- DX11 Present フック + ImGui でゲームウインドウ上にオーバーレイ
 
 ## Stage 3 実装計画 — アイコンクリックでラジオON/OFF
 
@@ -63,25 +62,39 @@ ProcessEvent呼び出し → hooks::OnProcessEvent(thisObj, function, parms)
 - translate_test.exe: スタンドアロンテストアプリ (対話モード / 単文 / ファイル一括)
 - hooks.cpp: ラジオON時に自動翻訳キュー投入
 - config.ini [Translation] セクションで設定 (Endpoint, Model, TargetLanguage, Enabled)
-セットアップ:
-- Ollama インストール: https://ollama.com
-- モデルダウンロード: `ollama pull gemma3:4b`
-- Ollama 起動: `ollama serve`
+Ollamaバンドル:
+- tools/ollama/ に CPU-only バイナリ同梱 (ollama.exe + ggml-*.dll, 約47.5MB)
+- モデル (gemma3:4b) は初回起動時に自動ダウンロード → tools/ollama/models/
+- translate.cpp: FindBundledOllama → StartOllamaServe → EnsureOllama で全自動管理
+- OLLAMA_MODELS 環境変数でモデル保存先をローカルに固定
 テスト:
 - `translate_test.exe "Hello world"` → 日本語翻訳結果を表示
 - `translate_test.exe --file chat_log.txt` → ログ一括翻訳
 - `translate_test.exe` → 対話モード
 制約:
 - Python 不使用、純粋 C++ (WinHTTP)
-- Ollama のインストールとモデルダウンロードが必要
+- Ollama バイナリは同梱済み、モデルは初回自動ダウンロード
 
-## Stage 6 実装計画 — ローカル多言語読み上げテスト
+## Stage 6 実装計画 — 翻訳表示領域（画面右下）
 
-目的: インターネット接続なしで多言語テキストの音声読み上げ (TTS) が動作することを検証する。
-対象言語: 英語、ロシア語、韓国語、中国語、日本語
+目的: 最終的に翻訳結果を表示するための領域を画面右下に作る。
 実装内容:
-- 固定で与えたメッセージを自動的に読み上げられればよい（UI統合は不要）
-- 読み上げはすべてローカルで完結すること（インターネットアクセス不可）
+- ラジオアイコン (右下) の左側に翻訳テキスト2行を横並びで表示:
+  - 上の行: 原文: XXXXXXXXXXXXXXXXXXXXXX
+  - 下の行: 翻訳: XXXXXXXXXXXXXXXXXXXXXX
+  - 2行とも同じ幅で表示する
+- テキスト領域の幅は固定 400px
+- テキストが長い場合は自動で水平スクロール (マーキー) して全文を表示する
+- テキスト領域に半透明の黒背景を付ける (ラジオON時のみ表示、OFF時は非表示)
+- この段階では固定メッセージのデモ表示とする:
+  - EN/RU/KO/ZH/JA の5言語ペア (原文+翻訳) を数秒ごとに自動切替
+  - 各言語が正しく表示できることを確認するためのテスト
+- ゲームプロセスのメモリは書き換えない
+多言語フォント:
+- NotoSansCJKjp-Regular.otf (~16MB) を Google Fonts から直接ダウンロードして assets/ に配置
+- EN/RU/KO/ZH/JA すべてのスクリプトをカバー (Latin, Cyrillic, Hangul, CJK, かな/カナ)
+- overlay.cpp の InitImGui() で io.Fonts->AddFontFromFileTTF() により登録
+- グリフ範囲: Latin + Cyrillic + CJK Unified Ideographs + Hangul Syllables + Full-width
 
 ## トラブルシューティング
 
