@@ -24,6 +24,8 @@ struct Config {
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
     std::string ollamaModel    = "gemma3:4b";
     std::string targetLanguage = "Japanese";
+    int         numCtx         = 256;
+    int         numThread      = 2;
 };
 
 namespace config {

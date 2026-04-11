@@ -31,6 +31,8 @@ __declspec(dllexport) void* WorkerInit() {
         tcfg.endpoint   = cfg.ollamaEndpoint;
         tcfg.model      = cfg.ollamaModel;
         tcfg.targetLang = cfg.targetLanguage;
+        tcfg.numCtx     = cfg.numCtx;
+        tcfg.numThread  = cfg.numThread;
         translate::Init(tcfg);
     }
 

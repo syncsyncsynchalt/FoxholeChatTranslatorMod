@@ -7,12 +7,15 @@
 #include "log.h"
 #include "radio_icon.h"
 #include "tts.h"
+#include "translate.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
 #include <mmsystem.h>
+#include <atomic>
 #include <mutex>
 #include <string>
+#include <thread>
 
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -30,7 +33,6 @@ static ID3D11Device*              g_device            = nullptr;
 static ID3D11DeviceContext*       g_context           = nullptr;
 static HWND                       g_hwnd              = nullptr;
 static ID3D11ShaderResourceView*  g_radioTextureSRV   = nullptr;
-static bool                       g_radioOn           = true;
 static std::string                g_radioOnWav;
 static std::string                g_radioOffWav;
 static std::string                g_assetsDir;
@@ -46,31 +48,74 @@ static float                      g_scrollOrig        = 0.0f;
 static float                      g_scrollTrans       = 0.0f;
 
 // デモモード: 5言語自動切替
-struct DemoMessage {
-    const char* original;
-    const char* translated;
-};
-static const DemoMessage g_demoMessages[] = {
-    { u8"We need more supplies at the front line!",
-      u8"前線にもっと補給が必要だ！" },
-    { u8"\u041d\u0430\u043c \u043d\u0443\u0436\u043d\u043e \u0431\u043e\u043b\u044c\u0448\u0435 \u0442\u0430\u043d\u043a\u043e\u0432 \u043d\u0430 \u0444\u0440\u043e\u043d\u0442\u0435!",
-      u8"前線にさらに多くの戦車が必要です！" },
-    { u8"\uc6b0\ub9ac \ud300\uc5d0 \ubcf4\uae09\uc774 \ub354 \ud544\uc694\ud574\uc694!",
-      u8"チームに補給がもっと必要です！" },
-    { u8"\u6211\u4eec\u9700\u8981\u5728\u524d\u7ebf\u90e8\u7f72\u66f4\u591a\u5766\u514b\uff01",
-      u8"前線にさらに戦車を配置する必要がある！" },
-    { u8"\u5f3e\u85ac\u304c\u5c3d\u304d\u305d\u3046\u3060\u3001\u88dc\u7d66\u3092\u983c\u3080\uff01",
-      u8"\u5f3e\u85ac\u304c\u5c3d\u304d\u305d\u3046\u3060\u3001\u88dc\u7d66\u3092\u983c\u3080\uff01" },
-    // Long messages for marquee scroll test
-    { u8"Enemy tanks spotted near Jade Cove, we need anti-tank weapons and reinforcements immediately! All available units please respond!",
-      u8"\u30b8\u30a7\u30a4\u30c9\u30b3\u30fc\u30d6\u4ed8\u8fd1\u3067\u6575\u306e\u6226\u8eca\u3092\u767a\u898b\u3001\u5bfe\u6226\u8eca\u5175\u5668\u3068\u588f\u63f4\u304c\u81f3\u6025\u5fc5\u8981\u3067\u3059\uff01\u5168\u90e8\u968a\u5fdc\u7b54\u3057\u3066\u304f\u3060\u3055\u3044\uff01" },
-    { u8"\u041f\u0440\u043e\u0442\u0438\u0432\u043d\u0438\u043a \u043f\u0440\u043e\u0440\u0432\u0430\u043b \u043d\u0430\u0448\u0443 \u043e\u0431\u043e\u0440\u043e\u043d\u0443 \u043d\u0430 \u0432\u043e\u0441\u0442\u043e\u0447\u043d\u043e\u043c \u0444\u043b\u0430\u043d\u0433\u0435, \u0441\u0440\u043e\u0447\u043d\u043e \u043d\u0443\u0436\u043d\u044b \u043f\u043e\u0434\u043a\u0440\u0435\u043f\u043b\u0435\u043d\u0438\u044f \u0438 \u0431\u043e\u0435\u043f\u0440\u0438\u043f\u0430\u0441\u044b!",
-      u8"\u6575\u304c\u6771\u5074\u9632\u885b\u7dda\u3092\u7a81\u7834\u3057\u307e\u3057\u305f\u3001\u588f\u63f4\u3068\u5f3e\u85ac\u304c\u81f3\u6025\u5fc5\u8981\u3067\u3059\uff01" },
+static const char* g_demoMessages[] = {
+    u8"We need more supplies at the front line!",
+    u8"\u041d\u0430\u043c \u043d\u0443\u0436\u043d\u043e \u0431\u043e\u043b\u044c\u0448\u0435 \u0442\u0430\u043d\u043a\u043e\u0432 \u043d\u0430 \u0444\u0440\u043e\u043d\u0442\u0435!",
+    u8"\uc6b0\ub9ac \ud300\uc5d0 \ubcf4\uae09\uc774 \ub354 \ud544\uc694\ud574\uc694!",
+    u8"\u6211\u4eec\u9700\u8981\u5728\u524d\u7ebf\u90e8\u7f72\u66f4\u591a\u5766\u514b\uff01",
+    u8"\u5f3e\u85ac\u304c\u5c3d\u304d\u305d\u3046\u3060\u3001\u88dc\u7d66\u3092\u983c\u3080\uff01",
+    u8"Enemy tanks spotted near Jade Cove, we need anti-tank weapons and reinforcements immediately! All available units please respond!",
+    u8"\u041f\u0440\u043e\u0442\u0438\u0432\u043d\u0438\u043a \u043f\u0440\u043e\u0440\u0432\u0430\u043b \u043d\u0430\u0448\u0443 \u043e\u0431\u043e\u0440\u043e\u043d\u0443 \u043d\u0430 \u0432\u043e\u0441\u0442\u043e\u0447\u043d\u043e\u043c \u0444\u043b\u0430\u043d\u0433\u0435, \u0441\u0440\u043e\u0447\u043d\u043e \u043d\u0443\u0436\u043d\u044b \u043f\u043e\u0434\u043a\u0440\u0435\u043f\u043b\u0435\u043d\u0438\u044f \u0438 \u0431\u043e\u0435\u043f\u0440\u0438\u043f\u0430\u0441\u044b!",
 };
 static const int   g_demoCount    = sizeof(g_demoMessages) / sizeof(g_demoMessages[0]);
 static int         g_demoIndex    = 0;
 static float       g_demoTimer    = 0.0f;
 static const float g_demoInterval = 10.0f; // 秒
+
+// 非同期翻訳スレッド
+static std::atomic<bool> g_translating{false};
+
+// ヘルスチェック
+enum class RadioState { ON, OFF, FAULT };
+static RadioState g_radioState      = RadioState::ON;
+static float      g_healthTimer     = 0.0f;
+static const float g_healthInterval = 5.0f; // 秒
+static std::atomic<bool> g_restarting{false};
+static std::atomic<bool> g_healthy{true};       // Ollama 生存フラグ
+static std::atomic<bool> g_checking{false};      // ヘルスチェック中フラグ
+
+static void AsyncHealthCheck() {
+    g_checking.store(true);
+    bool ok = translate::IsHealthy();
+    g_healthy.store(ok);
+    g_checking.store(false);
+}
+
+static void AsyncTranslate(std::string text) {
+    g_translating.store(true);
+    // Ollama ダウン中はHTTPリクエストを送らない
+    if (!g_healthy.load()) {
+        {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            g_originalText   = text;
+            g_translatedText = u8"(Ollama停止中)";
+        }
+        tts::Speak(text.c_str());
+        g_translating.store(false);
+        return;
+    }
+    std::string result = translate::Sync(text);
+    {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        g_originalText   = text;
+        g_translatedText = result.empty() ? u8"(翻訳失敗)" : result;
+    }
+    tts::Speak(text.c_str());
+    g_translating.store(false);
+}
+
+static void AsyncRestart() {
+    g_restarting.store(true);
+    bool ok = translate::Restart();
+    if (ok) {
+        g_radioState = RadioState::ON;
+        logging::Debug("[Overlay] Ollama 再起動成功");
+    } else {
+        g_radioState = RadioState::FAULT;
+        logging::Debug("[Overlay] Ollama 再起動失敗");
+    }
+    g_restarting.store(false);
+}
 
 // ============================================================
 // テクスチャ作成 (埋め込み RGBA データから)
@@ -241,7 +286,7 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-    if (g_radioOn) {
+    if (g_radioState == RadioState::ON) {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.4f));
     } else {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -252,8 +297,32 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
 
-    // --- テキスト領域 (左側、ラジオON時のみ) ---
-    if (g_radioOn) {
+    // --- ヘルスチェック (5秒ごと、別スレッドで実行) ---
+    if (g_radioState != RadioState::OFF && !g_restarting.load()) {
+        g_healthTimer += io.DeltaTime;
+        if (g_healthTimer >= g_healthInterval) {
+            g_healthTimer = 0.0f;
+            // 前回のチェックがまだ実行中ならスキップ
+            if (!g_checking.load()) {
+                std::thread(AsyncHealthCheck).detach();
+            }
+        }
+        // 非同期チェック結果を反映
+        if (!g_checking.load()) {
+            if (!g_healthy.load()) {
+                if (g_radioState != RadioState::FAULT) {
+                    g_radioState = RadioState::FAULT;
+                    logging::Debug("[Overlay] Ollama ダウン検出");
+                }
+            } else if (g_radioState == RadioState::FAULT) {
+                g_radioState = RadioState::ON;
+                logging::Debug("[Overlay] Ollama 復旧検出");
+            }
+        }
+    }
+
+    // --- テキスト領域 (左側、ラジオONまたはFAULT時) ---
+    if (g_radioState != RadioState::OFF) {
         // デモ: 自動切替
         g_demoTimer += io.DeltaTime;
         if (g_demoTimer >= g_demoInterval) {
@@ -261,13 +330,11 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
             g_demoIndex = (g_demoIndex + 1) % g_demoCount;
             g_scrollOrig = 0.0f;
             g_scrollTrans = 0.0f;
-            {
-                std::lock_guard<std::mutex> lock(g_textMutex);
-                g_originalText   = g_demoMessages[g_demoIndex].original;
-                g_translatedText = g_demoMessages[g_demoIndex].translated;
+            // 非同期翻訳 (完了時に原文表示 + TTS 再生)
+            if (!g_translating.load()) {
+                std::string text = g_demoMessages[g_demoIndex];
+                std::thread(AsyncTranslate, text).detach();
             }
-            // TTS: 原文を読み上げ
-            tts::Speak(g_demoMessages[g_demoIndex].original);
         }
 
         std::string origText, transText;
@@ -304,14 +371,26 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     float iconPadY = (totalHeight - iconSize) * 0.5f;
     ImGui::SetCursorPosY(iconPadY);
     if (g_radioTextureSRV) {
-        float alpha = g_radioOn ? 1.0f : 0.3f;
+        ImVec4 tint;
+        switch (g_radioState) {
+        case RadioState::ON:    tint = ImVec4(1, 1, 1, 1.0f); break;
+        case RadioState::OFF:   tint = ImVec4(1, 1, 1, 0.3f); break;
+        case RadioState::FAULT: tint = ImVec4(1, 0.3f, 0.3f, 1.0f); break;
+        }
         ImGui::Image((ImTextureID)g_radioTextureSRV, ImVec2(iconSize, iconSize),
-                     ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, alpha));
+                     ImVec2(0, 0), ImVec2(1, 1), tint);
         if (ImGui::IsItemClicked()) {
-            g_radioOn = !g_radioOn;
-            logging::Debug("[Overlay] ラジオ %s", g_radioOn ? "ON" : "OFF");
-            const char* wav = g_radioOn ? g_radioOnWav.c_str() : g_radioOffWav.c_str();
-            PlaySoundA(wav, nullptr, SND_FILENAME | SND_ASYNC);
+            if (g_radioState == RadioState::FAULT && !g_restarting.load()) {
+                // Ollama再起動
+                logging::Debug("[Overlay] Ollama 再起動クリック");
+                std::thread(AsyncRestart).detach();
+            } else if (g_radioState != RadioState::FAULT) {
+                bool wasOn = (g_radioState == RadioState::ON);
+                g_radioState = wasOn ? RadioState::OFF : RadioState::ON;
+                logging::Debug("[Overlay] ラジオ %s", wasOn ? "OFF" : "ON");
+                const char* wav = wasOn ? g_radioOffWav.c_str() : g_radioOnWav.c_str();
+                PlaySoundA(wav, nullptr, SND_FILENAME | SND_ASYNC);
+            }
         }
     }
 
@@ -355,13 +434,11 @@ bool overlay::Init() {
     g_radioOnWav  = g_assetsDir + "radio_on.wav";
     g_radioOffWav = g_assetsDir + "radio_off.wav";
 
-    // デモ初期メッセージ
-    g_originalText   = g_demoMessages[0].original;
-    g_translatedText = g_demoMessages[0].translated;
+    // デモ初期メッセージ (非同期翻訳完了後に表示 + TTS)
+    std::thread(AsyncTranslate, std::string(g_demoMessages[0])).detach();
 
     // TTS初期化
     tts::Init();
-    tts::Speak(g_demoMessages[0].original);
 
     logging::Debug("[Overlay] Init (遅延初期化モード)");
     return true;
@@ -387,7 +464,7 @@ LRESULT overlay::OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 bool overlay::IsRadioOn() {
-    return g_radioOn;
+    return g_radioState == RadioState::ON;
 }
 
 void overlay::SetDisplayText(const char* original, const char* translated) {

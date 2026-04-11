@@ -13,7 +13,15 @@ struct TranslateConfig {
     std::string model      = "gemma3:4b";
     std::string targetLang = "Japanese";
     std::string ollamaDir;  // 同梱 ollama.exe のディレクトリ (空=自動検出)
+    int numCtx    = 256;    // コンテキスト長 (メモリ削減)
+    int numThread = 2;      // CPUスレッド数
 };
+
+// Ollama 死活確認 (GET /api/version)
+bool IsHealthy();
+
+// Ollama 再起動 (EnsureOllama 再実行)
+bool Restart();
 
 // WinHTTP セッション初期化 + ワーカースレッド起動
 bool Init(const TranslateConfig& cfg);

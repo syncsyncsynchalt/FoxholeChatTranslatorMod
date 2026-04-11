@@ -34,6 +34,8 @@ void config::Load(const char* baseDir) {
     g_config.ollamaEndpoint = ReadIniStr(configPath.c_str(), "Translation", "OllamaEndpoint", "http://localhost:11434/api/generate");
     g_config.ollamaModel    = ReadIniStr(configPath.c_str(), "Translation", "OllamaModel", "gemma3:4b");
     g_config.targetLanguage = ReadIniStr(configPath.c_str(), "Translation", "TargetLanguage", "Japanese");
+    g_config.numCtx         = GetPrivateProfileIntA("Translation", "NumCtx", 256, configPath.c_str());
+    g_config.numThread      = GetPrivateProfileIntA("Translation", "NumThread", 2, configPath.c_str());
 }
 
 const Config& config::Get() {

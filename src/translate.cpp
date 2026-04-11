@@ -34,6 +34,8 @@ static std::string  g_model;
 static std::string  g_targetLang;
 static std::string  g_ollamaDir;       // 同梱 ollama.exe のディレクトリ
 static HANDLE       g_ollamaProcess = nullptr; // 自前起動した ollama serve プロセス
+static int          g_numCtx    = 256;
+static int          g_numThread = 2;
 
 // ワーカースレッド
 struct QueueItem {
@@ -188,8 +190,8 @@ static std::string HttpPost(const std::string& body) {
         return "";
     }
 
-    // タイムアウト: resolve 60s, connect 60s, send 60s, receive 300s (初回モデルロード対応)
-    WinHttpSetTimeouts(hRequest, 60000, 60000, 60000, 300000);
+    // タイムアウト: resolve 3s, connect 3s, send 10s, receive 300s (初回モデルロード対応)
+    WinHttpSetTimeouts(hRequest, 3000, 3000, 10000, 300000);
 
     const wchar_t* headers = L"Content-Type: application/json";
     BOOL sent = WinHttpSendRequest(hRequest, headers, (DWORD)-1,
@@ -242,7 +244,9 @@ static std::string BuildRequestBody(const std::string& text) {
 
     return "{\"model\":\"" + JsonEscape(g_model) +
            "\",\"prompt\":\"" + JsonEscape(prompt) +
-           "\",\"stream\":false}";
+           "\",\"stream\":false"
+           ",\"options\":{\"num_ctx\":" + std::to_string(g_numCtx) +
+           ",\"num_thread\":" + std::to_string(g_numThread) + "}}";
 }
 
 static std::string DoTranslate(const std::string& text) {
@@ -489,6 +493,8 @@ bool translate::Init(const TranslateConfig& cfg) {
     g_model      = cfg.model;
     g_targetLang = cfg.targetLang;
     g_ollamaDir  = cfg.ollamaDir;
+    g_numCtx     = cfg.numCtx;
+    g_numThread  = cfg.numThread;
 
     g_hSession = WinHttpOpen(L"FoxholeChatTranslator/1.0",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
@@ -550,4 +556,13 @@ void translate::Queue(const std::string& channel, const std::string& sender, con
     }
     g_queue.push({channel, sender, message});
     g_cv.notify_one();
+}
+
+bool translate::IsHealthy() {
+    return IsOllamaReachable();
+}
+
+bool translate::Restart() {
+    logging::Debug("[Translate] Ollama 再起動試行...");
+    return EnsureOllama();
 }

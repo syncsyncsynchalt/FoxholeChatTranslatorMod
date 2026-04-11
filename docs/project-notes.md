@@ -2,7 +2,7 @@
 
 ## 現在の状態
 
-Stage 1-7 完了。
+Stage 1-8 完了。
 
 ## 初期化フロー
 
@@ -120,43 +120,43 @@ TTSエンジン: Windows OneCore (Neural) — SAPI5 経由
 制約:
 - ゲームプロセスのメモリは書き換えない
 
-## Stage 8 実装計画 — デモメッセージのリアルタイム翻訳 + Ollamaメモリ削減
+## Stage 8 実装 — デモメッセージのリアルタイム翻訳 + Ollamaメモリ削減 + ヘルスチェック
 
 目的: Stage 6 のハードコード翻訳をやめ、Stage 5 の Ollama 翻訳で実際に翻訳する。
-合わせて gemma3:4b のメモリ使用量を削減する。
+合わせて gemma3:4b のメモリ使用量を削減し、Ollama の死活監視と自動復旧を行う。
 実装内容:
-- デモメッセージ切替時に `translate::Sync()` (または非同期キュー) で原文を翻訳し、
-  2行目「翻訳:」の行に結果を表示する
-- DemoMessage 構造体から `translated` フィールドを削除し、`original` のみにする
-- 翻訳中は「翻訳中...」を表示
-- 翻訳完了後に `g_translatedText` を更新
-- 翻訳は別スレッド (translate ワーカー) で行い、描画スレッドをブロックしない
+- デモメッセージ切替時に `AsyncTranslate()` (別スレッド) で `translate::Sync()` を呼び出し
+- 翻訳完了後に原文+翻訳を同時に表示し、TTS 読み上げを開始する (翻訳中は前のメッセージを維持)
+- DemoMessage 構造体廃止 → `g_demoMessages[]` は `const char*` 配列 (原文のみ)
+- 翻訳は描画スレッドをブロックしない
 Ollamaメモリ削減:
 - Ollama API `options` パラメータで以下を指定:
   - `num_ctx=256` — チャットは短文のためコンテキスト長を最小化 (デフォルト2048の1/8)
-  - `num_gpu=0` — GPU VRAM を一切使わない (ゲームが3-4GB VRAM消費するため)
   - `num_thread=2` — CPU スレッド数を制限しゲーム描画への影響を最小化
-- メモリ見積もり (16GB RAM / RTX 3050 Ti 4GB VRAM):
-  - gemma3:4b Q4: ~2.5GB RAM (CPU-only)
-  - KVキャッシュ (num_ctx=256): ~50MB
-  - Foxhole: ~4-6GB RAM + 3-4GB VRAM
-  - OS: ~3GB → 合計 ~12GB / 16GB で余裕あり
-- config.ini [Translation] セクションに `NumCtx=256`, `NumGpu=0`, `NumThread=2` 追加
-制約:
-- Python 不使用、純粋 C++ (WinHTTP)
-- ゲーム描画を妨げない (翻訳は非同期)
+- `num_gpu=0` は gemma3:4b で `"memory layout cannot be allocated"` エラーになるため削除
+  → GPU レイヤー割り当ては Ollama デフォルトに委任
+- config.ini [Translation] セクションに `NumCtx=256`, `NumThread=2` を追加
+タイムアウト最適化:
+- HttpPost: resolve/connect を 60s → 3s に短縮 (Ollama 停止時のブロック防止)
+- send 10s, receive 300s (初回モデルロード対応)
 Ollamaヘルスチェック & 自動復旧:
-- 定期的に Ollama の死活を監視 (GET /api/tags または /api/version, 数秒間隔)
-- ラジオアイコンの3状態:
-  - 通常ON (不透明) — Ollama正常稼働中
-  - 通常OFF (半透明) — ユーザーがOFFにした状態
-  - 赤色 (エラー) — Ollamaがダウンしている状態
-- 赤色アイコン用の radio_icon テクスチャを追加 (赤色版、32×32px)
-- 赤色アイコンをクリック → Ollama再起動 (`translate::RestartOllama()` 等)
-  - 再起動中はアイコンを点滅させるなどフィードバックを表示
-  - 再起動成功 → 通常アイコンに戻る
-  - 再起動失敗 → 赤色のまま + ログに警告
-- translate.h/cpp に `translate::IsHealthy()` と `translate::Restart()` API 追加
+- `AsyncHealthCheck()` — 別スレッドで `translate::IsHealthy()` を呼び、`g_healthy` アトミックフラグを更新
+- 描画スレッドは 5 秒ごとにスレッドを起動するだけで HTTP 待ちしない
+- `g_healthy` が false のとき `AsyncTranslate` は HTTP リクエストを送らず即 `"(Ollama停止中)"` を返す
+- `RadioState` enum (ON / OFF / FAULT):
+  - ON (不透明) — Ollama 正常稼働中
+  - OFF (半透明) — ユーザーが OFF にした状態 (テキスト非表示)
+  - FAULT (赤色 tint) — Ollama ダウン (テキスト領域は表示、原文+TTS は再生)
+  - ※ `ERROR` は Windows マクロ衝突のため `FAULT` にリネーム
+- アイコン tint: ON=(1,1,1,1), OFF=(1,1,1,0.3), FAULT=(1,0.3,0.3,1)
+- FAULT アイコンクリック → `AsyncRestart()` で Ollama 再起動 (成功→ON, 失敗→FAULT維持)
+- translate.h/cpp: `translate::IsHealthy()` と `translate::Restart()` API 追加
+変更ファイル:
+- overlay.cpp: RadioState enum, AsyncTranslate, AsyncRestart, AsyncHealthCheck, tint 描画
+- translate.h/cpp: numCtx/numThread 設定, IsHealthy/Restart, BuildRequestBody に options 追加
+- config.h/cpp: numCtx/numThread フィールド追加
+- worker_main.cpp: numCtx/numThread を TranslateConfig に渡す
+- config.ini: NumCtx=256, NumThread=2 追加
 
 ## トラブルシューティング
 
