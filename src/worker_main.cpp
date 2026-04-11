@@ -37,6 +37,10 @@ __declspec(dllexport) void* WorkerGetRenderCallback() {
     return reinterpret_cast<void*>(&overlay::OnPresent);
 }
 
+__declspec(dllexport) void* WorkerGetWndProcCallback() {
+    return reinterpret_cast<void*>(&overlay::OnWndProc);
+}
+
 } // extern "C"
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {

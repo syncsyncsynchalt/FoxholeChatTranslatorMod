@@ -170,7 +170,34 @@ static PFN_Present g_originalPresent = nullptr;
 typedef void (*RenderCallbackFn)(void*);
 static volatile RenderCallbackFn g_renderCallback = nullptr;
 
+// WndProc サブクラス化 (マウス入力を ImGui に転送)
+typedef LRESULT (*WndProcCallbackFn)(HWND, UINT, WPARAM, LPARAM);
+static volatile WndProcCallbackFn g_wndProcCallback = nullptr;
+static WNDPROC g_originalWndProc = nullptr;
+static HWND    g_gameHwnd = nullptr;
+
+static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    WndProcCallbackFn cb = g_wndProcCallback;
+    if (cb) {
+        LRESULT result = cb(hwnd, msg, wParam, lParam);
+        if (result) return result;  // ImGui が入力を消費した
+    }
+    return CallWindowProc(g_originalWndProc, hwnd, msg, wParam, lParam);
+}
+
+static void InstallWndProcHook(IDXGISwapChain* swapChain) {
+    if (g_gameHwnd) return;  // 既にインストール済み
+    DXGI_SWAP_CHAIN_DESC desc;
+    if (SUCCEEDED(swapChain->GetDesc(&desc)) && desc.OutputWindow) {
+        g_gameHwnd = desc.OutputWindow;
+        g_originalWndProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtr(g_gameHwnd, GWLP_WNDPROC,
+                             reinterpret_cast<LONG_PTR>(HookedWndProc)));
+    }
+}
+
 static HRESULT WINAPI HookedPresent(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags) {
+    InstallWndProcHook(swapChain);
     RenderCallbackFn cb = g_renderCallback;
     if (cb) {
         cb(swapChain);
@@ -349,6 +376,7 @@ static void UnloadWorker() {
     if (!g_hWorker) return;
 
     // コールバックを先にクリア (アトミック)
+    g_wndProcCallback = nullptr;
     g_renderCallback = nullptr;
     g_workerCallback = nullptr;
     // インフライト呼び出しが完了するのを待つ
@@ -426,6 +454,18 @@ static bool LoadWorker() {
         if (renderCb) {
             g_renderCallback = reinterpret_cast<RenderCallbackFn>(renderCb);
             LogLoader("レンダーコールバック設定完了");
+        }
+    }
+
+    // WndProc コールバックを取得
+    typedef void* (*PFN_GetWndProcCallback)();
+    auto getWndProcCb = reinterpret_cast<PFN_GetWndProcCallback>(
+        GetProcAddress(g_hWorker, "WorkerGetWndProcCallback"));
+    if (getWndProcCb) {
+        void* wndProcCb = getWndProcCb();
+        if (wndProcCb) {
+            g_wndProcCallback = reinterpret_cast<WndProcCallbackFn>(wndProcCb);
+            LogLoader("WndProc コールバック設定完了");
         }
     }
 

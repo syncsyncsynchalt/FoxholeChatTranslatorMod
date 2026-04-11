@@ -14,6 +14,9 @@
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 
+// ImGui Win32 WndProc ハンドラ (外部宣言)
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+
 // ============================================================
 // 内部状態
 // ============================================================
@@ -23,6 +26,7 @@ static ID3D11Device*              g_device            = nullptr;
 static ID3D11DeviceContext*       g_context           = nullptr;
 static HWND                       g_hwnd              = nullptr;
 static ID3D11ShaderResourceView*  g_radioTextureSRV   = nullptr;
+static bool                       g_radioOn           = true;
 
 // ============================================================
 // テクスチャ作成 (埋め込み RGBA データから)
@@ -122,12 +126,18 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
     ImGui::Begin("##radio_overlay", nullptr,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
-        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBackground |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMove);
 
     if (g_radioTextureSRV) {
-        ImGui::Image((ImTextureID)g_radioTextureSRV, ImVec2(iconSize, iconSize));
+        float alpha = g_radioOn ? 1.0f : 0.3f;
+        ImGui::Image((ImTextureID)g_radioTextureSRV, ImVec2(iconSize, iconSize),
+                     ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, alpha));
+        if (ImGui::IsItemClicked()) {
+            g_radioOn = !g_radioOn;
+            logging::Debug("[Overlay] ラジオ %s", g_radioOn ? "ON" : "OFF");
+        }
     }
 
     ImGui::End();
@@ -168,6 +178,18 @@ void overlay::OnPresent(void* swapChainPtr) {
     }
 
     RenderFrame(swapChain);
+}
+
+LRESULT overlay::OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (!g_initialized) return 0;
+    LRESULT result = ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+    // ImGui がマウス入力を使いたい場合のみゲームへの転送をブロック
+    if (ImGui::GetIO().WantCaptureMouse) return result;
+    return 0;
+}
+
+bool overlay::IsRadioOn() {
+    return g_radioOn;
 }
 
 void overlay::Shutdown() {
