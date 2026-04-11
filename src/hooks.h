@@ -2,27 +2,22 @@
 // ============================================================
 // hooks.h - チャット処理ロジック (ワーカーDLL側)
 // ProcessEventフックはversion.dll側で永続管理される。
-// このモジュールはGNames解決とイベント処理を担当。
+// このモジュールはイベント処理とチャットキャプチャを担当。
+// GNames解決は gnames.h に分離。
 // ============================================================
 
 #include <cstdint>
 
 namespace hooks {
 
-// GNames検出 + 設定読み込み (ProcessEventフックは行わない)
+// 設定読み込み + GNames検出 + ログ初期化
 bool Init();
 
-// ログファイル等のクリーンアップ (フック解除は行わない)
+// ログファイル等のクリーンアップ
 void Shutdown();
 
 // ProcessEventから呼ばれるコールバック (version.dll側のフックから呼び出される)
 void OnProcessEvent(void* thisObj, void* function, void* parms);
-
-// GNamesが使用可能かどうか
-bool IsGNamesAvailable();
-
-// FNameを文字列に解決
-bool ResolveFName(int32_t comparisonIndex, char* buf, int bufSize);
 
 // フック済みProcessEventアドレスを設定 (version.dll側から呼ばれる)
 void SetHookedPEAddress(uintptr_t addr);

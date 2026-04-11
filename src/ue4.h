@@ -7,6 +7,22 @@
 
 #include <cstdint>
 #include <cstring>
+#include <windows.h>
+#include <string>
+
+// ============================================================
+// メモリ安全ヘルパー
+// ============================================================
+
+inline bool IsReadableMemory(const void* ptr, size_t size = 8) {
+    MEMORY_BASIC_INFORMATION mbi;
+    if (!VirtualQuery(ptr, &mbi, sizeof(mbi))) return false;
+    if (mbi.State != MEM_COMMIT) return false;
+    if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) return false;
+    return (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE |
+            PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY |
+            PAGE_EXECUTE_WRITECOPY)) != 0;
+}
 
 // ============================================================
 // 基本型
@@ -109,6 +125,43 @@ static_assert(sizeof(Parms_ClientWorldChatMessage) == 0x48);
 
 // APlayerState::PlayerNamePrivate オフセット (Dumper-7: Engine_classes.hpp)
 constexpr int PLAYERSTATE_PLAYERNAME_OFFSET = 0x328;
+
+// ============================================================
+// UE4 型変換ユーティリティ
+// ============================================================
+
+// FString → UTF-8 変換
+inline std::string FStringToUtf8(const FString& fstr) {
+    if (!fstr.IsValid()) return "";
+    if (!IsReadableMemory(fstr.Data)) return "";
+
+    int len = fstr.Count - 1; // null terminator 除く
+    if (len <= 0) return "";
+
+    char buf[2048];
+    int written = WideCharToMultiByte(CP_UTF8, 0, fstr.Data, len, buf, sizeof(buf) - 1, nullptr, nullptr);
+    if (written <= 0) return "";
+    buf[written] = 0;
+    return std::string(buf);
+}
+
+// EChatChannel → 文字列
+inline const char* ChannelName(EChatChannel ch) {
+    switch (ch) {
+    case EChatChannel::Default:       return "Default";
+    case EChatChannel::RegionTeam:    return "Team";
+    case EChatChannel::RegionTeamAir: return "TeamAir";
+    case EChatChannel::WorldTeam:     return "World";
+    case EChatChannel::Logistics:     return "Logistics";
+    case EChatChannel::Intel:         return "Intel";
+    case EChatChannel::LocalAll:      return "Local";
+    case EChatChannel::Squad:         return "Squad";
+    case EChatChannel::Regiment:      return "Regiment";
+    case EChatChannel::Whisper:       return "Whisper";
+    case EChatChannel::Admin:         return "Admin";
+    default:                          return "Unknown";
+    }
+}
 
 // ============================================================
 // UObject オフセット (Foxhole UE4 4.24.3 x64)

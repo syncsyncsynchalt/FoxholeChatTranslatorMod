@@ -1,118 +1,91 @@
 # Foxhole Chat Translator
 
-Foxholeのゲーム内チャットを自動翻訳するDLLモジュール。
+DLLインジェクションによるUE4ゲーム内チャット自動翻訳。EAC BAN リスクあり、自己責任。
 
-## ⚠️ 警告
+## アーキテクチャ
 
-- このツールはDLLインジェクションを使用します
-- EasyAntiCheat (EAC) によりBANされる可能性があります
-- **自己責任でご使用ください**
-- テスト目的のみで使用を推奨します
+2つのDLL構成。version.dll(ローダー)がゲーム起動時にロードされ、chat_translator.dll(ワーカー)を動的ロードする。
 
-## 動作原理
+version.dll: DLLプロキシ(17関数転送) → .rdataセクションvtable走査 → ProcessEvent(vtable[66])をMinHookでフック(最大64枠) → chat_translator.dllをLoadLibrary → コールバック登録
+chat_translator.dll: FNamePool検出(メモリスキャン) → ProcessEventコールバックでUFunction名を解決 → チャット関連関数を判定 → ChatMessage構造体に変換 → ログ出力
 
-1. `version.dll` プロキシとしてゲームに自動ロードされる（17関数転送）
-2. .rdataセクション内の全vtableを走査し、`ProcessEvent`(vtable[66]) の全実装をMinHookでフック
-3. `chat_translator.dll`（ホットリロード対応）がGNamesを検出し、チャット関連UFunctionのFName CIを照合
-4. 重複排除（500ms窓）+ FUNC_Net検証で正確にチャットメッセージを判定
-5. 検出したメッセージをコンソール表示 + `chat_log.txt` に記録
+ホットリロード: F9キーでchat_translator.dllを再読み込み。ファイル変更の自動検出にも対応。version.dllはゲーム起動中は変更不可。
 
-## ビルド方法
+## ソースファイル
 
-### 前提条件
+### version.dll (ローダー)
+- src/dllmain.cpp: DLLプロキシ + vtableフック + ワーカー管理 + ホットリロード
+- src/scanner.cpp, src/scanner.h: PEセクション走査(.text/.rdataパターンマッチング)
 
-- **CMake** 3.20以上
-- **Visual Studio 2019/2022** (C++ デスクトップ開発ワークロード)
-- **Git** (MinHookの自動ダウンロードに使用)
+### chat_translator.dll (ワーカー)
+- src/worker_main.cpp: エントリポイント。exports: WorkerInit, WorkerShutdown, WorkerSetPEAddress
+- src/hooks.cpp, src/hooks.h: ProcessEventコールバック + チャット判定 + ChatMessage構築。hooks::Init(), hooks::Shutdown(), hooks::OnProcessEvent(), hooks::SetHookedPEAddress()
+- src/gnames.cpp, src/gnames.h: FNamePool検出エンジン。gnames::Find(), gnames::ResolveFName(), gnames::FindFNameIndex(), gnames::ResolveFNameWithShift(), gnames::GetBlockOffsetBits(), gnames::SetBlockOffsetBits()
+- src/config.cpp, src/config.h: config.ini読み込み。config::Load(), config::Get() → Config構造体
+- src/log.cpp, src/log.h: スレッドセーフログ。logging::Init(), logging::Shutdown(), logging::Debug(), logging::Chat(), logging::SetChatLogPath()
 
-### ビルド手順
+### 共有ヘッダー (chat_translator.dllのみ使用)
+- src/ue4.h: UE4内部型(FName, TArray, FString, EChatChannel, EChatLanguage) + inline関数(IsReadableMemory, FStringToUtf8, ChannelName) + RPC Parms構造体(Parms_ClientChatMessage, Parms_ClientChatMessageWithTag, Parms_ClientWorldChatMessage)
+- src/chat_message.h: ChatMessage{channel, sender, message, channelEnum, timestamp}。Stage 2翻訳パイプラインの入力型。
 
-```powershell
+### その他
+- version.def: DLLエクスポート定義(17関数)
+- test/test_loader.cpp: version.dll + chat_translator.dllの動作確認用ローダー
+- config.ini: ランタイム設定
+- docs/project-notes.md: 開発状態・実装メモ
+- docs/ue4-reversing-foxhole.md: UE4リバースエンジニアリング知見
+
+## ビルド
+
+前提: CMake 3.20+, Visual Studio 2019/2022 (C++), Git
+CMakeパス: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+コンパイラフラグ: MSVC /utf-8 必須
+
+```
 cd "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\Mods\ChatTranslator"
-
-# ビルドディレクトリ作成
-mkdir build
-cd build
-
-# CMake構成 (Visual Studio 2022の場合)
+mkdir build && cd build
 cmake .. -G "Visual Studio 17 2022" -A x64
-
-# ビルド (Release)
-cmake --build . --config Release
+cmake --build . --config Release                          # 全体
+cmake --build . --config Release --target chat_translator # ワーカーのみ
 ```
 
-ビルド成功後、`version.dll` が自動的にゲームディレクトリ
-(`War\Binaries\Win64\`) にコピーされます。
+ポストビルド: version.dll, chat_translator.dll, config.iniが ../../War/Binaries/Win64/ に自動コピーされる。
 
-## インストール
-
-ビルド後に自動コピーされますが、手動の場合：
-
-```powershell
+手動コピー:
+```
 copy build\Release\version.dll "..\..\War\Binaries\Win64\version.dll"
 copy config.ini "..\..\War\Binaries\Win64\config.ini"
 ```
 
-## アンインストール
+アンインストール: War\Binaries\Win64\version.dll を削除。
 
-```powershell
-del "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64\version.dll"
-```
+## config.ini
 
-## 使い方
+Config構造体(config.h)のフィールドと対応:
 
-### Stage 1: チャットログ収集
+| セクション | キー | Config フィールド | デフォルト | 読み込み元 |
+|---|---|---|---|---|
+| General | EnableConsole | enableConsole | true | config.cpp |
+| General | LogFilePath | logFilePath | "" | config.cpp |
+| General | InitDelayMs | initDelayMs | 10000 | dllmain.cpp (直接読み) |
+| Discovery | DumpAllEvents | dumpAllEvents | false | config.cpp |
+| Discovery | FunctionNameFilter | functionNameFilter | "Chat,Message,..." | config.cpp |
+| Addresses | ProcessEventVtableIndex | - | 66 | dllmain.cpp (直接読み) |
+| Stage2 | Prefix | prefix | "★" (UTF-8: \xe2\x98\x85) | config.cpp |
+| Stage3 | OllamaEndpoint | ollamaEndpoint | "http://localhost:11434/api/generate" | config.cpp |
 
-1. ビルドしてインストール
-2. `config.ini` の設定を確認
-3. ゲームを起動
-4. デバッグコンソールが表示される
-5. チャットメッセージが `chat_log.txt` に記録される
+Addresses.ProcessEventAddress, Addresses.GNamesAddress, Patterns.*: 現在未使用。パターンスキャンベースのアドレス検出用予約。
 
-### トラブルシューティング
+## チャットキャプチャ仕様
 
-チャットが検出されない場合：
-1. コンソールに `GNames: FNamePool 発見!` と表示されているか確認
-2. `ProcessEvent フック: N/M 成功` の数を確認
-3. `config.ini` の `ProcessEventVtableIndex` が正しいか確認 (デフォルト: 66)
-4. `InitDelayMs` を増やしてUE4初期化完了を待つ時間を延長
+監視対象UFunction: ClientChatMessage, ClientChatMessageWithTag, ClientWorldChatMessage
+除外: ServerChat系(送信RPC)
+判定条件: FName ComparisonIndex一致 + FUNC_Net(0x01000000)フラグ検証
+重複排除: 同一sender+message+channelの組み合わせを500msウィンドウで排除
+出力: chat_log.txt(チャットのみ), debug_log.txt(デバッグ全般), コンソール
 
-## 設定ファイル (config.ini)
+## ロードマップ
 
-| セクション | キー | 説明 | 読み込み元 |
-|-----------|------|------|----------|
-| General | EnableConsole | デバッグコンソールの表示 (1/0) | hooks.cpp |
-| General | LogFilePath | チャットログ出力先パス (空=DLL同階層) | hooks.cpp |
-| General | InitDelayMs | UE4初期化待機時間 (ms) | dllmain.cpp |
-| Addresses | ProcessEventVtableIndex | ProcessEvent vtableインデックス (デフォルト: 66) | dllmain.cpp |
-
-> **注**: config.ini には Discovery, Patterns, Stage2, Stage3 セクションもありますが、
-> 現在のコードでは読み込まれていません（将来のStage 2/3実装用プレースホルダー）。
-
-## 開発ロードマップ
-
-- [x] **Stage 1**: チャットメッセージのキャプチャ + テキストファイル出力
-- [ ] **Stage 2**: Ollama連携による自動翻訳
-- [ ] **Stage 3**: 翻訳結果のゲーム内表示
-
-## ファイル構成
-
-```
-Mods/ChatTranslator/
-├── CMakeLists.txt          # ビルド構成 (version.dll + chat_translator.dll + test_loader)
-├── version.def             # DLLエクスポート定義 (17関数)
-├── config.ini              # ランタイム設定
-├── README.md               # このファイル
-├── docs/
-│   ├── project-notes.md    # プロジェクトメモ
-│   └── ue4-reversing-foxhole.md  # UE4リバースエンジニアリング知見
-├── test/
-│   └── test_loader.cpp     # DLL動作確認テスト
-└── src/
-    ├── dllmain.cpp         # version.dll: プロキシ + vtableフック + ワーカーローダー
-    ├── scanner.h/cpp       # パターンスキャナー (.text/.rdataセクション走査)
-    ├── ue4.h               # UE4内部型定義 (Dumper-7 SDK準拠)
-    ├── hooks.h/cpp         # chat_translator.dll: GNames検出 + チャットキャプチャ
-    ├── worker_main.cpp     # chat_translator.dll エントリポイント
-    └── (Stage 2/3 で追加予定)
-```
+- Stage 1: チャットキャプチャ + ログ出力 [完了]
+- Stage 2: Ollama翻訳(gemma3:4b) [未着手]
+- Stage 3: 翻訳結果のゲーム内表示 [未着手]

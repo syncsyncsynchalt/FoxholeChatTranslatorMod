@@ -62,7 +62,9 @@ set_target_properties(version PROPERTIES
 add_library(chat_translator SHARED
     src/worker_main.cpp
     src/hooks.cpp
-    src/scanner.cpp
+    src/gnames.cpp
+    src/log.cpp
+    src/config.cpp
 )
 
 target_include_directories(chat_translator PRIVATE src)
