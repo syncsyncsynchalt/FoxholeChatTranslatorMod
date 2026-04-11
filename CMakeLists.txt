@@ -95,7 +95,7 @@ add_library(chat_translator SHARED
 )
 
 target_include_directories(chat_translator PRIVATE src)
-target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi)
+target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm)
 
 target_compile_definitions(chat_translator PRIVATE
     WIN32_LEAN_AND_MEAN
@@ -134,7 +134,15 @@ add_custom_command(TARGET chat_translator POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
         "${GAME_BIN_DIR}/config.ini"
-    COMMENT "Copying chat_translator.dll to ${GAME_BIN_DIR} (F9でリロード可能)"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${GAME_BIN_DIR}/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/radio_on.wav"
+        "${GAME_BIN_DIR}/assets/radio_on.wav"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/radio_off.wav"
+        "${GAME_BIN_DIR}/assets/radio_off.wav"
+    COMMENT "Copying chat_translator.dll + assets to ${GAME_BIN_DIR} (F9でリロード可能)"
 )
 
 # ============================================================

@@ -9,6 +9,8 @@
 
 #include <d3d11.h>
 #include <dxgi.h>
+#include <mmsystem.h>
+#include <string>
 
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -27,6 +29,8 @@ static ID3D11DeviceContext*       g_context           = nullptr;
 static HWND                       g_hwnd              = nullptr;
 static ID3D11ShaderResourceView*  g_radioTextureSRV   = nullptr;
 static bool                       g_radioOn           = true;
+static std::string                g_radioOnWav;
+static std::string                g_radioOffWav;
 
 // ============================================================
 // テクスチャ作成 (埋め込み RGBA データから)
@@ -137,6 +141,8 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         if (ImGui::IsItemClicked()) {
             g_radioOn = !g_radioOn;
             logging::Debug("[Overlay] ラジオ %s", g_radioOn ? "ON" : "OFF");
+            const char* wav = g_radioOn ? g_radioOnWav.c_str() : g_radioOffWav.c_str();
+            PlaySoundA(wav, nullptr, SND_FILENAME | SND_ASYNC);
         }
     }
 
@@ -164,7 +170,18 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
 // 公開 API
 // ============================================================
 
-bool overlay::Init() {
+bool overlay::Init() {    // DLLベースディレクトリからWAVパスを構築
+    char dllPath[MAX_PATH];
+    HMODULE hSelf;
+    GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        reinterpret_cast<LPCSTR>(&overlay::Init), &hSelf);
+    GetModuleFileNameA(hSelf, dllPath, MAX_PATH);
+    std::string dir(dllPath);
+    size_t lastSlash = dir.rfind('\\');
+    if (lastSlash != std::string::npos) dir = dir.substr(0, lastSlash + 1);
+    g_radioOnWav  = dir + "assets\\radio_on.wav";
+    g_radioOffWav = dir + "assets\\radio_off.wav";
     logging::Debug("[Overlay] Init (遅延初期化モード)");
     return true;
 }
