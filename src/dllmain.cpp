@@ -12,6 +12,8 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <d3d11.h>
+#include <dxgi.h>
 #include <MinHook.h>
 #include "scanner.h"
 
@@ -159,6 +161,27 @@ static FILE* g_loaderLogFile = nullptr;
 static uintptr_t g_hookedPeAddr = 0;  // フックしたProcessEventのアドレス
 
 // ============================================================
+// DXGI Present フック (version.dll に常駐)
+// ============================================================
+
+typedef HRESULT (WINAPI *PFN_Present)(IDXGISwapChain*, UINT, UINT);
+static PFN_Present g_originalPresent = nullptr;
+
+typedef void (*RenderCallbackFn)(void*);
+static volatile RenderCallbackFn g_renderCallback = nullptr;
+
+static HRESULT WINAPI HookedPresent(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags) {
+    RenderCallbackFn cb = g_renderCallback;
+    if (cb) {
+        cb(swapChain);
+    }
+    return g_originalPresent(swapChain, syncInterval, flags);
+}
+
+// HookDXGIPresent() は LogLoader の後に定義 (前方参照回避)
+static bool HookDXGIPresent();
+
+// ============================================================
 // ProcessEvent フック (MinHook 版 - 診断後に使用)
 // 複数PE実装のフック: 各フックは同じコールバック + 個別のオリジナル呼び出し
 // ============================================================
@@ -248,10 +271,85 @@ static void LogLoader(const char* fmt, ...) {
     va_end(args);
 }
 
+// ============================================================
+// HookDXGIPresent 実装 (LogLoader の後に配置)
+// ============================================================
+
+static bool HookDXGIPresent() {
+    // ダミーウインドウ作成
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(wc);
+    wc.lpfnWndProc = DefWindowProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = "DummyDX11Window";
+    RegisterClassEx(&wc);
+    HWND hwnd = CreateWindow(wc.lpszClassName, "", WS_OVERLAPPED,
+                              0, 0, 1, 1, nullptr, nullptr, wc.hInstance, nullptr);
+    if (!hwnd) {
+        LogLoader("ダミーウインドウ作成失敗");
+        return false;
+    }
+
+    // ダミー SwapChain + Device 作成
+    DXGI_SWAP_CHAIN_DESC desc = {};
+    desc.BufferCount = 1;
+    desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    desc.OutputWindow = hwnd;
+    desc.SampleDesc.Count = 1;
+    desc.Windowed = TRUE;
+    desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+    ID3D11Device* device = nullptr;
+    IDXGISwapChain* dummySwapChain = nullptr;
+    ID3D11DeviceContext* context = nullptr;
+    D3D_FEATURE_LEVEL featureLevel;
+
+    HRESULT hr = D3D11CreateDeviceAndSwapChain(
+        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
+        nullptr, 0, D3D11_SDK_VERSION,
+        &desc, &dummySwapChain, &device, &featureLevel, &context);
+
+    if (FAILED(hr)) {
+        LogLoader("D3D11 ダミーデバイス作成失敗: 0x%08X", hr);
+        DestroyWindow(hwnd);
+        UnregisterClass(wc.lpszClassName, wc.hInstance);
+        return false;
+    }
+
+    // SwapChain vtable から Present アドレス取得 (index 8)
+    void** vtable = *reinterpret_cast<void***>(dummySwapChain);
+    void* presentAddr = vtable[8];
+
+    // ダミーリソース解放
+    context->Release();
+    dummySwapChain->Release();
+    device->Release();
+    DestroyWindow(hwnd);
+    UnregisterClass(wc.lpszClassName, wc.hInstance);
+
+    // MinHook で Present をフック
+    MH_STATUS st = MH_CreateHook(presentAddr, &HookedPresent,
+                                  reinterpret_cast<void**>(&g_originalPresent));
+    if (st != MH_OK) {
+        LogLoader("Present フック作成失敗 (MH=%d)", st);
+        return false;
+    }
+    st = MH_EnableHook(presentAddr);
+    if (st != MH_OK) {
+        LogLoader("Present フック有効化失敗 (MH=%d)", st);
+        return false;
+    }
+
+    LogLoader("Present フック成功 (addr=0x%p)", presentAddr);
+    return true;
+}
+
 static void UnloadWorker() {
     if (!g_hWorker) return;
 
     // コールバックを先にクリア (アトミック)
+    g_renderCallback = nullptr;
     g_workerCallback = nullptr;
     // インフライト呼び出しが完了するのを待つ
     Sleep(200);
@@ -317,6 +415,18 @@ static bool LoadWorker() {
     if (setPEAddrFn && g_hookedPeAddr) {
         setPEAddrFn(g_hookedPeAddr);
         LogLoader("PE アドレス 0x%llX をワーカーに通知", g_hookedPeAddr);
+    }
+
+    // レンダーコールバックを取得
+    typedef void* (*PFN_GetRenderCallback)();
+    auto getRenderCb = reinterpret_cast<PFN_GetRenderCallback>(
+        GetProcAddress(g_hWorker, "WorkerGetRenderCallback"));
+    if (getRenderCb) {
+        void* renderCb = getRenderCb();
+        if (renderCb) {
+            g_renderCallback = reinterpret_cast<RenderCallbackFn>(renderCb);
+            LogLoader("レンダーコールバック設定完了");
+        }
     }
 
     return true;
@@ -528,6 +638,13 @@ static DWORD WINAPI InitThread(LPVOID param) {
         }
     }
     LogLoader("ProcessEvent フック: %d/%d 成功 ✓", hookedCount, uniquePECount);
+
+    // DXGI Present をフック
+    if (HookDXGIPresent()) {
+        LogLoader("Present フック完了 ✓");
+    } else {
+        LogLoader("Present フック失敗 (オーバーレイ無効)");
+    }
 
     // ワーカーDLLをロード
     LogLoader("ワーカーDLL を読み込み中...");

@@ -29,6 +29,32 @@ if(NOT minhook_POPULATED)
 endif()
 
 # ============================================================
+# Dear ImGui - immediate mode GUI for DX11 overlay
+# ============================================================
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.6
+)
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+    add_library(imgui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+    )
+    target_include_directories(imgui PUBLIC
+        ${imgui_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}/backends
+    )
+    target_compile_options(imgui PRIVATE /W0 /utf-8)
+endif()
+
+# ============================================================
 # ============================================================
 # Loader DLL (version.dll) - プロキシ + ワーカーローダー
 # ゲーム起動中は変更不要。安定版。
@@ -40,7 +66,7 @@ add_library(version SHARED
 )
 
 target_include_directories(version PRIVATE src)
-target_link_libraries(version PRIVATE minhook)
+target_link_libraries(version PRIVATE minhook d3d11 dxgi)
 
 target_compile_definitions(version PRIVATE
     WIN32_LEAN_AND_MEAN
@@ -65,9 +91,11 @@ add_library(chat_translator SHARED
     src/gnames.cpp
     src/log.cpp
     src/config.cpp
+    src/overlay.cpp
 )
 
 target_include_directories(chat_translator PRIVATE src)
+target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi)
 
 target_compile_definitions(chat_translator PRIVATE
     WIN32_LEAN_AND_MEAN

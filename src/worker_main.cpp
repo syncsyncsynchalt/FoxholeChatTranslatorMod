@@ -11,6 +11,7 @@
 #endif
 #include <windows.h>
 #include "hooks.h"
+#include "overlay.h"
 
 extern "C" {
 
@@ -19,15 +20,21 @@ __declspec(dllexport) void* WorkerInit() {
     if (!hooks::Init()) {
         return nullptr;
     }
+    overlay::Init();
     return reinterpret_cast<void*>(&hooks::OnProcessEvent);
 }
 
 __declspec(dllexport) void WorkerShutdown() {
+    overlay::Shutdown();
     hooks::Shutdown();
 }
 
 __declspec(dllexport) void WorkerSetPEAddress(uintptr_t addr) {
     hooks::SetHookedPEAddress(addr);
+}
+
+__declspec(dllexport) void* WorkerGetRenderCallback() {
+    return reinterpret_cast<void*>(&overlay::OnPresent);
 }
 
 } // extern "C"
