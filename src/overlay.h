@@ -25,6 +25,9 @@ LRESULT OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 // ラジオの ON/OFF 状態
 bool IsRadioOn();
 
+// 表示テキストを設定 (スレッドセーフ)
+void SetDisplayText(const char* original, const char* translated);
+
 // ImGui + DX11 リソース解放
 void Shutdown();
 
