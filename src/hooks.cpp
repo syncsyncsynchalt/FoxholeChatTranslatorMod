@@ -120,14 +120,14 @@ static int IdentifyChatFunc(void* function) {
     if (!function || !g_chatCIsReady) return -1;
     __try {
         uintptr_t funcAddr = reinterpret_cast<uintptr_t>(function);
-        if (funcAddr < 0x10000 || !IsReadableMemory(function)) return -1;
+        if (funcAddr < 0x10000) return -1;
+        // UE4 ProcessEvent の function ポインタは常に有効なため、
+        // VirtualQuery (IsReadableMemory) を省略し SEH で保護する
         int32_t funcCI = *reinterpret_cast<int32_t*>(funcAddr + ue4::UOBJECT_NAME_OFFSET);
         for (int i = 0; i < CHAT_FUNC_COUNT; i++) {
             if (g_chatFuncCIs[i] >= 0 && funcCI == g_chatFuncCIs[i]) {
-                if (IsReadableMemory(reinterpret_cast<void*>(funcAddr + 0x98))) {
-                    uint32_t flags = *reinterpret_cast<uint32_t*>(funcAddr + 0x98);
-                    if (!(flags & 0x40)) return -1;
-                }
+                uint32_t flags = *reinterpret_cast<uint32_t*>(funcAddr + 0x98);
+                if (!(flags & 0x40)) return -1;
                 return i;
             }
         }

@@ -165,15 +165,6 @@ static uintptr_t g_hookedPeAddr = 0;  // フックしたProcessEventのアドレ
 
 // 共通のコールバック処理
 static void InvokeWorkerCallback(void* thisObj, void* function, void* parms) {
-    static volatile long peCount = 0;
-    long c = InterlockedIncrement(&peCount);
-    if (c == 1 || c == 10 || c == 100 || c == 1000 || (c % 100000 == 0)) {
-        if (g_loaderLogFile) {
-            fprintf(g_loaderLogFile, "[Loader] HookedProcessEvent #%ld\n", c);
-            fflush(g_loaderLogFile);
-        }
-    }
-
     WorkerCallbackFn cb = g_workerCallback;
     if (cb) {
         cb(thisObj, function, parms);
