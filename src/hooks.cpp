@@ -139,7 +139,7 @@ static int IdentifyChatFunc(void* function) {
 // パラメータ読み取り
 // ============================================================
 
-struct ChatData {
+struct RawChatParams {
     FString      msgStr;
     FString      senderStr;
     FString      regTagStr;
@@ -149,7 +149,7 @@ struct ChatData {
     void*        senderPlayerState;
 };
 
-static bool ReadChatParamsSafe(int chatFunc, void* parms, ChatData* out) {
+static bool ReadChatParamsSafe(int chatFunc, void* parms, RawChatParams* out) {
     __try {
         memset(out, 0, sizeof(*out));
         out->channel = EChatChannel::Default;
@@ -268,7 +268,7 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
     if (chatFunc < 0 || !parms) return;
 
     // SEH安全にパラメータ読み取り
-    ChatData data;
+    RawChatParams data;
     if (!ReadChatParamsSafe(chatFunc, parms, &data)) return;
 
     // メッセージ抽出
