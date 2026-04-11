@@ -6,6 +6,7 @@
 #include "overlay.h"
 #include "log.h"
 #include "radio_icon.h"
+#include "tts.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -265,6 +266,8 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
                 g_originalText   = g_demoMessages[g_demoIndex].original;
                 g_translatedText = g_demoMessages[g_demoIndex].translated;
             }
+            // TTS: 原文を読み上げ
+            tts::Speak(g_demoMessages[g_demoIndex].original);
         }
 
         std::string origText, transText;
@@ -356,6 +359,10 @@ bool overlay::Init() {
     g_originalText   = g_demoMessages[0].original;
     g_translatedText = g_demoMessages[0].translated;
 
+    // TTS初期化
+    tts::Init();
+    tts::Speak(g_demoMessages[0].original);
+
     logging::Debug("[Overlay] Init (遅延初期化モード)");
     return true;
 }
@@ -390,6 +397,8 @@ void overlay::SetDisplayText(const char* original, const char* translated) {
 }
 
 void overlay::Shutdown() {
+    tts::Shutdown();
+
     if (!g_initialized) return;
 
     ImGui_ImplDX11_Shutdown();

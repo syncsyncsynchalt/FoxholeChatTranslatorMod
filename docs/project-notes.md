@@ -2,7 +2,7 @@
 
 ## 現在の状態
 
-Stage 1-6 完了。
+Stage 1-7 完了。
 
 ## 初期化フロー
 
@@ -89,12 +89,36 @@ Ollamaバンドル:
 - この段階では固定メッセージのデモ表示とする:
   - EN/RU/KO/ZH/JA の5言語ペア (原文+翻訳) を数秒ごとに自動切替
   - 各言語が正しく表示できることを確認するためのテスト
-- ゲームプロセスのメモリは書き換えない
 多言語フォント:
 - NotoSansCJKjp-Regular.otf (~16MB) を Google Fonts から直接ダウンロードして assets/ に配置
 - EN/RU/KO/ZH/JA すべてのスクリプトをカバー (Latin, Cyrillic, Hangul, CJK, かな/カナ)
 - overlay.cpp の InitImGui() で io.Fonts->AddFontFromFileTTF() により登録
 - グリフ範囲: Latin + Cyrillic + CJK Unified Ideographs + Hangul Syllables + Full-width
+
+## Stage 7 実装計画 — 多言語TTS読み上げ
+
+目的: チャット原文を音声で読み上げる。
+対象言語: 英語、ロシア語、韓国語、中国語、日本語
+TTSエンジン: Windows OneCore (Neural) — SAPI5 経由
+実装内容:
+- Stage 6 のデモメッセージの「原文」を、表示が切り替わるたびにTTSで読み上げる
+- 5言語すべてに対応した音声合成
+- テキストの言語を自動判定し、対応するOneCore音声を選択
+- ラジオON時のみ読み上げ
+- Python 不使用、純粋 C++ (SAPI5 COM API)
+前提条件 (事前インストール必須):
+- Windows OneCore 音声パックを管理者権限でインストールする必要がある:
+  ```powershell
+  # 管理者PowerShellで実行
+  Add-WindowsCapability -Online -Name "Language.Speech~~~en-US~0.0.1.0"
+  Add-WindowsCapability -Online -Name "Language.Speech~~~zh-CN~0.0.1.0"
+  Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ru-RU~0.0.1.0"
+  Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ko-KR~0.0.1.0"
+  ```
+- 日本語 (ja-JP) はWindows日本語版に標準搭載
+- 音声が見つからない言語はスキップしてログに警告出力
+制約:
+- ゲームプロセスのメモリは書き換えない
 
 ## トラブルシューティング
 
