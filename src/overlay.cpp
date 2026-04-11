@@ -8,6 +8,7 @@
 #include "radio_icon.h"
 #include "tts.h"
 #include "translate.h"
+#include "config.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -81,7 +82,7 @@ static void AsyncHealthCheck() {
     g_checking.store(false);
 }
 
-static void AsyncTranslate(std::string text) {
+static void AsyncTranslate(std::string text, std::string sender) {
     g_translating.store(true);
     // Ollama ダウン中はHTTPリクエストを送らない
     if (!g_healthy.load()) {
@@ -90,7 +91,7 @@ static void AsyncTranslate(std::string text) {
             g_originalText   = text;
             g_translatedText = u8"(Ollama停止中)";
         }
-        tts::Speak(text.c_str());
+        tts::Speak(text.c_str(), sender.empty() ? nullptr : sender.c_str());
         g_translating.store(false);
         return;
     }
@@ -100,7 +101,7 @@ static void AsyncTranslate(std::string text) {
         g_originalText   = text;
         g_translatedText = result.empty() ? u8"(翻訳失敗)" : result;
     }
-    tts::Speak(text.c_str());
+    tts::Speak(text.c_str(), sender.empty() ? nullptr : sender.c_str());
     g_translating.store(false);
 }
 
@@ -323,17 +324,19 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
 
     // --- テキスト領域 (左側、ラジオONまたはFAULT時) ---
     if (g_radioState != RadioState::OFF) {
-        // デモ: 自動切替
-        g_demoTimer += io.DeltaTime;
-        if (g_demoTimer >= g_demoInterval) {
-            g_demoTimer = 0.0f;
-            g_demoIndex = (g_demoIndex + 1) % g_demoCount;
-            g_scrollOrig = 0.0f;
-            g_scrollTrans = 0.0f;
-            // 非同期翻訳 (完了時に原文表示 + TTS 再生)
-            if (!g_translating.load()) {
-                std::string text = g_demoMessages[g_demoIndex];
-                std::thread(AsyncTranslate, text).detach();
+        // デモモード: 自動切替
+        if (config::Get().demoMode) {
+            g_demoTimer += io.DeltaTime;
+            if (g_demoTimer >= g_demoInterval) {
+                g_demoTimer = 0.0f;
+                g_demoIndex = (g_demoIndex + 1) % g_demoCount;
+                g_scrollOrig = 0.0f;
+                g_scrollTrans = 0.0f;
+                // 非同期翻訳 (完了時に原文表示 + TTS 再生)
+                if (!g_translating.load()) {
+                    std::string text = g_demoMessages[g_demoIndex];
+                    std::thread(AsyncTranslate, text, std::string()).detach();
+                }
             }
         }
 
@@ -434,8 +437,10 @@ bool overlay::Init() {
     g_radioOnWav  = g_assetsDir + "radio_on.wav";
     g_radioOffWav = g_assetsDir + "radio_off.wav";
 
-    // デモ初期メッセージ (非同期翻訳完了後に表示 + TTS)
-    std::thread(AsyncTranslate, std::string(g_demoMessages[0])).detach();
+    // デモモード: 初期メッセージ (非同期翻訳完了後に表示 + TTS)
+    if (config::Get().demoMode) {
+        std::thread(AsyncTranslate, std::string(g_demoMessages[0]), std::string()).detach();
+    }
 
     // TTS初期化
     tts::Init();
@@ -471,6 +476,17 @@ void overlay::SetDisplayText(const char* original, const char* translated) {
     std::lock_guard<std::mutex> lock(g_textMutex);
     g_originalText   = original  ? original  : "";
     g_translatedText = translated ? translated : "";
+}
+
+void overlay::OnChatMessage(const std::string& sender, const std::string& message) {
+    if (config::Get().demoMode) return; // デモモード中は実チャットを無視
+    if (g_radioState != RadioState::ON) return;
+    if (message.empty()) return;
+    if (!g_translating.load()) {
+        g_scrollOrig = 0.0f;
+        g_scrollTrans = 0.0f;
+        std::thread(AsyncTranslate, message, sender).detach();
+    }
 }
 
 void overlay::Shutdown() {

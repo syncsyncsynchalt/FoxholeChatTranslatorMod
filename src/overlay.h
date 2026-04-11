@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <string>
 
 namespace overlay {
 
@@ -27,6 +28,10 @@ bool IsRadioOn();
 
 // 表示テキストを設定 (スレッドセーフ)
 void SetDisplayText(const char* original, const char* translated);
+
+// チャットメッセージを受信 (hooks.cpp から呼ばれる)
+// ラジオ ON 時に翻訳・TTS再生を開始する
+void OnChatMessage(const std::string& sender, const std::string& message);
 
 // ImGui + DX11 リソース解放
 void Shutdown();

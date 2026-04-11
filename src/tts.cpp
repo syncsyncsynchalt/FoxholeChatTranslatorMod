@@ -108,10 +108,15 @@ static std::wstring Utf8ToWide(const char* utf8) {
 // TTS ワーカースレッド
 // ============================================================
 
+struct TtsRequest {
+    std::string text;
+    std::string sender; // 空の場合はランダム声色
+};
+
 static std::thread          g_ttsThread;
 static std::mutex           g_ttsMutex;
 static std::condition_variable g_ttsCv;
-static std::queue<std::string> g_ttsQueue;
+static std::queue<TtsRequest> g_ttsQueue;
 static std::atomic<bool>    g_ttsRunning{false};
 static std::atomic<bool>    g_ttsStop{false};
 
@@ -186,16 +191,17 @@ static void TtsWorker() {
     logging::Debug("[TTS] ワーカー起動");
 
     while (g_ttsRunning.load()) {
-        std::string text;
+        TtsRequest req;
         {
             std::unique_lock<std::mutex> lock(g_ttsMutex);
             g_ttsCv.wait(lock, [] { return !g_ttsQueue.empty() || !g_ttsRunning.load(); });
             if (!g_ttsRunning.load()) break;
             // 最新のリクエストのみ処理 (古いのは捨てる)
             while (g_ttsQueue.size() > 1) g_ttsQueue.pop();
-            text = g_ttsQueue.front();
+            req = g_ttsQueue.front();
             g_ttsQueue.pop();
         }
+        const std::string& text = req.text;
 
         g_ttsStop.store(false);
 
@@ -203,7 +209,7 @@ static void TtsWorker() {
         Lang lang = DetectLanguage(text.c_str());
         const wchar_t* langTag = LangToVoiceTag(lang);
 
-        // 対応する音声をランダムに選択
+        // 対応する音声を選択 (sender指定時はハッシュで固定、なければランダム)
         if (voices) {
             std::vector<unsigned> candidates;
             unsigned count = 0;
@@ -219,14 +225,23 @@ static void TtsWorker() {
                 }
             }
             if (!candidates.empty()) {
-                static std::mt19937 rng(std::random_device{}());
-                unsigned pick = candidates[rng() % candidates.size()];
+                unsigned pick;
+                if (!req.sender.empty()) {
+                    // sender名のハッシュで声色を決定論的に選択
+                    std::hash<std::string> hasher;
+                    pick = candidates[hasher(req.sender) % candidates.size()];
+                } else {
+                    static std::mt19937 rng(std::random_device{}());
+                    pick = candidates[rng() % candidates.size()];
+                }
                 ComPtr<IVoiceInformation> vi;
                 voices->GetAt(pick, &vi);
                 synth->put_Voice(vi.Get());
                 HSTRING name;
                 vi->get_DisplayName(&name);
-                logging::Debug("[TTS] 音声選択: %ls", WindowsGetStringRawBuffer(name, nullptr));
+                logging::Debug("[TTS] 音声選択: %ls (sender=%s)",
+                    WindowsGetStringRawBuffer(name, nullptr),
+                    req.sender.empty() ? "(none)" : req.sender.c_str());
             }
         }
 
@@ -393,12 +408,15 @@ void tts::Init() {
     logging::Debug("[TTS] Init");
 }
 
-void tts::Speak(const char* textUtf8) {
+void tts::Speak(const char* textUtf8, const char* senderUtf8) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
         g_ttsStop.store(true); // 前回の読み上げを中断
-        g_ttsQueue.push(std::string(textUtf8));
+        TtsRequest req;
+        req.text = textUtf8;
+        if (senderUtf8 && *senderUtf8) req.sender = senderUtf8;
+        g_ttsQueue.push(std::move(req));
     }
     g_ttsCv.notify_one();
 }

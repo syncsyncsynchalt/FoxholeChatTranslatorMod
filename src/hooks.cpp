@@ -316,10 +316,8 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
     logging::Debug("[%s] %s: %s", chName, displaySender.c_str(), msg.c_str());
     logging::Chat(chName, displaySender.c_str(), msg.c_str());
 
-    // Stage 5: Ollama 翻訳 (ラジオON + 翻訳有効の場合)
-    if (overlay::IsRadioOn() && config::Get().translationEnabled) {
-        translate::Queue(chatMsg.channel, chatMsg.sender, chatMsg.message);
-    }
+    // Stage 9: 実チャットメッセージをオーバーレイに渡す
+    overlay::OnChatMessage(displaySender, msg);
 }
 
 // ============================================================

@@ -26,6 +26,9 @@ struct Config {
     std::string targetLanguage = "Japanese";
     int         numCtx         = 256;
     int         numThread      = 2;
+
+    // [Overlay]
+    bool        demoMode       = true;
 };
 
 namespace config {
