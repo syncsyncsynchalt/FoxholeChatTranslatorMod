@@ -29,7 +29,11 @@ void config::Load(const char* baseDir) {
     g_config.functionNameFilter = ReadIniStr(configPath.c_str(), "Discovery", "FunctionNameFilter", "");
 
     g_config.prefix = ReadIniStr(configPath.c_str(), "Stage2", "Prefix", "\xe2\x98\x85");
-    g_config.ollamaEndpoint = ReadIniStr(configPath.c_str(), "Stage3", "OllamaEndpoint", "http://localhost:11434/api/generate");
+
+    g_config.translationEnabled = GetPrivateProfileIntA("Translation", "Enabled", 1, configPath.c_str()) != 0;
+    g_config.ollamaEndpoint = ReadIniStr(configPath.c_str(), "Translation", "OllamaEndpoint", "http://localhost:11434/api/generate");
+    g_config.ollamaModel    = ReadIniStr(configPath.c_str(), "Translation", "OllamaModel", "gemma3:4b");
+    g_config.targetLanguage = ReadIniStr(configPath.c_str(), "Translation", "TargetLanguage", "Japanese");
 }
 
 const Config& config::Get() {

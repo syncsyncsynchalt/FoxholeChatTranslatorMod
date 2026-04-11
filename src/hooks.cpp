@@ -14,6 +14,8 @@
 #include "config.h"
 #include "log.h"
 #include "chat_message.h"
+#include "overlay.h"
+#include "translate.h"
 
 // ============================================================
 // DLLベースディレクトリ取得
@@ -314,7 +316,10 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
     logging::Debug("[%s] %s: %s", chName, displaySender.c_str(), msg.c_str());
     logging::Chat(chName, displaySender.c_str(), msg.c_str());
 
-    // TODO: Stage 2 - chatMsg を翻訳パイプラインに渡す
+    // Stage 5: Ollama 翻訳 (ラジオON + 翻訳有効の場合)
+    if (overlay::IsRadioOn() && config::Get().translationEnabled) {
+        translate::Queue(chatMsg.channel, chatMsg.sender, chatMsg.message);
+    }
 }
 
 // ============================================================

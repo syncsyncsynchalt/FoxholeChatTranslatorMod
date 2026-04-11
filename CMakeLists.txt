@@ -92,10 +92,11 @@ add_library(chat_translator SHARED
     src/log.cpp
     src/config.cpp
     src/overlay.cpp
+    src/translate.cpp
 )
 
 target_include_directories(chat_translator PRIVATE src)
-target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm)
+target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm winhttp)
 
 target_compile_definitions(chat_translator PRIVATE
     WIN32_LEAN_AND_MEAN
@@ -151,6 +152,20 @@ add_custom_command(TARGET chat_translator POST_BUILD
 add_executable(test_loader test/test_loader.cpp)
 target_compile_definitions(test_loader PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(test_loader PRIVATE /utf-8)
+
+# ============================================================
+# 翻訳テスト (スタンドアロン)
+# Ollama が起動している状態で実行する
+# ============================================================
+add_executable(translate_test
+    test/translate_test.cpp
+    src/translate.cpp
+    src/log.cpp
+)
+target_include_directories(translate_test PRIVATE src)
+target_link_libraries(translate_test PRIVATE winhttp)
+target_compile_definitions(translate_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_options(translate_test PRIVATE /utf-8)
 
 add_custom_command(TARGET test_loader POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

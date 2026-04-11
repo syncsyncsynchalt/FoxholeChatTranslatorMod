@@ -2,7 +2,7 @@
 
 ## 現在の状態
 
-Stage 1 完了。Stage 2 未着手。リファクタリング完了済み。
+Stage 1-5 完了。Stage 6 未着手。
 
 ## 初期化フロー
 
@@ -53,17 +53,27 @@ ProcessEvent呼び出し → hooks::OnProcessEvent(thisObj, function, parms)
 - ラジオOFF時: "Radio OFF" のボイスを再生
 - 音声ファイル (WAV等) をアセットとして同梱し、Windows Audio API で再生
 
-## Stage 5 実装計画 — ローカル自動翻訳テスト
+## Stage 5 実装計画 — Ollama ローカル翻訳
 
-目的: インターネット接続なしで多言語翻訳が動作することを検証する。
-対象言語: 英語、ロシア語、韓国語、中国語、日本語
+目的: Ollama (gemma3:4b) を使ってチャットメッセージを自動翻訳する。
+対象言語: 英語、ロシア語、韓国語、中国語、日本語 → 日本語 (configurable)
 実装内容:
-- 固定で与えたメッセージを指定言語に翻訳し、テキストとして得られればよい（UI統合は不要）
-- 翻訳はすべてローカルで完結すること（インターネットアクセス不可）
+- C++ WinHTTP で Ollama REST API (localhost:11434) にリクエスト
+- translate.h/cpp: 同期 (Sync) + 非同期 (Queue + ワーカースレッド) API
+- translate_test.exe: スタンドアロンテストアプリ (対話モード / 単文 / ファイル一括)
+- hooks.cpp: ラジオON時に自動翻訳キュー投入
+- config.ini [Translation] セクションで設定 (Endpoint, Model, TargetLanguage, Enabled)
+セットアップ:
+- Ollama インストール: https://ollama.com
+- モデルダウンロード: `ollama pull gemma3:4b`
+- Ollama 起動: `ollama serve`
+テスト:
+- `translate_test.exe "Hello world"` → 日本語翻訳結果を表示
+- `translate_test.exe --file chat_log.txt` → ログ一括翻訳
+- `translate_test.exe` → 対話モード
 制約:
-- CPU・メモリを過剰に消費しないこと
-- GPU に依存しないこと（VRAM を大量に使わないこと）
-- 軽量な翻訳モデル・ライブラリを選定すること
+- Python 不使用、純粋 C++ (WinHTTP)
+- Ollama のインストールとモデルダウンロードが必要
 
 ## Stage 6 実装計画 — ローカル多言語読み上げテスト
 

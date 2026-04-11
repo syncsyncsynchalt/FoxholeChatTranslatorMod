@@ -19,8 +19,11 @@ struct Config {
     // [Stage2]
     std::string prefix = "\xe2\x98\x85"; // ★ (UTF-8)
 
-    // [Stage3]
+    // [Translation]
+    bool        translationEnabled = true;
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
+    std::string ollamaModel    = "gemma3:4b";
+    std::string targetLanguage = "Japanese";
 };
 
 namespace config {

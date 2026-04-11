@@ -12,6 +12,8 @@
 #include <windows.h>
 #include "hooks.h"
 #include "overlay.h"
+#include "translate.h"
+#include "config.h"
 
 extern "C" {
 
@@ -21,10 +23,22 @@ __declspec(dllexport) void* WorkerInit() {
         return nullptr;
     }
     overlay::Init();
+
+    // 翻訳モジュール初期化
+    const Config& cfg = config::Get();
+    if (cfg.translationEnabled) {
+        translate::TranslateConfig tcfg;
+        tcfg.endpoint   = cfg.ollamaEndpoint;
+        tcfg.model      = cfg.ollamaModel;
+        tcfg.targetLang = cfg.targetLanguage;
+        translate::Init(tcfg);
+    }
+
     return reinterpret_cast<void*>(&hooks::OnProcessEvent);
 }
 
 __declspec(dllexport) void WorkerShutdown() {
+    translate::Shutdown();
     overlay::Shutdown();
     hooks::Shutdown();
 }
