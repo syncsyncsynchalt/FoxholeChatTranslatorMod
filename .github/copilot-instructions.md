@@ -1,209 +1,88 @@
 # Foxhole Chat Translator - Copilot Instructions
 
+## Role
+
+C++、Windows、バイナリリバースエンジニアリング、UE4内部構造（4.24）、MinHook、DX11/ImGui、
+Ollama API（WinHTTP）、WinRT OneCore TTS + XAudio2 の専門家として開発支援を行うこと。
+日本語で応答すること。
+
 ## プロジェクト概要
 
-Foxholeのゲームチャットを傍受し、翻訳結果を音声(ラジオ)で流すC++ DLLモジュール。
-version.dllプロキシ方式でUE4ゲームに自動ロードされ、ProcessEventをフックしてチャットメッセージを傍受する。
-ゲームクライアントのメモリは書き換えない方針。
-
-## アーキテクチャ
+Foxhole (UE4 4.24.3) のゲームチャットを傍受し、ローカルAI翻訳＋オーバーレイ表示＋多言語TTS読み上げを行うC++ DLLモジュール。
+version.dllプロキシ方式でゲームに自動ロードされ、ProcessEvent (vtable[66]) をフックしてチャットメッセージを傍受する。
+Stage 1-9 全完了。基本機能は実装済み。
 
 ### 2-DLL構成
-- **version.dll** (永続DLL): システムのversion.dllを偽装しゲーム起動時に自動ロード
-  - 17個のエクスポート関数をオリジナルDLL (System32\version.dll) に転送
-  - `version.def` でエクスポート名を `Proxy_*` にマッピング
-  - .rdataセクション内の全vtableを走査し、ProcessEvent (vtable[66]) の全実装をMinHookでフック
-  - DEFINE_PE_HOOK(N)マクロで0-63の個別detour関数を生成
-  - chat_translator.dllの管理: ロード/アンロード/ホットリロード/自動リロード(2秒FILETIME監視)/整合性チェック(3秒JMPバイト検証)
-- **chat_translator.dll** (ホットリロード可能ワーカー): GNames検出 + OnProcessEventコールバック
-  - GNames: FNamePool Block[0]をメモリ走査で検出し、モジュール内逆引きでBlocks[]配列を特定
-  - FName CI照合でチャット関連UFunctionを判別 (FUNC_Net 0x40検証で偽陽性除去)
-  - 重複排除 (500ms窓) で正確にチャットメッセージを判定
-  - 検出メッセージをコンソール表示 + chat_log.txt に記録
+- **version.dll** (永続DLL): DLLプロキシ + .rdata vtableスキャン + ProcessEventフック (MinHook, 最大64枠) + DX11 Presentフック + chat_translator.dll管理 (ホットリロード/自動リロード/整合性チェック)
+- **chat_translator.dll** (ホットリロード可能ワーカー): GNames自動検出 + FName CI照合 + チャットキャプチャ + Ollama翻訳 + ImGuiオーバーレイ + WinRT OneCore TTS
 
 ### 対象ゲーム
-- Foxhole (War-Win64-Shipping.exe)
-- **UE4 4.24.3** (`4.24.3-0+++UE4+Release-4.24-War`)
-- ゲームパス: `C:\Program Files (x86)\Steam\steamapps\common\Foxhole\`
+- Foxhole (War-Win64-Shipping.exe), UE4 4.24.3, ゲームパス: `C:\Program Files (x86)\Steam\steamapps\common\Foxhole\`
 
-## ファイル構成
-
-```
-Mods/ChatTranslator/
-├── .github/copilot-instructions.md  # この知見ファイル
-├── .gitignore
-├── CMakeLists.txt          # ビルド構成 (version.dll + chat_translator.dll + test_loader)
-├── version.def             # DLLエクスポート定義 (17関数)
-├── config.ini              # ランタイム設定
-├── README.md
-├── docs/
-│   ├── project-notes.md    # プロジェクトメモ
-│   └── ue4-reversing-foxhole.md  # UE4リバースエンジニアリング知見
-├── test/
-│   └── test_loader.cpp     # DLL動作確認テスト
-└── src/
-    ├── dllmain.cpp         # version.dll: プロキシ + vtableフック + ワーカーローダー
-    ├── scanner.h/cpp       # パターンスキャナー (.text/.rdataセクション走査)
-    ├── ue4.h               # UE4内部型定義 (Dumper-7 SDK準拠)
-    ├── hooks.h/cpp         # chat_translator.dll: GNames検出 + チャットキャプチャ
-    └── worker_main.cpp     # chat_translator.dll エントリポイント
-```
-
-## ビルド方法
+## ビルド
 
 ```powershell
-# 前提: Visual Studio 2022 Community (C++ デスクトップ開発ワークロード)
-$cmake = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-
 cd "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\Mods\ChatTranslator"
-
-# 初回: CMake構成
-& $cmake -B build -G "Visual Studio 17 2022" -A x64
-
-# フルビルド (version.dll + chat_translator.dll + test_loader)
-& $cmake --build build --config Release
-
-# ワーカーのみリビルド (ゲーム起動中でもOK、F9でホットリロード)
-& $cmake --build build --config Release --target chat_translator
-
-# → version.dll, chat_translator.dll, config.ini が War/Binaries/Win64/ に自動コピー
-# → ゲーム起動中は version.dll のコピーが失敗する (ファイルロック) → 正常動作
+cmake -B build -G "Visual Studio 17 2022" -A x64              # 初回構成
+cmake --build build --config Release                          # フルビルド
+cmake --build build --config Release --target chat_translator  # ワーカーのみ (F9でホットリロード)
 ```
 
-### ビルド注意点
-- MSVC `/utf-8` フラグ必須（CMakeLists.txtで設定済み）
-- MinHookはFetchContentで自動取得（Git必要）
+- MinHook, Dear ImGui v1.91.6 は FetchContent で自動取得
 - `WIN32_LEAN_AND_MEAN` はCMake側で定義済み。ソースでは `#ifndef` ガード使用
+- 成果物は War/Binaries/Win64/ に自動コピー
 
-## config.ini (実際にコードが読み込む設定のみ)
+## Coding Conventions
 
-| セクション | キー | 説明 | 読み込み元 |
-|-----------|------|------|-----------|
-| General | EnableConsole | デバッグコンソールの表示 (1/0) | hooks.cpp |
-| General | LogFilePath | チャットログ出力先パス (空=DLL同階層) | hooks.cpp |
-| General | InitDelayMs | UE4初期化待機時間 (ms, デフォルト: 10000) | dllmain.cpp |
-| Addresses | ProcessEventVtableIndex | ProcessEvent vtableインデックス (デフォルト: 66) | dllmain.cpp |
+### 命名規則
+- 関数: `PascalCase` (`Init()`, `OnProcessEvent()`, `FindBundledOllama()`)
+- ローカル変数: `camelCase` (`hostPort`, `slashPos`)
+- グローバル/static変数: `g_` prefix + `camelCase` (`g_hSession`, `g_mutex`)
+- namespace: `snake_case` (`hooks`, `config`, `logging`, `translate`, `gnames`, `overlay`, `tts`)
+- 構造体/enum: `PascalCase` (`Config`, `ChatMessage`, `RadioState`)
+- 定数/マクロ: `ALL_CAPS` (`MAX_PE_HOOKS`, `MAX_QUEUE_SIZE`)
+- UE4由来の定数名はUE4の命名をそのまま使用する (`FUNC_Net`, `EObjectFlags` 等、正規化しない)
 
-> Discovery, Patterns, Stage2, Stage3 セクションはconfig.iniに存在するが、
-> 現在のコードでは読み込まれない（将来のStage 2/3実装用プレースホルダー）。
+### スタイルルール
+- C++17 (`CMAKE_CXX_STANDARD 17`)
+- `#pragma once` (全ヘッダ統一)
+- インクルード順序: `<windows.h>` → C標準 (`<cstdio>`) → C++標準 (`<string>`, `<mutex>`) → 外部 (`<MinHook.h>`, `"imgui.h"`) → プロジェクト内 (`"log.h"`)
+- C++ 例外は使用しない。エラーは `bool` 返却 + `logging::Debug()` で報告
+- UE4メモリ読み取りには `__try/__except` (SEH) でクラッシュ保護
+- スレッド同期: `std::mutex` + `std::lock_guard` / `std::unique_lock`。フラグは `std::atomic<bool>`
+- 内部文字列は `std::string` (UTF-8)。UE4 `FString` は即座に `FStringToUtf8()` で変換
+- JSON: 手書き (`JsonEscape()`, `ExtractResponse()`)。外部ライブラリ不使用
+- ファイルI/O: `fopen`/`fprintf`/`fflush` (iostream未使用)
+- HTTP通信: `WinHTTP` (libcurl等の外部ライブラリ不使用)
+- INI読込: `GetPrivateProfileStringA` (自前パーサー不使用)
+- TTS: WinRT COM API (`RoInitialize`, `ComPtr<>`, `HStringReference`)
+- モジュール構成: namespace + free function + static 内部状態 (クラスベースではない)
+- 内部関数/変数は `static` (無名namespace未使用)
+- コメント・ログ文字列は日本語
 
-## 開発ロードマップ (6段階)
+## Rules
 
-### Stage 1: チャットキャプチャ + テキストファイル出力 ✅ 完了
-- ProcessEventフックで3種のチャットRPCを検出:
-  - ClientChatMessage, ClientChatMessageWithTag, ClientWorldChatMessage
-- Dumper-7 SDK準拠の構造体でparms直接キャスト（FString探索不要）
-- 検出メッセージをコンソール表示 + chat_log.txt にUTF-8で記録
+### 絶対禁止
+- ゲームクライアントのメモリを**書き換えるコードを生成してはならない**（読み取りのみ）
+- `DllMain` 内で `LoadLibrary` 等のローダーロック違反操作を行わない
+- `WIN32_LEAN_AND_MEAN` / `NOMINMAX` をソースで再定義しない（CMake定義済み）
 
-### Stage 2: ラジオオーバーレイ表示 (未着手)
-- 画面右上にラジオアイコン (32×32px) を常時オーバーレイ表示
-- ゲームクライアントのメモリは書き換えない
+### 必須ルール
+- UE4構造体のフィールドオフセットは Dumper-7 SDK 準拠とする (SDK: `War_parameters.hpp`, 出力先: `C:\Dumper-7\4.24.3-0+++UE4+Release-4.24-War\CppSDK\`)
+- MinHookフックは `MH_EnableHook` / `MH_DisableHook` でペア管理する
+- ProcessEvent コールバック内は最小限の処理のみ。重い処理は別スレッドに委譲
+- 翻訳処理は描画スレッドをブロックしない（非同期実行）
 
-### Stage 3: ショートカットキーでラジオON/OFF (未着手)
-- Pキーでラジオアイコンを半透明トグル (ON/OFF表現)
+## Key Design Decisions
 
-### Stage 4: ラジオON/OFFボイス再生 (未着手)
-- 状態切り替え時に "Radio ON" / "Radio OFF" ボイスを再生
+- **vtable先頭境界検出**: `addr[-1]` がモジュール内コードを指さない位置を検出しないとスライディングウィンドウで大量の偽陽性が出る。vtable候補は `[0],[1],[2]` がモジュール内コードを指すか確認
+- **GNames検出**: FNamePool Block[0]をヒープメモリ走査で検出し、モジュール内逆引きでBlocks[]配列を特定。FNameBlockOffsetBits は 16 にハードコード、TryDetectShift() で自動補正
+- **チャットキャプチャ**: 監視対象は ClientChatMessage / ClientChatMessageWithTag / ClientWorldChatMessage のみ (ServerChat系は除外)。判定は FName ComparisonIndex一致 + FUNC_Net (0x40) フラグ検証。重複排除は sender+message+channel, 500ms窓
 
-### Stage 5: ローカル自動翻訳テスト (未着手)
-- 固定メッセージを英/露/韓/中/日に翻訳 (ローカル完結、GPU不使用)
+## Known Pitfalls
 
-### Stage 6: ローカル多言語読み上げテスト (未着手)
-- 固定メッセージを多言語TTS読み上げ (ローカル完結)
-- 非同期リクエスト + キャッシュで遅延を最小化する設計が必要
-
-### Stage 3: 翻訳結果のゲーム内表示 (未着手)
-- チャット表示テキストを翻訳結果に直接置き換え、またはparms書き換えで接頭辞追加
-
-## 技術詳細
-
-### UE4オフセット (Foxhole UE4 4.24.3 x64, Dumper-7 SDK確認済み)
-- ProcessEvent vtableインデックス: **66 (0x42)**
-- UObject::ClassPrivate: +0x10
-- UObject::NamePrivate: +0x18 (FName = ComparisonIndex:int32 + Number:int32)
-- UObject::OuterPrivate: +0x20
-- UFunction::FunctionFlags: +0x98 (FUNC_Net = 0x40)
-- APlayerState::PlayerNamePrivate: +0x328
-
-### GNames / FNamePool
-- FNameEntryHeader: `(Len<<1) | bIsWide` → headerShift = **1** (UE4 4.24系)
-- FNameBlockOffsetBits = **16** (自動検出済み)
-- ComparisonIndex: `(block << 16) | (offset / stride)`, stride=2
-- Block[0]検出: メモリ全域走査で "None" + gap(2/8) + "ByteProperty" の複合パターン
-- FNamePool検出: Block[0]ポインタをモジュール内(.data)で逆引き → Blocks[]配列
-
-### チャットparms構造体 (Dumper-7 SDK: War_parameters.hpp)
-- ClientChatMessage (0x28): Channel+0x00, SenderPlayerState+0x08, MsgString+0x10
-- ClientChatMessageWithTag (0x38): Channel+0x00, SenderPlayerState+0x08, RegTag+0x10, MsgString+0x20
-- ClientWorldChatMessage (0x48): Message+0x00, SenderName+0x10, RegTag+0x20, Channel+0x41
-- ServerChat (0x18): 送信RPCのため監視不要。除外済み（不正parmsからゴミデータが出力される）
-
-### DLL初期化フロー
-1. DllMain(DLL_PROCESS_ATTACH) → LoadOriginalDll(17関数) → CreateThread(InitThread)
-2. InitThread: AllocConsole → SetConsoleOutputCP(UTF8) → Sleep(InitDelayMs)
-3. MH_Initialize → vtableパターンスキャン → .rdata全vtable走査でユニークPE収集 → MinHookフック
-4. LoadWorker: chat_translator.dllをコピー→ロード→WorkerInit()→コールバック設定
-5. ホットキーループ: F9=リロード, F10=アンロード, F11=ステータス + 自動リロード + 整合性チェック
-
-### vtableスキャナーの重要ポイント
-- **vtable先頭境界検出が必須**: addr[-1]がモジュール内コードを指さない位置 = vtable先頭
-  - これがないとスライディングウィンドウで大量の偽陽性が出る
-- vtable候補判定: [0],[1],[2]がモジュール内コードを指すか確認
-- 全ユニークPEアドレスに個別MinHookフック (最大64個)
-
-## テスト方法
-
-### 単体テスト (ゲーム不要)
-```powershell
-cd build/Release
-.\test_loader.exe
-```
-
-### ゲームテスト
-```powershell
-Start-Process "steam://rungameid/505460"
-# コンソールに [ChatTranslator] [Team] sender: message 形式で出力される
-# F9でワーカーホットリロード
-```
-
-### アンインストール
-```powershell
-Remove-Item "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64\version.dll"
-Remove-Item "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64\config.ini"
-Remove-Item "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64\chat_translator*.dll"
-```
-
-## Git
-- author: Yohei Ikata <ikata-yohei@jsdnet.co.jp>
-- リポジトリルート: Foxholeインストールディレクトリ
-
-## 学んだ教訓
-
-### SDK出力を最初に確認すること
-- HWBPやランタイムデバッグより、Dumper-7等のSDK出力が信頼性高い
-- HWBPでvtable[77]と測定 → 実際はDumper-7 SDKの通りvtable[66]だった
-- 間違ったインデックスの症状: コールバックは大量に来るがプロパティ名しか見えない
-
-### ServerChat (送信RPC) を監視してはいけない
-- ServerChatはクライアント→サーバーの送信RPC (NetServer)
-- UE4のRPC処理中に同じFName CIを持つ別のProcessEvent呼び出しが発生し、不正parmsからゴミデータが読まれる
-- プレイヤー自身のメッセージはサーバーからClientChatMessage/WithTagとして折り返されるので機能的に不要
-
-### FNameBlockOffsetBits自動検出の順序
-- 降順 (16→14) で試行すること。昇順だとblock=0のCIがどのshiftでも同じ結果になり小さいshiftを誤検出
-- CI >= 65536 のフィルタが必須 (block>0の場合のみ有効な判別可能)
-
-### UE4 RPC関数の重複
-- ClientChatMessage + ClientChatMessageWithTag が同一メッセージで両方発火する
-- 500ms重複排除ウィンドウ (channel + sender + message をキーに) で対処
-
-### 偽陽性UPropertyマッチへの対処
-- FName CIの偶然一致でUPropertyなどがUFunctionと誤認される
-- UFunction::FunctionFlags (offset 0x98) の FUNC_Net (0x40) 検証で偽陽性を除去
-
-### ゲーム起動中のversion.dllコピー失敗は正常
-- ゲームがversion.dllをロック中のためコピーが失敗するが、chat_translator.dllは正常にコピー・リロード可能
-
-## 既知の課題・注意事項
 - EasyAntiCheat (EAC) によりBAN対象の可能性あり（自己責任）
-- ゲームアップデートでオフセットが変更される可能性あり → TryDetectShiftで一部自動対応
+- ゲームアップデートでオフセット変更の可能性あり → TryDetectShift で一部自動対応
+- Ollama がダウンすると FAULT 状態 → 原文のみ表示 + TTS再生、アイコンクリックで Ollama 再起動試行
+- UE4オフセット・構造体レイアウト・parms解析の詳細は `docs/ue4-reversing-foxhole.md` を参照
+- 初期化フロー・パイプライン・config.ini 詳細は `docs/project-notes.md` を参照

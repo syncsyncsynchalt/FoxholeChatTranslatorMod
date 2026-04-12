@@ -2,30 +2,127 @@
 
 ## 現在の状態
 
-Stage 1-8 完了。
+Stage 1-9 完了。
 
-## 初期化フロー
+## 技術詳細 (copilot-instructions.md から移動)
 
+### ファイル構成
+
+```
+Mods/ChatTranslator/
+├── .github/copilot-instructions.md  # Copilot指示書
+├── CMakeLists.txt          # ビルド構成 (version.dll + chat_translator.dll + test_loader + translate_test)
+├── version.def             # DLLエクスポート定義 (17関数)
+├── config.ini              # ランタイム設定
+├── assets/                 # フォント、効果音、アイコン
+├── docs/                   # 開発メモ、リバースエンジニアリング知見
+├── test/                   # test_loader.cpp, translate_test.cpp
+├── tools/ollama/           # CPU-only Ollamaバイナリ同梱
+└── src/
+    ├── dllmain.cpp         # version.dll: プロキシ + vtableフック + Presentフック + ワーカーローダー
+    ├── scanner.h/cpp       # パターンスキャナー (.text/.rdataセクション走査)
+    ├── worker_main.cpp     # chat_translator.dll エントリポイント
+    ├── hooks.h/cpp         # ProcessEventコールバック + チャット判定
+    ├── gnames.h/cpp        # FNamePool検出エンジン
+    ├── config.h/cpp        # config.ini → Config構造体
+    ├── log.h/cpp           # スレッドセーフログ
+    ├── overlay.h/cpp       # DX11 ImGuiオーバーレイ
+    ├── translate.h/cpp     # Ollama WinHTTP翻訳
+    ├── tts.h/cpp           # WinRT OneCore + XAudio2 TTS
+    ├── ue4.h               # UE4内部型定義 (Dumper-7 SDK準拠)
+    ├── chat_message.h      # ChatMessage構造体
+    └── radio_icon.h        # 埋め込みRGBAデータ (32×32px)
+```
+
+### config.ini
+
+| セクション | キー | Config フィールド | デフォルト | 説明 |
+|-----------|------|------------------|-----------|------|
+| General | EnableConsole | enableConsole | true | デバッグコンソール表示 |
+| General | LogFilePath | logFilePath | "" | チャットログ出力先 (空=DLL同階層) |
+| General | InitDelayMs | initDelayMs | 10000 | UE4初期化待機(ms) |
+| Discovery | DumpAllEvents | dumpAllEvents | false | 全ProcessEvent出力(デバッグ用) |
+| Discovery | FunctionNameFilter | functionNameFilter | "" | 関数名フィルタ (カンマ区切り) |
+| Stage2 | Prefix | prefix | "★" | チャット接頭辞 |
+| Translation | Enabled | translationEnabled | true | 翻訳機能の有効/無効 |
+| Translation | OllamaEndpoint | ollamaEndpoint | "http://localhost:11434/api/generate" | Ollama APIエンドポイント |
+| Translation | OllamaModel | ollamaModel | "gemma3:4b" | 使用モデル |
+| Translation | TargetLanguage | targetLanguage | "Japanese" | 翻訳先言語 |
+| Translation | NumCtx | numCtx | 256 | コンテキスト長(メモリ削減) |
+| Translation | NumThread | numThread | 2 | CPUスレッド数 |
+| Overlay | DemoMode | demoMode | true | デモモード |
+| Addresses | ProcessEventVtableIndex | - | 66 | ProcessEvent vtableインデックス |
+
+### DLL初期化フロー
 1. ゲーム起動 → Windows が War/Binaries/Win64/version.dll をロード (DLLプロキシ)
-2. dllmain.cpp DLL_PROCESS_ATTACH → config.ini から InitDelayMs, ProcessEventVtableIndex 読み込み → Sleep(InitDelayMs)
-3. .rdataセクション走査 → vtable[ProcessEventVtableIndex] の全実装を MinHook でフック (最大64枠)
-4. chat_translator.dll を LoadLibrary → WorkerInit() 呼び出し
-5. worker_main.cpp WorkerInit() → hooks::Init()
-6. hooks::Init() → config::Load() → logging::Init() → gnames::Find()
-7. gnames::Find() → ヒープメモリスキャンで FNamePool 検出 → FNameBlockOffsetBits 自動判定
-8. チャット関連UFunctionの ComparisonIndex を gnames::FindFNameIndex() で逆引き・キャッシュ
-9. ProcessEvent コールバック(hooks::OnProcessEvent)がフックから呼ばれる状態に
+2. dllmain.cpp DLL_PROCESS_ATTACH → LoadOriginalDll(17関数) → CreateThread で InitThread を起動 (ローダーロック回避)
+3. InitThread → AllocConsole → SetConsoleOutputCP(UTF8) → config.ini から InitDelayMs 読み込み → Sleep(InitDelayMs)
+4. MH_Initialize → config.ini から ProcessEventVtableIndex 読み込み → .rdataセクション走査 → vtable[peIndex] の全実装を MinHook でフック (最大64枠)
+5. DX11 Presentフック: ダミーデバイスでvtable[8]取得 → MinHookフック → WndProcサブクラス
+6. chat_translator.dll を LoadLibrary → WorkerInit() 呼び出し → コールバック設定(ProcessEvent/Render/WndProc)
+7. worker_main.cpp WorkerInit() → hooks::Init() → overlay::Init() → translate::Init()
+8. hooks::Init() → config::Load() → logging::Init() → gnames::Find()
+9. gnames::Find() → ヒープメモリスキャンで FNamePool 検出 (FNameBlockOffsetBits は 16 にハードコード)
+10. チャット関連UFunctionの ComparisonIndex を gnames::FindFNameIndex() で逆引き・キャッシュ
+11. overlay::Init() → TTS初期化 + デモモードなら初回非同期翻訳開始
+12. translate::Init() → Ollama同梱バイナリ自動起動 (FindBundledOllama → StartOllamaServe → EnsureOllama)
+13. OnProcessEvent 初回100回で hooks::TryDetectShift() により FNameBlockOffsetBits を自動検証・補正
 
-## データフロー (チャットキャプチャ)
+### 翻訳・表示・TTS パイプライン
+1. hooks::OnProcessEvent → ChatMessage構築 → overlay::OnChatMessage(sender, message)
+2. overlay::OnChatMessage → ラジオON時のみ AsyncTranslate スレッド起動
+3. AsyncTranslate → translate::Sync(text) で Ollama 翻訳 (別スレッド、描画ブロックなし)
+4. 翻訳完了 → g_originalText / g_translatedText を更新 → tts::Speak(text, sender)
+5. TTS → 言語自動判定 → 送信者名から決定論的にOneCore音声を選択 → 読み上げ
+6. RenderFrame → マーキースクロールで原文+翻訳を表示
+
+Ollamaダウン時: 原文のみ表示 + TTS再生、ラジオアイコンが赤色(FAULT)に変化。FAULTアイコンクリックでOllama再起動を試行。
+
+### データフロー (チャットキャプチャ)
 
 ProcessEvent呼び出し → hooks::OnProcessEvent(thisObj, function, parms)
-→ function->FunctionFlags & FUNC_Net(0x01000000) チェック
 → function->NamePrivate.ComparisonIndex をキャッシュ済みCIと照合
+→ 一致時 function->FunctionFlags & FUNC_Net(0x40) チェック
 → 一致 → parms を対応する Parms_* 構造体にキャスト
 → FStringToUtf8 で sender/message 抽出
 → 重複排除 (sender+message+channel, 500ms窓)
 → ChatMessage{channel, sender, message, channelEnum, timestamp} 構築
 → logging::Chat() + logging::Debug() で出力
+→ overlay::OnChatMessage(sender, message) で翻訳・TTS転送
+
+### ラジオアイコン状態
+
+| 状態 | 外観 | 動作 | クリック時 |
+|---|---|---|---|
+| ON | 不透明 | 翻訳+TTS+テキスト表示 | OFFに切替 |
+| OFF | 半透明 | テキスト非表示、翻訳停止 | ONに切替 |
+| FAULT | 赤色 | 原文表示+TTS (翻訳なし) | Ollama再起動試行 |
+
+### Stage 実装状態
+
+| Stage | 内容 | 状態 |
+|---|---|---|
+| 1 | チャットキャプチャ + ログ出力 | 完了 |
+| 2 | ラジオオーバーレイ表示 (DX11 Present + ImGui, 画面右下32×32px) | 完了 |
+| 3 | ラジオON/OFF (アイコンクリックでトグル、半透明切替) | 完了 |
+| 4 | ラジオON/OFFボイス再生 (radio_on.wav / radio_off.wav) | 完了 |
+| 5 | Ollama翻訳 (gemma3:4b, WinHTTP, EN/RU/KO/ZH→JA) | 完了 |
+| 6 | 翻訳表示領域 (画面右下、マーキースクロール、NotoSansCJK) | 完了 |
+| 7 | 多言語TTS (WinRT OneCore + XAudio2, 言語自動判定) | 完了 |
+| 8 | リアルタイム翻訳 + ヘルスチェック + FAULT状態 + 自動復旧 | 完了 |
+| 9 | 実チャット翻訳・読み上げ + 送信者別ボイス + デモ/実チャット切替 | 完了 |
+
+## Stage 1 実装計画 — チャットキャプチャ
+
+目的: ゲーム内チャットメッセージをリアルタイムに傍受・抽出する。
+実装内容:
+- DLLプロキシ方式でゲームプロセスに自動注入する
+- UE4 の ProcessEvent をフックしてチャット関連イベントを捕捉する
+- UE4 の FName テーブルを自動検出し、チャット関連関数を名前で特定する
+- チャットメッセージから送信者名・本文・チャンネルを抽出する
+- 同一メッセージの重複を排除する (500ms窓)
+- 抽出したメッセージをログに出力する
+- フック対象やタイミングを config.ini で調整可能にする
 
 ## Stage 2 実装計画 — ラジオオーバーレイ表示
 
@@ -162,7 +259,34 @@ TTS ボイス割り当て:
 - デモモードと実チャットモードで翻訳・TTS の処理フローは共通とする
 - 翻訳は描画スレッドをブロックしない
 
+
+## テスト方法
+
+### 単体テスト (ゲーム不要)
+```powershell
+cd build/Release
+.\test_loader.exe        # DLL動作確認
+.\translate_test.exe "Hello world"  # Ollama翻訳テスト
+```
+
+### ゲームテスト
+```powershell
+Start-Process "steam://rungameid/505460"
+# コンソールに [ChatTranslator] [Team] sender: message 形式で出力される
+# F9でワーカーホットリロード, F10=アンロード, F11=ステータス
+```
+
+### アンインストール
+```powershell
+$dir = "C:\Program Files (x86)\Steam\steamapps\common\Foxhole\War\Binaries\Win64"
+Remove-Item "$dir\version.dll", "$dir\chat_translator*.dll", "$dir\config.ini" -ErrorAction SilentlyContinue
+Remove-Item "$dir\assets", "$dir\tools" -Recurse -ErrorAction SilentlyContinue
+```
+
 ## トラブルシューティング
 
 - チャット未検出: コンソールで "GNames: FNamePool 発見!" 確認 → "ProcessEvent フック: N/M 成功" 確認 → ProcessEventVtableIndex=66 確認 → InitDelayMs を増やす
-- ホットリロード: F9キー or chat_translator.dll ファイル変更で自動検出
+- ホットリロード: F9キー or chat_translator.dll ファイル変更で自動検出 (2秒ごとFILETIME監視)
+- Ollama未起動: ラジオアイコンが赤(FAULT)になる → アイコンクリックで再起動、または tools/ollama/ollama.exe serve を手動実行
+- TTS音声なし: Windows OneCore音声パックがインストールされているか確認 (管理者PowerShellで Add-WindowsCapability)
+- フォント表示崩れ: assets/NotoSansCJKjp-Regular.otf が War/Binaries/Win64/assets/ にコピーされているか確認
