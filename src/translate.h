@@ -10,11 +10,9 @@ namespace translate {
 
 struct TranslateConfig {
     std::string endpoint   = "http://localhost:11434/api/generate";
-    std::string model      = "gemma3:4b";
     std::string targetLang = "Japanese";
-    std::string ollamaDir;  // 同梱 ollama.exe のディレクトリ (空=自動検出)
-    int numCtx    = 256;    // コンテキスト長 (メモリ削減)
-    int numThread = 2;      // CPUスレッド数
+    std::string ollamaDir;          // 同梱 ollama.exe のディレクトリ (空=自動検出)
+    std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"
 };
 
 // Ollama 死活確認 (GET /api/version)

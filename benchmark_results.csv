@@ -1,0 +1,153 @@
+﻿Pattern,Model,NumCtx,NumThread,Sentence,SentenceLen,Run,ElapsedMs,TokensPerSec,EvalCount,MemoryMB,Translation
+4b-Baseline,gemma3:4b,256,2,Short,9,1,7721,10.18,5,4085.8,"弾を必要としている"
+4b-Baseline,gemma3:4b,256,2,Short,9,2,957,10.55,5,4174.3,"弾を必要としている"
+4b-Baseline,gemma3:4b,256,2,Short,9,3,1150,10.23,7,4166.3,"弾を必要としています。"
+4b-Baseline,gemma3:4b,256,2,Medium,44,1,2555,8.98,12,4171.6,"門を再建する必要がある、今は防御が必要だ"
+4b-Baseline,gemma3:4b,256,2,Medium,44,2,1994,9.16,14,4179.2,"門を再建しなければなりません。今すぐに防御が必要なのです。"
+4b-Baseline,gemma3:4b,256,2,Medium,44,3,2093,9.21,15,4186.7,"門を再建し、今すぐに防御を立てる必要があります。"
+4b-Baseline,gemma3:4b,256,2,Long,107,1,4849,8.79,25,4183.8,"皆さん、前線に人員を増やす必要があります。敵は激しく押し寄せ、物資が不足しています。"
+4b-Baseline,gemma3:4b,256,2,Long,107,2,3276,8.88,25,4182.6,"みんな、前線に人員を増やしてほしい。敵が強く攻めていて、物資が不足している。"
+4b-Baseline,gemma3:4b,256,2,Long,107,3,3413,8.82,26,4180.6,"みんな、前線に人員を増やしてほしい。敵が激しく攻めていて、物資が不足している。"
+4b-Thread4,gemma3:4b,256,4,Short,9,1,5174,12.62,7,4118.5,"弾を必要としています。"
+4b-Thread4,gemma3:4b,256,4,Short,9,2,1015,12.93,7,4180.6,"弾を必要としています。"
+4b-Thread4,gemma3:4b,256,4,Short,9,3,915,14.26,7,4185.3,"弾を必要としています。"
+4b-Thread4,gemma3:4b,256,4,Medium,44,1,1791,13.6,13,4197.8,"門を再建する必要があります。今、防御が必要なのです。"
+4b-Thread4,gemma3:4b,256,4,Medium,44,2,1612,13.46,16,4172.1,"門をもう一度建て直して、今すぐに防御を築きましょう。"
+4b-Thread4,gemma3:4b,256,4,Medium,44,3,1207,14.15,11,4177.2,"門を建て直しましょう、今は防御が必要だ"
+4b-Thread4,gemma3:4b,256,4,Long,107,1,3217,13.46,27,4180.6,"皆さん、前線に人員を増やしてほしいです。敵が激しく攻めていて、物資が不足しています。"
+4b-Thread4,gemma3:4b,256,4,Long,107,2,2375,13.47,26,4198.6,"皆さん、前線に人員を増やす必要があります。敵は激しく攻めていて、物資が不足しています。"
+4b-Thread4,gemma3:4b,256,4,Long,107,3,2614,13.37,29,4197.1,"皆さん、前線に人員を増やしていただきたいです。敵が容赦なく攻めており、物資が不足しています。"
+4b-ThreadMax,gemma3:4b,256,8,Short,9,1,4414,13.6,7,4115.3,"弾を必要としています。"
+4b-ThreadMax,gemma3:4b,256,8,Short,9,2,975,13.53,7,4174.8,"弾を必要としています。"
+4b-ThreadMax,gemma3:4b,256,8,Short,9,3,992,13.68,7,4192.6,"弾を必要としています。"
+4b-ThreadMax,gemma3:4b,256,8,Medium,44,1,1860,13.74,16,4207.7,"門を再建し、今すぐに防御を整えなければなりません。"
+4b-ThreadMax,gemma3:4b,256,8,Medium,44,2,1370,13.85,13,4197.7,"門を再建しなければなりません。今、防御が必要です。"
+4b-ThreadMax,gemma3:4b,256,8,Medium,44,3,1441,13.9,14,4185.1,"門を再建しなければなりません。今こそ防衛が必要です。"
+4b-ThreadMax,gemma3:4b,256,8,Long,107,1,3013,13.2,28,4175.5,"皆さん、前線にはもっと人員が必要だ。敵が容赦なく攻め込んでいる上に、物資が不足している。"
+4b-ThreadMax,gemma3:4b,256,8,Long,107,2,2595,13.1,28,4184.1,"やあみんな、前線にはもっと人員が必要だ。敵が激しく攻撃してきており、物資が不足している。"
+4b-ThreadMax,gemma3:4b,256,8,Long,107,3,2618,13.12,28,4187.4,"やあみんな、前線にはもっと人員が必要だ。敵は激しく攻め立てており、物資が不足している"
+4b-ThreadAuto,gemma3:4b,256,0,Short,9,1,4343,13.86,7,4144.1,"弾を必要としています。"
+4b-ThreadAuto,gemma3:4b,256,0,Short,9,2,966,13.7,7,4182.8,"弾を必要としています。"
+4b-ThreadAuto,gemma3:4b,256,0,Short,9,3,963,13.63,7,4205.3,"弾を必要としています。"
+4b-ThreadAuto,gemma3:4b,256,0,Medium,44,1,1668,12.94,13,4173.5,"門をもう一度建て直して、今は防御が必要だ"
+4b-ThreadAuto,gemma3:4b,256,0,Medium,44,2,1569,12.49,14,4195.9,"門を再建しなければなりません。今、防御が必要なのです。"
+4b-ThreadAuto,gemma3:4b,256,0,Medium,44,3,1280,12.29,10,4188.7,"門を再建し、防御が必要だ"
+4b-ThreadAuto,gemma3:4b,256,0,Long,107,1,3456,12.41,31,4176.2,"やあみんな、前線にはもっと人員が必要だ。敵が容赦なく攻め込めており、物資が不足している。
+"
+4b-ThreadAuto,gemma3:4b,256,0,Long,107,2,2586,11.69,25,4179.4,"みんな、前線に人員を増やしてほしい。敵が強く攻めていて、物資が不足している。"
+4b-ThreadAuto,gemma3:4b,256,0,Long,107,3,2608,13,28,4183.9,"やあみんな、前線にはもっと人員が必要だ。敵が容赦なく攻めてきて、物資が不足している。"
+4b-Ctx128,gemma3:4b,128,4,Short,9,1,4927,13.89,5,4091.3,"弾を必要としている"
+4b-Ctx128,gemma3:4b,128,4,Short,9,2,1004,13.07,7,4160.2,"弾を必要としています。"
+4b-Ctx128,gemma3:4b,128,4,Short,9,3,895,15.17,7,4180.2,"弾を必要としています。"
+4b-Ctx128,gemma3:4b,128,4,Medium,44,1,1641,13.61,11,4169.5,"門を再建する必要がある、防御が必要だ"
+4b-Ctx128,gemma3:4b,128,4,Medium,44,2,1442,13.76,14,4186.9,"門を再建し、今すぐに防御を強化する必要がある"
+4b-Ctx128,gemma3:4b,128,4,Medium,44,3,1770,13.37,18,4169.8,"門をもう一度建て直して、今すぐに防御を築かなければなりません。"
+4b-Ctx128,gemma3:4b,128,4,Long,107,1,3392,12.98,28,4183.3,"皆さん、前線に人員を増やしてほしいです。敵が容赦なく攻めていて、物資が不足しています。"
+4b-Ctx128,gemma3:4b,128,4,Long,107,2,2470,13.99,28,4177,"皆さん、前線に人員を増やしていただきたいです。敵が激しく攻めていて、物資が不足しています。"
+4b-Ctx128,gemma3:4b,128,4,Long,107,3,2397,14.27,28,4190.7,"やあみんな、前線にはもっと人員が必要だ。敵が容赦なく攻めていて、物資が不足している。"
+4b-Ctx512,gemma3:4b,512,4,Short,9,1,1016,15.98,7,4179.2,"弾を必要としています。"
+4b-Ctx512,gemma3:4b,512,4,Short,9,2,732,16.19,5,4183.6,"弾を必要としている"
+4b-Ctx512,gemma3:4b,512,4,Short,9,3,893,14.8,7,4172.1,"弾を必要としています。"
+4b-Ctx512,gemma3:4b,512,4,Medium,44,1,1727,13.99,13,4180.7,"門を再建しなければなりません。今すぐ防御が必要です。"
+4b-Ctx512,gemma3:4b,512,4,Medium,44,2,1197,14.54,11,4185.7,"門を再建する必要がある、防御が必要だ"
+4b-Ctx512,gemma3:4b,512,4,Medium,44,3,1352,13.94,13,4177.3,"門を再建し、今すぐに防御を必要とする"
+4b-Ctx512,gemma3:4b,512,4,Long,107,1,3116,13.66,26,4184.6,"やあみんな、前線に人員を増やしてほしい。敵が強く攻めていて、物資が不足している"
+4b-Ctx512,gemma3:4b,512,4,Long,107,2,2369,13.41,26,4181.6,"皆さん、前線に人員を増やす必要があります。敵が激しく攻めていて、物資が不足しています。"
+4b-Ctx512,gemma3:4b,512,4,Long,107,3,2361,13.54,26,4180.6,"皆さん、前線に人員を増やしてほしいです。敵が激しく押し寄せ、物資が不足しています。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Short,9,1,4334,13.73,7,4160.1,"弾を必要としています。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Short,9,2,959,13.7,7,4178.7,"弾を必要としています。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Short,9,3,967,13.67,7,4194.7,"弾を必要としています。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Medium,44,1,1897,13.58,17,4182,"門を建て直して、今すぐ防御を築かなければなりません。
+"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Medium,44,2,1698,14.28,18,4178.7,"ゲートをもう一度建て直して、今すぐ防御を築かなければなりません。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Medium,44,3,1422,13.19,13,4195.4,"門を再建しなければなりません。今、防御が必要です。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Long,107,1,2791,13.6,26,4182.4,"やあみんな、前線にはもっと人員が必要だ。敵が激しく押し寄せ、物資が不足している。"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Long,107,2,2858,13.25,32,4181.4,"やあみんな、前線にはもっと人員が必要だ。敵が容赦なく攻め込んでいる上に、物資が底をつきかけている"
+4b-MinCtx+MaxThread,gemma3:4b,128,8,Long,107,3,2381,13.85,27,4174.6,"やあみんな、前線にはもっと人員が必要だ。敵が強襲をかけていて、物資が不足している。"
+1b-Thread4,gemma3:1b,256,4,Short,9,1,2324,41.73,7,5377.9,"弾薬が必要です。
+"
+1b-Thread4,gemma3:1b,256,4,Short,9,2,567,43.18,8,5419.4,"弾薬を必要です。
+"
+1b-Thread4,gemma3:1b,256,4,Short,9,3,533,41.93,7,5444,"弾薬が必要です。
+"
+1b-Thread4,gemma3:1b,256,4,Medium,44,1,887,37.62,15,5457.3,"門を開き直しましょう。今、防衛が必要です。
+"
+1b-Thread4,gemma3:1b,256,4,Medium,44,2,893,36.6,19,5462.6,"防衛線を取り戻す必要があり、今すぐ防御を確立する必要がある。
+"
+1b-Thread4,gemma3:1b,256,4,Medium,44,3,696,39.91,13,5469.7,"門を作り直しましょう。今は防衛が必要です。
+"
+1b-Thread4,gemma3:1b,256,4,Long,107,1,1372,37.7,29,5462,"仲間たち、前線の人員がもっと必要です。敵は押し寄せていますし、物資が少なくなってきました。"
+1b-Thread4,gemma3:1b,256,4,Long,107,2,1076,38.38,27,5470.3,"大家、先線にさらに人員が必要だ。敵は攻勢を強めているし、物資が少なくなっている。"
+1b-Thread4,gemma3:1b,256,4,Long,107,3,1206,33.51,28,5472.5,"みんな、先手の人員を増やすべきだ。敵は攻勢を強めていて、供給が少なくなっている。
+"
+1b-ThreadAuto,gemma3:1b,256,0,Short,9,1,2082,41.19,6,5386,"弾薬が必要です。"
+1b-ThreadAuto,gemma3:1b,256,0,Short,9,2,551,43.47,7,5430.4,"弾薬を必要です。"
+1b-ThreadAuto,gemma3:1b,256,0,Short,9,3,534,43.32,7,5464.7,"弾薬が必要ですか？
+"
+1b-ThreadAuto,gemma3:1b,256,0,Medium,44,1,738,40.01,12,5465.1,"門を閉じて、防衛が必要だ。
+"
+1b-ThreadAuto,gemma3:1b,256,0,Medium,44,2,720,40.05,14,5466.1,"門を復興させてください。今、防衛が必要です。"
+1b-ThreadAuto,gemma3:1b,256,0,Medium,44,3,664,40.1,12,5468.6,"門を再構築する必要があります。今は防御が必要です。
+"
+1b-ThreadAuto,gemma3:1b,256,0,Long,107,1,1239,39.75,27,5481.4,"仲間たち、先手の人員が増える必要がある。敵は攻勢を強めているし、物資が不足している。
+"
+1b-ThreadAuto,gemma3:1b,256,0,Long,107,2,1150,41.11,32,5436.1,"仲間たち、先手の人員がもっと必要です。敵は攻勢を強めていますし、物資が少なくなってきました。
+"
+1b-ThreadAuto,gemma3:1b,256,0,Long,107,3,1111,38.09,28,5436.2,"各位、先手でさらに人員が必要です。敵は攻勢を強めていますし、所用品が減っています。
+"
+1b-ThreadMax,gemma3:1b,256,8,Short,9,1,2138,39.05,8,5453.2,"弾薬が欲しいです。
+"
+1b-ThreadMax,gemma3:1b,256,8,Short,9,2,518,42.97,7,5453.7,"弾薬をください。
+"
+1b-ThreadMax,gemma3:1b,256,8,Short,9,3,497,43.8,6,5434.4,"弾薬ください。
+"
+1b-ThreadMax,gemma3:1b,256,8,Medium,44,1,752,39.77,12,5439.3,"門を再建する必要があります。今は防衛が必要です。"
+1b-ThreadMax,gemma3:1b,256,8,Medium,44,2,773,39.67,15,5457,"門を再建し、今、防衛が必要だ。
+"
+1b-ThreadMax,gemma3:1b,256,8,Medium,44,3,711,39.71,14,5455.1,"門を復興させましょう。今は防衛が必要です。
+"
+1b-ThreadMax,gemma3:1b,256,8,Long,107,1,1136,38.53,23,5462.7,"皆さん、先手の人員が増える必要があります。敵は進攻しており、物資が不足しています。
+"
+1b-ThreadMax,gemma3:1b,256,8,Long,107,2,1145,38.05,29,5463.1,"仲間たち、先頭陣の人員を増やす必要があります。敵は前進を続けていますし、物資が不足しています。"
+1b-ThreadMax,gemma3:1b,256,8,Long,107,3,1001,38.24,24,5465,"皆さん、先手の人員が増えが必要です。敵は積極的に進攻しており、物資が不足しています。
+"
+270m-Thread4,gemma3:270m,256,4,Short,9,1,929,161.8,2,5967.5,"ammo"
+270m-Thread4,gemma3:270m,256,4,Short,9,2,222,140.79,3,5980.3," ammo
+"
+270m-Thread4,gemma3:270m,256,4,Short,9,3,225,187.45,2,5998.5,"Ammo"
+270m-Thread4,gemma3:270m,256,4,Medium,44,1,318,108.3,11,6004.4,"build the gates back up we need defenses now
+"
+270m-Thread4,gemma3:270m,256,4,Medium,44,2,309,105.11,11,6003.8,"build the gates back up we need defenses now
+"
+270m-Thread4,gemma3:270m,256,4,Medium,44,3,317,106.2,11,6010.1,"build the gates back up we need defenses now
+"
+270m-Thread4,gemma3:270m,256,4,Long,107,1,506,101.09,27,6009.2,"Hey guys, we need more people at the front line. The enemy is pushing hard and we're running low on supplies."
+270m-Thread4,gemma3:270m,256,4,Long,107,2,487,103.32,27,6009.3,"Hey guys, we need more people at the front line. The enemy is pushing hard and we're running low on supplies."
+270m-Thread4,gemma3:270m,256,4,Long,107,3,475,99.63,27,6009.6,"Hey guys, we need more people at the front line. The enemy is pushing hard and we're running low on supplies."
+270m-ThreadAuto,gemma3:270m,256,0,Short,9,1,985,130.72,3,5998.3,"ammo
+"
+270m-ThreadAuto,gemma3:270m,256,0,Short,9,2,222,134.74,3,6000.6,"ammo
+"
+270m-ThreadAuto,gemma3:270m,256,0,Short,9,3,268,103.74,7,5999.1,"Ammagurashi
+"
+270m-ThreadAuto,gemma3:270m,256,0,Medium,44,1,307,102.75,10,6001,"build the gates back up we need defenses now"
+270m-ThreadAuto,gemma3:270m,256,0,Medium,44,2,319,101.89,11,6005,"build the gates back up we need defenses now
+"
+270m-ThreadAuto,gemma3:270m,256,0,Medium,44,3,320,99.84,11,6004.8,"build the gates back up we need defenses now
+"
+270m-ThreadAuto,gemma3:270m,256,0,Long,107,1,517,95.31,26,6007.5,"Hey guys, we need more people at the front line. The enemy is pushing hard and we are running low on supplies."
+270m-ThreadAuto,gemma3:270m,256,0,Long,107,2,493,95.54,27,6012.3,"Hey guys, we need more people at the front line, the enemy is pushing hard, and we are running low on supplies."
+270m-ThreadAuto,gemma3:270m,256,0,Long,107,3,485,95.72,26,6012.5,"Hey guys, we need more people at the front line, the enemy is pushing hard and we are running low on supplies."
+270m-ThreadMax,gemma3:270m,256,8,Short,9,1,1069,97.53,9,6008.1,"Останься голодным."
+270m-ThreadMax,gemma3:270m,256,8,Short,9,2,245,115.99,5,6008.7,"Ammunition"
+270m-ThreadMax,gemma3:270m,256,8,Short,9,3,248,121.93,3,6009.2,"Ammo
+"
+270m-ThreadMax,gemma3:270m,256,8,Medium,44,1,316,102.7,11,6014.2,"build the gates back up we need defenses now
+"
+270m-ThreadMax,gemma3:270m,256,8,Medium,44,2,319,99.59,11,6012.2,"build the gates back up we need defenses now
+"
+270m-ThreadMax,gemma3:270m,256,8,Medium,44,3,314,101.86,11,6007,"build the gates back up we need defenses now
+"
+270m-ThreadMax,gemma3:270m,256,8,Long,107,1,520,94.57,27,6012.5,"Hey guys, we need more people at the front line. The enemy is pushing hard and we're running low on supplies."
+270m-ThreadMax,gemma3:270m,256,8,Long,107,2,469,99.37,26,6013.8,"Hey guys, we need more people at the front line. The enemy is pushing hard and we are running low on supplies."
+270m-ThreadMax,gemma3:270m,256,8,Long,107,3,505,98.3,27,6006.3,"Hey guys, we need more people at the front line. The enemy is pushing hard and we're running low on supplies."

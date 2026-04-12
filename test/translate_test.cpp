@@ -9,7 +9,7 @@
 //
 // オプション:
 //   --endpoint URL    Ollama API (既定: http://localhost:11434/api/generate)
-//   --model MODEL     モデル名    (既定: gemma3:4b)
+//   --preset PRESET   プリセット  (既定: Medium, Low/Medium/High)
 //   --lang LANG       翻訳先言語  (既定: Japanese)
 // ============================================================
 
@@ -54,13 +54,15 @@ int main(int /*argc*/, char* /*argv*/[]) {
     translate::TranslateConfig cfg;
     std::string inputText;
     std::string inputFile;
+    bool presetSpecified = false;
 
     // 引数パース
     for (int i = 1; i < (int)args.size(); i++) {
         if (args[i] == "--endpoint" && i + 1 < (int)args.size()) {
             cfg.endpoint = args[++i];
-        } else if (args[i] == "--model" && i + 1 < (int)args.size()) {
-            cfg.model = args[++i];
+        } else if (args[i] == "--preset" && i + 1 < (int)args.size()) {
+            cfg.performancePreset = args[++i];
+            presetSpecified = true;
         } else if (args[i] == "--lang" && i + 1 < (int)args.size()) {
             cfg.targetLang = args[++i];
         } else if (args[i] == "--file" && i + 1 < (int)args.size()) {
@@ -68,6 +70,14 @@ int main(int /*argc*/, char* /*argv*/[]) {
         } else if (args[i][0] != '-') {
             inputText = args[i];
         }
+    }
+
+    // --preset 未指定時は config.ini から読む
+    if (!presetSpecified) {
+        char buf[64] = {};
+        GetPrivateProfileStringA("Translation", "PerformancePreset", "Medium",
+                                  buf, sizeof(buf), ".\\config.ini");
+        cfg.performancePreset = buf;
     }
 
     // ログ初期化 (コンソール出力のみ)
@@ -132,7 +142,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
         // 対話モード
         printf("=== Foxhole Chat Translation Test ===\n");
         printf("Endpoint: %s\n", cfg.endpoint.c_str());
-        printf("Model:    %s\n", cfg.model.c_str());
+        printf("Preset:   %s\n", cfg.performancePreset.c_str());
         printf("Target:   %s\n", cfg.targetLang.c_str());
         printf("テキストを入力してください (空行で終了):\n\n");
 

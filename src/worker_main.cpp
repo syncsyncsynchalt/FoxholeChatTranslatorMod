@@ -28,11 +28,9 @@ __declspec(dllexport) void* WorkerInit() {
     const Config& cfg = config::Get();
     if (cfg.translationEnabled) {
         translate::TranslateConfig tcfg;
-        tcfg.endpoint   = cfg.ollamaEndpoint;
-        tcfg.model      = cfg.ollamaModel;
-        tcfg.targetLang = cfg.targetLanguage;
-        tcfg.numCtx     = cfg.numCtx;
-        tcfg.numThread  = cfg.numThread;
+        tcfg.endpoint          = cfg.ollamaEndpoint;
+        tcfg.targetLang        = cfg.targetLanguage;
+        tcfg.performancePreset = cfg.performancePreset;
         translate::Init(tcfg);
     }
 

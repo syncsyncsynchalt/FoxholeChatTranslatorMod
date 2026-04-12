@@ -66,6 +66,7 @@ cmake --build build --config Release --target chat_translator  # ワーカーの
 - ゲームクライアントのメモリを**書き換えるコードを生成してはならない**（読み取りのみ）
 - `DllMain` 内で `LoadLibrary` 等のローダーロック違反操作を行わない
 - `WIN32_LEAN_AND_MEAN` / `NOMINMAX` をソースで再定義しない（CMake定義済み）
+- 勝手にコミットしない、プッシュしない、PRを作成しない。コード生成が必要な場合は必ずユーザーに確認すること。
 
 ### 必須ルール
 - UE4構造体のフィールドオフセットは Dumper-7 SDK 準拠とする (SDK: `War_parameters.hpp`, 出力先: `C:\Dumper-7\4.24.3-0+++UE4+Release-4.24-War\CppSDK\`)

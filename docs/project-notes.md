@@ -153,110 +153,23 @@ TTS ボイス割り当て:
 
 ## Stage 10 実装計画 — Ollama 翻訳速度最適化
 
-目的: Ollama の翻訳が遅い問題を解決するため、パラメータのベンチマークを行い、PC スペックに応じた 3 段階のプリセットを提供する。
-背景:
-- 現状の設定 (num_ctx=256, num_thread=2) は省リソース寄りで翻訳レイテンシが大きい
-- スレッド数・コンテキスト長を調整することで大幅な高速化が見込める
-- ただし高速設定は CPU/メモリに負荷がかかるため、環境に応じた使い分けが必要
-- Ollama REST API の options で per-request に制御可能な速度関連パラメータは **num_ctx** と **num_thread** のみ (api/types.go Runner struct より確認)
-- モデルサイズも速度に大きく影響する。ベンチマーク対象: gemma3:4b (現行), gemma3:1b, gemma3:270m
-
-ベンチマーク:
-- ゲームを起動せずに Ollama 単独で実行できるベンチマークスクリプト (PowerShell) を作成する
-- 直接 Ollama REST API を叩いて計測する
-- テスト文は実チャットログの長さ分布に基づき、3段階で用意する
-
-テスト文:
-- **英語 → 日本語** の 3 段階
-  - 短文 (~10文字): 1文
-  - 中文 (~40文字): 1文
-  - 長文 (~80文字): 1文
-- ベンチマーク前に `ollama pull gemma3:1b` / `ollama pull gemma3:270m` でモデルを事前ダウンロードする
-
-ベンチマークパターン一覧 (全 13 パターン):
-  1. **4b-Baseline**: gemma3:4b, num_ctx=256, num_thread=2 (現行設定)
-  2. **4b-Thread4**: gemma3:4b, num_ctx=256, num_thread=4
-  3. **4b-ThreadMax**: gemma3:4b, num_ctx=256, num_thread=<物理コア数>
-  4. **4b-ThreadAuto**: gemma3:4b, num_ctx=256, num_thread=0 (Ollama デフォルト、ランタイムが自動決定)
-  5. **4b-Ctx128**: gemma3:4b, num_ctx=128, num_thread=4 (※システムプロンプト ~55トークン+入出力で128を超える可能性あり。切り詰め発生時はパターンから除外)
-  6. **4b-Ctx512**: gemma3:4b, num_ctx=512, num_thread=4
-  7. **4b-MinCtx+MaxThread**: gemma3:4b, num_ctx=128, num_thread=<物理コア数> (Ctx128と同様の切り詰めリスクあり)
-  8. **1b-Thread4**: gemma3:1b, num_ctx=256, num_thread=4
-  9. **1b-ThreadAuto**: gemma3:1b, num_ctx=256, num_thread=0
-  10. **1b-ThreadMax**: gemma3:1b, num_ctx=256, num_thread=<物理コア数>
-  11. **270m-Thread4**: gemma3:270m, num_ctx=256, num_thread=4
-  12. **270m-ThreadAuto**: gemma3:270m, num_ctx=256, num_thread=0
-  13. **270m-ThreadMax**: gemma3:270m, num_ctx=256, num_thread=<物理コア数>
-
-各パターンで以下を記録する:
-  - 平均応答時間 (ms)
-  - tokens/s (Ollama レスポンスの eval_count / eval_duration から算出)
-  - 翻訳出力テキスト (品質の目視確認用にそのまま CSV に保存)
-  - メモリ使用量: ベンチマーク前後の ollama プロセスの WorkingSet64 差分を Get-Process で取得
-  - CPU/GPU 使用率: 自動計測はしない。プリセット候補が絞れた後に手動で Task Manager 確認
-各パターンを 3 回ずつ実行し、初回 (モデルロード込み) と 2〜3 回目 (ウォームキャッシュ) を分けて記録する
-推定実行時間: 13 パターン × 3 テスト文 × 3 回 = 117 リクエスト。**約 15 分** (小モデルは高速のため実際はもっと短い)
-
-環境変数テスト (Ollama 再起動が必要、手動実施):
-- 上記ベンチマークで最速パターンが判明した後、そのパターンで以下を追加テストする:
-  - **OLLAMA_FLASH_ATTENTION=1**: Ollama をこの環境変数付きで再起動し、最速パターンを再計測
-  - **OLLAMA_KV_CACHE_TYPE=q8_0**: KV キャッシュを q8 量子化して VRAM 削減効果を確認
-- これらは per-request で制御できないため、プリセットには含めず README に推奨環境変数として記載する
-
-3 段階プリセット:
-- ベンチマーク結果を元に以下の 3 プリセットを config.ini の [Translation] セクションに追加する
-- config.ini に PerformancePreset キーを追加し、値で切り替える
-
-| プリセット | 目的 | 方針 |
-|-----------|------|------|
-| Low | ローエンド PC | 速度を妥協し最小リソースで動作。ゲーム FPS への影響を最小化 |
-| Medium | ミドルレンジ PC | リソースと速度のバランスが最も良い実用的な設定 |
-| High | ハイエンド PC | 最大限リソースを使用して最速で動作 |
-
-- プリセット選択時、内部でモデル名 / num_ctx / num_thread を自動設定する
-- num_thread はマシンごとにコア数が異なるため、プリセットでは num_thread=0 (Ollama が実行時に自動決定) を基本とする。ベンチマーク結果で固定値の方が明確に優れる場合のみ物理コア数ベースの計算式 (例: cores/2) を採用する
-- Low プリセットでは、翻訳品質が実用レベルなら gemma3:1b や gemma3:270m を使用してリソース消費を最小化する可能性がある
-
-
+目的: Ollama の翻訳速度を最適化し、PC スペックに応じた 3 段階のプリセット (Low/Medium/High) を提供する。
 実装内容:
-- test/benchmark_ollama.ps1: ベンチマークスクリプト (PowerShell)
-  - Ollama REST API に直接 HTTP リクエストを送信して計測
-  - 結果を CSV + コンソールサマリーで出力
-  - 実行前に Ollama の起動確認、未起動なら同梱バイナリから自動起動
-- config.h/cpp: PerformancePreset フィールド追加 ("Low" / "Medium" / "High")
-- config.ini: [Translation] に PerformancePreset キー追加 (デフォルト: "Low")
-- translate.cpp: Init() でプリセットに応じたパラメータを適用
-- docs/benchmark-results.md: ベンチマーク結果のまとめドキュメント
-  - benchmark_ollama.ps1 の出力 CSV を整形して記載する
-  - 以下の構成で記録する:
-    1. 実行環境 (CPU型番, コア数, RAM容量, GPU型番, VRAM容量, OS, Ollamaバージョン, モデル)
-    2. テスト文一覧 (言語, 文字数, 内容)
-    3. パターン別結果テーブル (パターン名, 平均応答時間ms, tokens/s, 初回/ウォーム別, メモリMB)
-    4. モデル別翻訳出力一覧 (原文 / 翻訳結果テキストをそのまま掲載、品質の目視確認用)
-    5. 考察 (ボトルネック分析, 適切なパラメータの選択)
-    6. プリセット決定根拠 (Low/Medium/High 各プリセットに選んだパラメータとその理由)
-  - 異なるマシンで再実行した場合は結果を追記できる構造にする
+- test/benchmark_ollama.ps1: モデル (gemma3:4b/1b/270m) × num_ctx × num_thread の 13 パターンをベンチマーク
+- config.ini [Translation] に PerformancePreset キー追加 (デフォルト: "Medium")
+- translate.cpp: ApplyPreset() でプリセットに応じた model / num_ctx / num_thread を自動設定
+- OllamaModel / NumCtx / NumThread キーは削除し、PerformancePreset で一括管理
+- docs/benchmark-results.md: ベンチマーク結果・考察・プリセット決定根拠
+ベンチマーク結果:
+- gemma3:270m は翻訳能力なし (英語をそのまま返す) → 不採用
+- gemma3:1b は高速 (41 tok/s) だが翻訳品質に難あり → Low のみ採用
+- gemma3:4b は高品質 (9.5〜14.4 tok/s) → Medium/High で採用
 
-config.ini [Translation] セクション (整理後):
-
-| キー | Config フィールド | デフォルト | 説明 |
-|------|------------------|-----------|------|
-| Enabled | translationEnabled | true | 翻訳機能の有効/無効 |
-| OllamaEndpoint | ollamaEndpoint | "http://localhost:11434/api/generate" | Ollama APIエンドポイント |
-| TargetLanguage | targetLanguage | "Japanese" | 翻訳先言語 |
-| PerformancePreset | performancePreset | "Low" | プリセット (Low/Medium/High) |
-
-- NumCtx / NumThread / OllamaModel は削除し、PerformancePreset が内部で model / num_ctx / num_thread を一括管理する
-- デフォルトは "Low" (どんな PC でも動作することを最優先)
-
-テスト:
-- `powershell -ExecutionPolicy Bypass -File test/benchmark_ollama.ps1` でベンチマーク実行
-- 出力された CSV を元にプリセット値を決定
-- 各プリセットでの translate_test.exe 動作確認
-制約:
-- ベンチマークスクリプトはゲーム不要、Ollama 単独で動作する
-- Python 不使用、PowerShell + C++ のみ
-- プリセット値はベンチマーク結果確定後に最終決定する
+| プリセット | モデル | num_ctx | num_thread | 用途 |
+|-----------|--------|--------:|-----------:|------|
+| Low | gemma3:1b | 256 | 2 | ロースペック PC、動作最優先 |
+| Medium | gemma3:4b | 256 | 4 | バランス型 (デフォルト) |
+| High | gemma3:4b | 512 | 0 | 最速設定 |
 
 
 ## テスト方法
@@ -334,7 +247,7 @@ Mods/ChatTranslator/
 | Translation | Enabled | translationEnabled | true | 翻訳機能の有効/無効 |
 | Translation | OllamaEndpoint | ollamaEndpoint | "http://localhost:11434/api/generate" | Ollama APIエンドポイント |
 | Translation | TargetLanguage | targetLanguage | "Japanese" | 翻訳先言語 |
-| Translation | PerformancePreset | performancePreset | "Low" | プリセット (Low/Medium/High) |
+| Translation | PerformancePreset | performancePreset | "Medium" | プリセット (Low/Medium/High) |
 | Overlay | DemoMode | demoMode | true | デモモード |
 | Addresses | ProcessEventVtableIndex | - | 66 | ProcessEvent vtableインデックス |
 

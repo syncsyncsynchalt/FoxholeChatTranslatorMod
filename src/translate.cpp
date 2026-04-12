@@ -482,6 +482,28 @@ static bool EnsureOllama() {
 }
 
 // ============================================================
+// プリセット解決
+// ============================================================
+
+static void ApplyPreset(const std::string& preset) {
+    if (preset == "High") {
+        g_model     = "gemma3:4b";
+        g_numCtx    = 512;
+        g_numThread = 0; // Ollama 自動決定 — 4b最速設定
+    } else if (preset == "Medium") {
+        g_model     = "gemma3:4b";
+        g_numCtx    = 256;
+        g_numThread = 4;
+    } else { // Low
+        g_model     = "gemma3:1b";
+        g_numCtx    = 256;
+        g_numThread = 2;
+    }
+    logging::Debug("[Translate] プリセット '%s' 適用: model=%s, num_ctx=%d, num_thread=%d",
+        preset.c_str(), g_model.c_str(), g_numCtx, g_numThread);
+}
+
+// ============================================================
 // 公開 API
 // ============================================================
 
@@ -490,11 +512,10 @@ bool translate::Init(const TranslateConfig& cfg) {
         logging::Debug("[Translate] URL パース失敗: %s", cfg.endpoint.c_str());
         return false;
     }
-    g_model      = cfg.model;
     g_targetLang = cfg.targetLang;
     g_ollamaDir  = cfg.ollamaDir;
-    g_numCtx     = cfg.numCtx;
-    g_numThread  = cfg.numThread;
+
+    ApplyPreset(cfg.performancePreset);
 
     g_hSession = WinHttpOpen(L"FoxholeChatTranslator/1.0",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,

@@ -22,10 +22,8 @@ struct Config {
     // [Translation]
     bool        translationEnabled = true;
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
-    std::string ollamaModel    = "gemma3:4b";
     std::string targetLanguage = "Japanese";
-    int         numCtx         = 256;
-    int         numThread      = 2;
+    std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"
 
     // [Overlay]
     bool        demoMode       = true;
