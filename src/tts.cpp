@@ -196,8 +196,6 @@ static void TtsWorker() {
             std::unique_lock<std::mutex> lock(g_ttsMutex);
             g_ttsCv.wait(lock, [] { return !g_ttsQueue.empty() || !g_ttsRunning.load(); });
             if (!g_ttsRunning.load()) break;
-            // 最新のリクエストのみ処理 (古いのは捨てる)
-            while (g_ttsQueue.size() > 1) g_ttsQueue.pop();
             req = g_ttsQueue.front();
             g_ttsQueue.pop();
         }
@@ -412,7 +410,6 @@ void tts::Speak(const char* textUtf8, const char* senderUtf8) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
-        g_ttsStop.store(true); // 前回の読み上げを中断
         TtsRequest req;
         req.text = textUtf8;
         if (senderUtf8 && *senderUtf8) req.sender = senderUtf8;

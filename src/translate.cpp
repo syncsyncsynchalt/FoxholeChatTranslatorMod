@@ -190,8 +190,8 @@ static std::string HttpPost(const std::string& body) {
         return "";
     }
 
-    // タイムアウト: resolve 3s, connect 3s, send 10s, receive 300s (初回モデルロード対応)
-    WinHttpSetTimeouts(hRequest, 3000, 3000, 10000, 300000);
+    // タイムアウト: resolve 3s, connect 3s, send 5s, receive 10s
+    WinHttpSetTimeouts(hRequest, 3000, 3000, 5000, 10000);
 
     const wchar_t* headers = L"Content-Type: application/json";
     BOOL sent = WinHttpSendRequest(hRequest, headers, (DWORD)-1,
@@ -331,7 +331,7 @@ static bool IsOllamaReachable() {
     HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", L"/api/version",
         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
     if (!hRequest) { WinHttpCloseHandle(hConnect); return false; }
-    WinHttpSetTimeouts(hRequest, 2000, 2000, 2000, 2000);
+    WinHttpSetTimeouts(hRequest, 3000, 3000, 3000, 3000);
     BOOL ok = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
     if (ok) ok = WinHttpReceiveResponse(hRequest, nullptr);
     WinHttpCloseHandle(hRequest);
