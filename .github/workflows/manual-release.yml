@@ -1,0 +1,91 @@
+name: 手動リリース
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "Release notes（任意）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: manual-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create staging directories
+        run: |
+          New-Item -ItemType Directory -Force -Path "..\..\War\Binaries\Win64" | Out-Null
+          New-Item -ItemType Directory -Force -Path "..\..\War\Binaries\Win64\assets" | Out-Null
+          New-Item -ItemType Directory -Force -Path "..\..\War\Binaries\Win64\tools\ollama" | Out-Null
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        run: cmake --build build --config Release --target version chat_translator
+
+      - name: Resolve release tag
+        id: version
+        run: |
+          $date = Get-Date -Format 'yyyy.MM.dd'
+          $baseTag = "v$date"
+          $existingTags = @(git tag --list "$baseTag*")
+          $tag = $baseTag
+
+          if ($existingTags -contains $baseTag) {
+            $suffix = 1
+            while ($existingTags -contains "$baseTag.$suffix") {
+              $suffix++
+            }
+            $tag = "$baseTag.$suffix"
+          }
+
+          $releaseName = $tag.TrimStart('v')
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "release_name=$releaseName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "archive_name=FoxholeChatTranslator-$releaseName.zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Package release files
+        run: |
+          $archivePath = Join-Path "build\Release" "${{ steps.version.outputs.archive_name }}"
+          if (Test-Path $archivePath) {
+            Remove-Item $archivePath -Force
+          }
+
+          Compress-Archive -Path "..\..\War\Binaries\Win64\*" -DestinationPath $archivePath -Force
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.release_name }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_name }}
+          body: |
+            手動実行で作成されたリリースです。
+            Commit: `${{ github.sha }}`
+            Branch: `${{ github.ref_name }}`
+
+            ${{ inputs.notes }}
+          files: build/Release/${{ steps.version.outputs.archive_name }}
