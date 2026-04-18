@@ -105,6 +105,61 @@ static std::wstring Utf8ToWide(const char* utf8) {
 }
 
 // ============================================================
+// SSML 生成
+// ============================================================
+
+// SSML の XML 特殊文字をエスケープ
+static std::wstring EscapeXml(const std::wstring& text) {
+    std::wstring out;
+    out.reserve(text.size() + 32);
+    for (wchar_t c : text) {
+        switch (c) {
+        case L'&':  out += L"&amp;";  break;
+        case L'<':  out += L"&lt;";   break;
+        case L'>':  out += L"&gt;";   break;
+        case L'"':  out += L"&quot;"; break;
+        case L'\'': out += L"&apos;"; break;
+        default:    out += c;         break;
+        }
+    }
+    return out;
+}
+
+// テキストを SSML でラップする
+// sender のハッシュ値からピッチとレートを変化させて人ごとに個性を付ける
+static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, const std::string& sender) {
+    // ピッチ: -20% ~ +20% の 9 段階
+    static const wchar_t* kPitches[] = {
+        L"-20%", L"-15%", L"-10%", L"-5%", L"0%", L"+5%", L"+10%", L"+15%", L"+20%"
+    };
+    // レート: 95% ~ 115% の 5 段階 (SpeakingRate 1.2 に対する相対値)
+    static const wchar_t* kRates[] = {
+        L"95%", L"100%", L"105%", L"110%", L"115%"
+    };
+
+    const wchar_t* pitch = L"0%";
+    const wchar_t* rate  = L"100%";
+    if (!sender.empty()) {
+        std::hash<std::string> hasher;
+        size_t h = hasher(sender);
+        pitch = kPitches[h % 9];
+        rate  = kRates[(h >> 8) % 5];
+    }
+
+    std::wstring ssml;
+    ssml  = L"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='";
+    ssml += langTag;
+    ssml += L"'><prosody pitch='";
+    ssml += pitch;
+    ssml += L"' rate='";
+    ssml += rate;
+    ssml += L"'>";
+    ssml += EscapeXml(text);
+    ssml += L"</prosody></speak>";
+    return ssml;
+}
+
+// ============================================================
 // TTS ワーカースレッド
 // ============================================================
 
@@ -119,6 +174,8 @@ static std::condition_variable g_ttsCv;
 static std::queue<TtsRequest> g_ttsQueue;
 static std::atomic<bool>    g_ttsRunning{false};
 static std::atomic<bool>    g_ttsStop{false};
+// "auto" の場合はテキストから自動判定、それ以外は固定言語
+static std::string          g_ttsLanguage = "auto";
 
 static void TtsWorker() {
     // ゲームのレンダリングを邪魔しないよう優先度を下げる
@@ -145,8 +202,19 @@ static void TtsWorker() {
         inspectable.As(&synth);
     }
 
-    // ISpeechSynthesizer2 で音声選択が可能なことを確認
-    // (実際の音声選択は put_Voice で ISpeechSynthesizer 上で行う)
+    // 再生速度を設定 (1.0=標準, 1.2=少し速め)
+    {
+        ComPtr<ISpeechSynthesizer2> synth2;
+        if (SUCCEEDED(synth.As(&synth2))) {
+            ComPtr<ISpeechSynthesizerOptions> options;
+            synth2->get_Options(&options);
+            ComPtr<ISpeechSynthesizerOptions2> options2;
+            if (options && SUCCEEDED(options.As(&options2))) {
+                options2->put_SpeakingRate(1.2);
+                logging::Debug("[TTS] SpeakingRate=1.2");
+            }
+        }
+    }
 
     // 利用可能な音声一覧を取得
     ComPtr<IInstalledVoicesStatic> voicesStatic;
@@ -203,13 +271,25 @@ static void TtsWorker() {
 
         g_ttsStop.store(false);
 
-        // 言語判定
-        Lang lang = DetectLanguage(text.c_str());
+        // 言語判定 (設定で強制指定されている場合はそちらを優先)
+        Lang lang;
+        if (g_ttsLanguage == "auto") {
+            lang = DetectLanguage(text.c_str());
+        } else if (g_ttsLanguage == "ja") { lang = Lang::JA;
+        } else if (g_ttsLanguage == "en") { lang = Lang::EN;
+        } else if (g_ttsLanguage == "ru") { lang = Lang::RU;
+        } else if (g_ttsLanguage == "zh") { lang = Lang::ZH;
+        } else if (g_ttsLanguage == "ko") { lang = Lang::KO;
+        } else {
+            lang = DetectLanguage(text.c_str());
+        }
         const wchar_t* langTag = LangToVoiceTag(lang);
 
         // 対応する音声を選択 (sender指定時はハッシュで固定、なければランダム)
+        // Natural (ニューラル) 音声を優先的に選択する
         if (voices) {
             std::vector<unsigned> candidates;
+            std::vector<unsigned> naturalCandidates;
             unsigned count = 0;
             voices->get_Size(&count);
             for (unsigned i = 0; i < count; i++) {
@@ -220,37 +300,48 @@ static void TtsWorker() {
                 const wchar_t* voiceLangStr = WindowsGetStringRawBuffer(voiceLang, nullptr);
                 if (voiceLangStr && _wcsnicmp(voiceLangStr, langTag, wcslen(langTag)) == 0) {
                     candidates.push_back(i);
+                    // "Natural" を含む音声はニューラルTTS (高品質)
+                    HSTRING name;
+                    vi->get_DisplayName(&name);
+                    const wchar_t* nameStr = WindowsGetStringRawBuffer(name, nullptr);
+                    if (nameStr && wcsstr(nameStr, L"Natural")) {
+                        naturalCandidates.push_back(i);
+                    }
                 }
             }
-            if (!candidates.empty()) {
+            // Natural音声が利用可能ならそちらを優先、なければ全候補にフォールバック
+            const std::vector<unsigned>& pool = naturalCandidates.empty() ? candidates : naturalCandidates;
+            if (!pool.empty()) {
                 unsigned pick;
                 if (!req.sender.empty()) {
                     // sender名のハッシュで声色を決定論的に選択
                     std::hash<std::string> hasher;
-                    pick = candidates[hasher(req.sender) % candidates.size()];
+                    pick = pool[hasher(req.sender) % pool.size()];
                 } else {
                     static std::mt19937 rng(std::random_device{}());
-                    pick = candidates[rng() % candidates.size()];
+                    pick = pool[rng() % pool.size()];
                 }
                 ComPtr<IVoiceInformation> vi;
                 voices->GetAt(pick, &vi);
                 synth->put_Voice(vi.Get());
                 HSTRING name;
                 vi->get_DisplayName(&name);
-                logging::Debug("[TTS] 音声選択: %ls (sender=%s)",
+                logging::Debug("[TTS] 音声選択: %ls (sender=%s, natural=%s)",
                     WindowsGetStringRawBuffer(name, nullptr),
-                    req.sender.empty() ? "(none)" : req.sender.c_str());
+                    req.sender.empty() ? "(none)" : req.sender.c_str(),
+                    naturalCandidates.empty() ? "no" : "yes");
             }
         }
 
-        // テキストを SSML なしで合成
+        // SSML で合成 (xml:lang 明示によりニューラル音声の韻律処理精度が向上)
         std::wstring wtext = Utf8ToWide(text.c_str());
-        HStringReference textRef(wtext.c_str());
+        std::wstring ssml = BuildSsml(wtext, langTag, req.sender);
+        HStringReference ssmlRef(ssml.c_str());
 
         ComPtr<IAsyncOperation<SpeechSynthesisStream*>> asyncOp;
-        hr = synth->SynthesizeTextToStreamAsync(textRef.Get(), &asyncOp);
+        hr = synth->SynthesizeSsmlToStreamAsync(ssmlRef.Get(), &asyncOp);
         if (FAILED(hr)) {
-            logging::Debug("[TTS] SynthesizeTextToStreamAsync 失敗: 0x%08X", hr);
+            logging::Debug("[TTS] SynthesizeSsmlToStreamAsync 失敗: 0x%08X", hr);
             continue;
         }
 
@@ -399,11 +490,12 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init() {
+void tts::Init(const char* language) {
     if (g_ttsRunning.load()) return;
+    g_ttsLanguage = (language && *language) ? language : "auto";
+    logging::Debug("[TTS] Init (language=%s)", g_ttsLanguage.c_str());
     g_ttsRunning.store(true);
     g_ttsThread = std::thread(TtsWorker);
-    logging::Debug("[TTS] Init");
 }
 
 void tts::Speak(const char* textUtf8, const char* senderUtf8) {

@@ -27,6 +27,11 @@ struct Config {
 
     // [Overlay]
     bool        demoMode       = true;
+
+    // [TTS]
+    // "auto" = テキスト内容から自動判定
+    // "ja", "en", "ru", "zh", "ko" = 強制指定
+    std::string ttsLanguage    = "auto";
 };
 
 namespace config {

@@ -36,6 +36,8 @@ void config::Load(const char* baseDir) {
     g_config.performancePreset = ReadIniStr(configPath.c_str(), "Translation", "PerformancePreset", "Medium");
 
     g_config.demoMode       = GetPrivateProfileIntA("Overlay", "DemoMode", 1, configPath.c_str()) != 0;
+
+    g_config.ttsLanguage = ReadIniStr(configPath.c_str(), "TTS", "Language", "auto");
 }
 
 const Config& config::Get() {
