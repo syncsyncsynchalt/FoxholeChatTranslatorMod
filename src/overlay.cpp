@@ -16,7 +16,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <thread>
 
@@ -65,23 +64,15 @@ static int         g_demoIndex    = 0;
 static float       g_demoTimer    = 0.0f;
 static const float g_demoInterval = 10.0f; // 秒
 
-// ワーカースレッド (detach 廃止、専用スレッドでキュー処理)
+// ワーカースレッド
 static std::atomic<bool>         g_workersRunning{false};
-static std::thread               g_translateThread;
-static std::condition_variable   g_translateCv;   // g_queueMutex と併用
 
-// チャットメッセージキュー
-struct OverlayQueueItem {
-    std::string sender;
-    std::string message;
-};
-static std::mutex               g_queueMutex;
-static std::queue<OverlayQueueItem> g_chatQueue;
-static constexpr size_t         MAX_OVERLAY_QUEUE = 32;
+// 翻訳結果到着フラグ (render スレッドでスクロールリセットに使用)
+static std::atomic<bool>         g_textChanged{false};
 
 // ヘルスチェック
 enum class RadioState { ON, OFF, FAULT };
-static RadioState g_radioState      = RadioState::ON;
+static std::atomic<RadioState>   g_radioState{RadioState::ON};
 static float      g_healthTimer     = 0.0f;
 static const float g_healthInterval = 5.0f; // 秒
 static std::atomic<bool> g_restarting{false};
@@ -109,10 +100,10 @@ static void HealthWorker() {
             g_restarting.store(true);
             bool ok = translate::Restart();
             if (ok) {
-                g_radioState = RadioState::ON;
+                g_radioState.store(RadioState::ON);
                 logging::Debug("[Overlay] Ollama 再起動成功");
             } else {
-                g_radioState = RadioState::FAULT;
+                g_radioState.store(RadioState::FAULT);
                 logging::Debug("[Overlay] Ollama 再起動失敗");
             }
             g_restarting.store(false);
@@ -125,42 +116,6 @@ static void HealthWorker() {
             g_healthy.store(ok);
             g_checking.store(false);
         }
-    }
-}
-
-static void TranslateWorker() {
-    while (true) {
-        OverlayQueueItem item;
-        {
-            std::unique_lock<std::mutex> lock(g_queueMutex);
-            g_translateCv.wait(lock, [] {
-                return !g_chatQueue.empty() || !g_workersRunning.load();
-            });
-            if (!g_workersRunning.load() && g_chatQueue.empty()) break;
-            if (g_chatQueue.empty()) continue;
-            item = std::move(g_chatQueue.front());
-            g_chatQueue.pop();
-        }
-
-        g_scrollOrig = 0.0f;
-        g_scrollTrans = 0.0f;
-
-        if (!g_healthy.load()) {
-            {
-                std::lock_guard<std::mutex> lock(g_textMutex);
-                g_originalText   = item.message;
-                g_translatedText = u8"(Ollama停止中)";
-            }
-            tts::Speak(item.message.c_str(), item.sender.empty() ? nullptr : item.sender.c_str());
-            continue;
-        }
-        std::string result = translate::Sync(item.message);
-        {
-            std::lock_guard<std::mutex> lock(g_textMutex);
-            g_originalText   = item.message;
-            g_translatedText = result.empty() ? u8"(翻訳失敗)" : result;
-        }
-        tts::Speak(item.message.c_str(), item.sender.empty() ? nullptr : item.sender.c_str());
     }
 }
 
@@ -326,6 +281,12 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     float winX = io.DisplaySize.x - totalWidth - margin;
     float winY = io.DisplaySize.y - totalHeight - margin;
 
+    // 翻訳完了フラグを確認してスクロールをリセット (render スレッドのみが触る)
+    if (g_textChanged.exchange(false)) {
+        g_scrollOrig  = 0.0f;
+        g_scrollTrans = 0.0f;
+    }
+
     // ラジオON: 黒背景あり / OFF: 背景なし
     ImGui::SetNextWindowPos(ImVec2(winX, winY));
     ImGui::SetNextWindowSize(ImVec2(totalWidth, totalHeight));
@@ -333,7 +294,7 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-    if (g_radioState == RadioState::ON) {
+    if (g_radioState.load() == RadioState::ON) {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.4f));
     } else {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -345,7 +306,7 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
 
     // --- ヘルスチェック (5秒ごと、別スレッドで実行) ---
-    if (g_radioState != RadioState::OFF && !g_restarting.load()) {
+    if (g_radioState.load() != RadioState::OFF && !g_restarting.load()) {
         g_healthTimer += io.DeltaTime;
         if (g_healthTimer >= g_healthInterval) {
             g_healthTimer = 0.0f;
@@ -358,33 +319,27 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         // 非同期チェック結果を反映
         if (!g_checking.load()) {
             if (!g_healthy.load()) {
-                if (g_radioState != RadioState::FAULT) {
-                    g_radioState = RadioState::FAULT;
+                if (g_radioState.load() != RadioState::FAULT) {
+                    g_radioState.store(RadioState::FAULT);
                     logging::Debug("[Overlay] Ollama ダウン検出");
                 }
-            } else if (g_radioState == RadioState::FAULT) {
-                g_radioState = RadioState::ON;
+            } else if (g_radioState.load() == RadioState::FAULT) {
+                g_radioState.store(RadioState::ON);
                 logging::Debug("[Overlay] Ollama 復旧検出");
             }
         }
     }
 
     // --- テキスト領域 (左側、ラジオONまたはFAULT時) ---
-    if (g_radioState != RadioState::OFF) {
+    if (g_radioState.load() != RadioState::OFF) {
         // デモモード: 自動切替
         if (config::Get().demoMode) {
             g_demoTimer += io.DeltaTime;
             if (g_demoTimer >= g_demoInterval) {
                 g_demoTimer = 0.0f;
                 g_demoIndex = (g_demoIndex + 1) % g_demoCount;
-                g_scrollOrig = 0.0f;
-                g_scrollTrans = 0.0f;
                 // 非同期翻訳 (完了時に原文表示 + TTS 再生)
-                {
-                    std::lock_guard<std::mutex> lock(g_queueMutex);
-                    g_chatQueue.push({"", g_demoMessages[g_demoIndex]});
-                }
-                g_translateCv.notify_one();
+                translate::Queue("", "", g_demoMessages[g_demoIndex]);
             }
         }
 
@@ -423,7 +378,7 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     ImGui::SetCursorPosY(iconPadY);
     if (g_radioTextureSRV) {
         ImVec4 tint;
-        switch (g_radioState) {
+        switch (g_radioState.load()) {
         case RadioState::ON:    tint = ImVec4(1, 1, 1, 1.0f); break;
         case RadioState::OFF:   tint = ImVec4(1, 1, 1, 0.3f); break;
         case RadioState::FAULT: tint = ImVec4(1, 0.3f, 0.3f, 1.0f); break;
@@ -431,14 +386,14 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         ImGui::Image((ImTextureID)g_radioTextureSRV, ImVec2(iconSize, iconSize),
                      ImVec2(0, 0), ImVec2(1, 1), tint);
         if (ImGui::IsItemClicked()) {
-            if (g_radioState == RadioState::FAULT && !g_restarting.load()) {
+            if (g_radioState.load() == RadioState::FAULT && !g_restarting.load()) {
                 // Ollama再起動
                 logging::Debug("[Overlay] Ollama 再起動クリック");
                 g_restartRequested.store(true);
                 g_healthCv.notify_one();
-            } else if (g_radioState != RadioState::FAULT) {
-                bool wasOn = (g_radioState == RadioState::ON);
-                g_radioState = wasOn ? RadioState::OFF : RadioState::ON;
+            } else if (g_radioState.load() != RadioState::FAULT) {
+                bool wasOn = (g_radioState.load() == RadioState::ON);
+                g_radioState.store(wasOn ? RadioState::OFF : RadioState::ON);
                 logging::Debug("[Overlay] ラジオ %s", wasOn ? "OFF" : "ON");
                 const char* wav = wasOn ? g_radioOffWav.c_str() : g_radioOnWav.c_str();
                 PlaySoundA(wav, nullptr, SND_FILENAME | SND_ASYNC);
@@ -486,18 +441,24 @@ bool overlay::Init() {
     g_radioOnWav  = g_assetsDir + "radio_on.wav";
     g_radioOffWav = g_assetsDir + "radio_off.wav";
 
-    // ワーカースレッド起動
-    g_workersRunning.store(true);
-    g_translateThread = std::thread(TranslateWorker);
-    g_healthThread    = std::thread(HealthWorker);
-
-    // デモモード: 初期メッセージ (非同期翻訳完了後に表示 + TTS)
-    if (config::Get().demoMode) {
+    // 翻訳完了コールバックを登録
+    translate::SetResultCallback([](const translate::TranslateResult& r) {
         {
-            std::lock_guard<std::mutex> lock(g_queueMutex);
-            g_chatQueue.push({"", g_demoMessages[0]});
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            g_originalText   = r.original;
+            g_translatedText = r.translated;
         }
-        g_translateCv.notify_one();
+        g_textChanged.store(true);
+        tts::Speak(r.original.c_str(), r.sender.empty() ? nullptr : r.sender.c_str());
+    });
+
+    // ワーカースレッド起動 (HealthWorker のみ)
+    g_workersRunning.store(true);
+    g_healthThread = std::thread(HealthWorker);
+
+    // デモモード: 初期メッセージ
+    if (config::Get().demoMode) {
+        translate::Queue("", "", g_demoMessages[0]);
     }
 
     // TTS初期化
@@ -527,7 +488,7 @@ LRESULT overlay::OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 bool overlay::IsRadioOn() {
-    return g_radioState == RadioState::ON;
+    return g_radioState.load() == RadioState::ON;
 }
 
 void overlay::SetDisplayText(const char* original, const char* translated) {
@@ -538,26 +499,16 @@ void overlay::SetDisplayText(const char* original, const char* translated) {
 
 void overlay::OnChatMessage(const std::string& sender, const std::string& message) {
     if (config::Get().demoMode) return; // デモモード中は実チャットを無視
-    if (g_radioState != RadioState::ON) return;
+    if (g_radioState.load() != RadioState::ON) return;
     if (message.empty()) return;
 
-    {
-        std::lock_guard<std::mutex> lock(g_queueMutex);
-        if (g_chatQueue.size() >= MAX_OVERLAY_QUEUE) {
-            g_chatQueue.pop(); // 最古を破棄
-        }
-        g_chatQueue.push({sender, message});
-    }
-
-    g_translateCv.notify_one();
+    translate::Queue("", sender, message);
 }
 
 void overlay::Shutdown() {
     // ワーカースレッド停止
     g_workersRunning.store(false);
-    g_translateCv.notify_one();
     g_healthCv.notify_one();
-    if (g_translateThread.joinable()) g_translateThread.join();
     if (g_healthThread.joinable()) g_healthThread.join();
 
     tts::Shutdown();

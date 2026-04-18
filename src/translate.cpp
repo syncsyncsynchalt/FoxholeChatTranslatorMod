@@ -52,6 +52,9 @@ static bool                     g_running = false;
 
 static constexpr size_t MAX_QUEUE_SIZE = 32;
 
+// 翻訳完了コールバック
+static translate::ResultCallback g_resultCallback;
+
 // ============================================================
 // URL パース (http://host:port/path)
 // ============================================================
@@ -295,12 +298,20 @@ static void WorkerThread() {
         }
 
         std::string translated = DoTranslate(item.message);
-        if (translated.empty()) continue;
-
         TrimTrailing(translated);
+
         logging::Debug("[Translate] [%s] %s: %s -> %s",
             item.channel.c_str(), item.sender.c_str(),
             item.message.c_str(), translated.c_str());
+
+        if (g_resultCallback) {
+            translate::TranslateResult result;
+            result.channel    = item.channel;
+            result.sender     = item.sender;
+            result.original   = item.message;
+            result.translated = translated.empty() ? u8"(翻訳失敗)" : translated;
+            g_resultCallback(result);
+        }
     }
     logging::Debug("[Translate] ワーカースレッド終了");
 }
@@ -562,6 +573,10 @@ void translate::Shutdown() {
     }
 
     logging::Debug("[Translate] シャットダウン完了");
+}
+
+void translate::SetResultCallback(translate::ResultCallback cb) {
+    g_resultCallback = std::move(cb);
 }
 
 std::string translate::Sync(const std::string& text) {

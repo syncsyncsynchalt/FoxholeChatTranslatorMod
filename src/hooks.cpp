@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <string>
 
 #include "hooks.h"
@@ -294,15 +295,20 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
     const char* chName = ChannelName(data.channel);
 
     // 重複排除: 同一メッセージを500ms以内に2回処理しない
+    // 複数のPEフックから並行呼び出しされる可能性があるため mutex で保護
+    static std::mutex s_dedupMutex;
     static std::string s_lastDedupKey;
     static DWORD s_lastDedupTime = 0;
     std::string dedupKey = std::string(chName) + "|" + displaySender + "|" + msg;
     DWORD now = GetTickCount();
-    if (dedupKey == s_lastDedupKey && (now - s_lastDedupTime) < 500) {
-        return;
+    {
+        std::lock_guard<std::mutex> lock(s_dedupMutex);
+        if (dedupKey == s_lastDedupKey && (now - s_lastDedupTime) < 500) {
+            return;
+        }
+        s_lastDedupKey = dedupKey;
+        s_lastDedupTime = now;
     }
-    s_lastDedupKey = dedupKey;
-    s_lastDedupTime = now;
 
     // ChatMessage を構築
     ChatMessage chatMsg;
