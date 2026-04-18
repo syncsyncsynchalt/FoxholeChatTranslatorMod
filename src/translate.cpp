@@ -173,6 +173,47 @@ static std::string ExtractResponse(const std::string& json) {
 }
 
 // ============================================================
+// Ollama JSON レスポンスから "error" フィールドを抽出
+// ============================================================
+
+static std::string ExtractError(const std::string& json) {
+    size_t pos = json.find("\"error\"");
+    if (pos == std::string::npos) return "";
+
+    pos = json.find(':', pos + 7);
+    if (pos == std::string::npos) return "";
+    pos++;
+
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    if (pos >= json.size() || json[pos] != '"') return "";
+    pos++;
+
+    std::string result;
+    while (pos < json.size() && json[pos] != '"') {
+        if (json[pos] == '\\' && pos + 1 < json.size()) {
+            pos++;
+            result += json[pos];
+        } else {
+            result += json[pos];
+        }
+        pos++;
+    }
+    return result;
+}
+
+// エラー文字列を日本語メッセージに変換
+static std::string ClassifyError(const std::string& errMsg) {
+    if (errMsg.find("memory") != std::string::npos ||
+        errMsg.find("Memory") != std::string::npos) {
+        return u8"(メモリ不足: config.ini の PerformancePreset を Low に変更してください)";
+    }
+    if (errMsg.find("not found") != std::string::npos) {
+        return u8"(モデル未インストール: ollama pull で取得してください)";
+    }
+    return u8"(Ollamaエラー: " + errMsg + ")";
+}
+
+// ============================================================
 // HTTP POST (WinHTTP)
 // ============================================================
 
@@ -256,17 +297,25 @@ static std::string DoTranslate(const std::string& text) {
     std::string body = BuildRequestBody(text);
     std::string response = HttpPost(body);
     if (response.empty()) {
-        logging::Debug("[Translate] HTTP レスポンスが空");
-        return "";
+        logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
+        return u8"(接続失敗: Ollamaが起動していません)";
     }
-    // デバッグ: レスポンスの先頭を出力
+
     std::string preview = response.substr(0, 200);
     logging::Debug("[Translate] レスポンス (先頭200): %s", preview.c_str());
+
     std::string result = ExtractResponse(response);
-    if (result.empty()) {
-        logging::Debug("[Translate] ExtractResponse: response フィールド未検出");
+    if (!result.empty()) return result;
+
+    // "response" フィールドがない場合は "error" フィールドを確認
+    std::string errMsg = ExtractError(response);
+    if (!errMsg.empty()) {
+        logging::Debug("[Translate] Ollamaエラー: %s", errMsg.c_str());
+        return ClassifyError(errMsg);
     }
-    return result;
+
+    logging::Debug("[Translate] レスポンス解析失敗 (未知のフォーマット)");
+    return u8"(解析失敗)";
 }
 
 // 末尾の空白・改行を除去
@@ -309,7 +358,7 @@ static void WorkerThread() {
             result.channel    = item.channel;
             result.sender     = item.sender;
             result.original   = item.message;
-            result.translated = translated.empty() ? u8"(翻訳失敗)" : translated;
+            result.translated = translated;
             g_resultCallback(result);
         }
     }
