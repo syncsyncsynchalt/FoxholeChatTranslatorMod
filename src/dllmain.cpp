@@ -314,6 +314,7 @@ static bool HookDXGIPresent() {
                               0, 0, 1, 1, nullptr, nullptr, wc.hInstance, nullptr);
     if (!hwnd) {
         LogLoader("ダミーウインドウ作成失敗");
+        UnregisterClass(wc.lpszClassName, wc.hInstance);
         return false;
     }
 
