@@ -806,6 +806,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         break;
 
     case DLL_PROCESS_DETACH:
+        if (g_loaderLogFile) { fclose(g_loaderLogFile); g_loaderLogFile = nullptr; }
         UnloadWorker();
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();
