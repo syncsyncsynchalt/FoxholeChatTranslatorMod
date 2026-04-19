@@ -25,9 +25,6 @@ void config::Load(const char* baseDir) {
     std::string logPath = ReadIniStr(configPath.c_str(), "General", "LogFilePath", "");
     g_config.logFilePath = logPath.empty() ? (dir + "chat_log.txt") : logPath;
 
-    g_config.dumpAllEvents = GetPrivateProfileIntA("Discovery", "DumpAllEvents", 0, configPath.c_str()) != 0;
-    g_config.functionNameFilter = ReadIniStr(configPath.c_str(), "Discovery", "FunctionNameFilter", "");
-
     g_config.prefix = ReadIniStr(configPath.c_str(), "Stage2", "Prefix", "\xe2\x98\x85");
 
     g_config.translationEnabled = GetPrivateProfileIntA("Translation", "Enabled", 1, configPath.c_str()) != 0;

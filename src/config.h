@@ -12,10 +12,6 @@ struct Config {
     std::string logFilePath;
     int         initDelayMs = 10000;
 
-    // [Discovery]
-    bool        dumpAllEvents = false;
-    std::string functionNameFilter;
-
     // [Stage2]
     std::string prefix = "\xe2\x98\x85"; // ★ (UTF-8)
 
