@@ -6,3 +6,6 @@ tools/ollama/models/
 
 # ビルド出力
 build/
+
+# ログ
+debug_log.txt
