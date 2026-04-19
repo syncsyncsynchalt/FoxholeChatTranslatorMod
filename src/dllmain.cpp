@@ -801,7 +801,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         }
 
         // 初期化スレッドを作成 (ローダーロック回避)
-        CreateThread(nullptr, 0, InitThread, nullptr, 0, nullptr);
+        HANDLE hInitThread = CreateThread(nullptr, 0, InitThread, nullptr, 0, nullptr);
+        if (hInitThread) CloseHandle(hInitThread);
         break;
 
     case DLL_PROCESS_DETACH:
