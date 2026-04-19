@@ -45,21 +45,21 @@ def detect_language(text: str) -> str:
     return "en"
 
 
-def sender_prosody(sender: str):
-    """
-    BuildSsml() の sender ハッシュ処理を再現。
-    MSVC std::hash<std::string> は FNV-1a (64bit) を使うため同じアルゴリズムを採用。
-    """
-    if not sender:
-        return "0%", "100%"
-    # FNV-1a 64bit (MSVC の std::hash<std::string> に相当)
+def _fnv1a_hash(s: str) -> int:
+    """FNV-1a 64bit (MSVC の std::hash<std::string> に相当)"""
     h = 14695981039346656037
-    for b in sender.encode("utf-8"):
+    for b in s.encode("utf-8"):
         h ^= b
         h = (h * 1099511628211) & 0xFFFFFFFFFFFFFFFF
-    pitch = PITCHES[h % 9]
-    rate  = RATES[(h >> 8) % 5]
-    return pitch, rate
+    return h
+
+
+def sender_prosody(sender: str):
+    """BuildSsml() の sender ハッシュ処理を再現。"""
+    if not sender:
+        return "0%", "100%"
+    h = _fnv1a_hash(sender)
+    return PITCHES[h % 9], RATES[(h >> 8) % 5]
 
 
 def escape_xml(text: str) -> str:
@@ -636,10 +636,7 @@ class App:
             pool = naturals if naturals else candidates
             if pool:
                 if sender:
-                    h = 14695981039346656037
-                    for b in sender.encode("utf-8"):
-                        h ^= b; h = (h * 1099511628211) & 0xFFFFFFFFFFFFFFFF
-                    voice_name = pool[h % len(pool)]["name"]
+                    voice_name = pool[_fnv1a_hash(sender) % len(pool)]["name"]
                 else:
                     voice_name = pool[0]["name"]
 
