@@ -25,8 +25,6 @@ void config::Load(const char* baseDir) {
     std::string logPath = ReadIniStr(configPath.c_str(), "General", "LogFilePath", "");
     g_config.logFilePath = logPath.empty() ? (dir + "chat_log.txt") : logPath;
 
-    g_config.prefix = ReadIniStr(configPath.c_str(), "Stage2", "Prefix", "\xe2\x98\x85");
-
     g_config.translationEnabled = GetPrivateProfileIntA("Translation", "Enabled", 1, configPath.c_str()) != 0;
     g_config.ollamaEndpoint = ReadIniStr(configPath.c_str(), "Translation", "OllamaEndpoint", "http://localhost:11434/api/generate");
     g_config.targetLanguage = ReadIniStr(configPath.c_str(), "Translation", "TargetLanguage", "Japanese");

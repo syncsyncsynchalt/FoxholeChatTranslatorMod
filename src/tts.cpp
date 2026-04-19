@@ -132,18 +132,23 @@ static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, 
     static const wchar_t* kPitches[] = {
         L"-20%", L"-15%", L"-10%", L"-5%", L"0%", L"+5%", L"+10%", L"+15%", L"+20%"
     };
-    // レート: 95% ~ 115% の 5 段階 (SpeakingRate 1.2 に対する相対値)
-    static const wchar_t* kRates[] = {
-        L"95%", L"100%", L"105%", L"110%", L"115%"
-    };
+    // レート: 95% ~ 115% の 5 段階。kSpeakingRate を乗算して最終レートを決定する。
+    // SSML の <prosody rate> が WinRT の SpeakingRate プロパティより優先されるため、
+    // SpeakingRate は SSML 側に直接反映させる (tts_test.py の apply_speaking_rate と同一ロジック)。
+    static const int kRates[] = { 95, 100, 105, 110, 115 };
+    static const double kSpeakingRate = 1.1;
 
     const wchar_t* pitch = L"0%";
-    const wchar_t* rate  = L"100%";
+    wchar_t rateBuf[16];
     if (!sender.empty()) {
         std::hash<std::string> hasher;
         size_t h = hasher(sender);
         pitch = kPitches[h % 9];
-        rate  = kRates[(h >> 8) % 5];
+        int r = static_cast<int>(kRates[(h >> 8) % 5] * kSpeakingRate + 0.5);
+        swprintf_s(rateBuf, L"%d%%", r);
+    } else {
+        // sender なし: 100% * kSpeakingRate
+        swprintf_s(rateBuf, L"%d%%", static_cast<int>(100 * kSpeakingRate + 0.5));
     }
 
     std::wstring ssml;
@@ -152,7 +157,7 @@ static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, 
     ssml += L"'><prosody pitch='";
     ssml += pitch;
     ssml += L"' rate='";
-    ssml += rate;
+    ssml += rateBuf;
     ssml += L"'>";
     ssml += EscapeXml(text);
     ssml += L"</prosody></speak>";
@@ -200,20 +205,6 @@ static void TtsWorker() {
             return;
         }
         inspectable.As(&synth);
-    }
-
-    // 再生速度を設定 (1.0=標準, 1.2=少し速め)
-    {
-        ComPtr<ISpeechSynthesizer2> synth2;
-        if (SUCCEEDED(synth.As(&synth2))) {
-            ComPtr<ISpeechSynthesizerOptions> options;
-            synth2->get_Options(&options);
-            ComPtr<ISpeechSynthesizerOptions2> options2;
-            if (options && SUCCEEDED(options.As(&options2))) {
-                options2->put_SpeakingRate(1.2);
-                logging::Debug("[TTS] SpeakingRate=1.2");
-            }
-        }
     }
 
     // 利用可能な音声一覧を取得

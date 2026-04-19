@@ -12,9 +12,6 @@ struct Config {
     std::string logFilePath;
     int         initDelayMs = 10000;
 
-    // [Stage2]
-    std::string prefix = "\xe2\x98\x85"; // ★ (UTF-8)
-
     // [Translation]
     bool        translationEnabled = true;
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
