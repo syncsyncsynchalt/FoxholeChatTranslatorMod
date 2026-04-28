@@ -9,3 +9,10 @@ build/
 
 # ログ
 debug_log.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code
+.claude/
