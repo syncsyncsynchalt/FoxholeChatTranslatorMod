@@ -275,7 +275,8 @@ Write-Progress -Activity "Benchmark" -Completed
 # ============================================================
 
 $csvContent = $csvHeader + "`n" + ($csvRows -join "`n")
-[System.IO.File]::WriteAllText((Join-Path (Get-Location) $OutputCsv), $csvContent, [System.Text.UTF8Encoding]::new($true))
+$csvPath = if ([System.IO.Path]::IsPathRooted($OutputCsv)) { $OutputCsv } else { Join-Path (Get-Location) $OutputCsv }
+[System.IO.File]::WriteAllText($csvPath, $csvContent, [System.Text.UTF8Encoding]::new($true))
 Write-Host "[Done] CSV: $OutputCsv" -ForegroundColor Green
 
 # ============================================================
