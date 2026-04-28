@@ -138,11 +138,12 @@ inline std::string FStringToUtf8(const FString& fstr) {
     int len = fstr.Count - 1; // null terminator 除く
     if (len <= 0) return "";
 
-    char buf[2048];
-    int written = WideCharToMultiByte(CP_UTF8, 0, fstr.Data, len, buf, sizeof(buf) - 1, nullptr, nullptr);
-    if (written <= 0) return "";
-    buf[written] = 0;
-    return std::string(buf);
+    // 必要バイト数を取得してから動的確保 (固定バッファによる無言トランケートを防ぐ)
+    int needed = WideCharToMultiByte(CP_UTF8, 0, fstr.Data, len, nullptr, 0, nullptr, nullptr);
+    if (needed <= 0) return "";
+    std::string result(needed, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, fstr.Data, len, &result[0], needed, nullptr, nullptr);
+    return result;
 }
 
 // EChatChannel → 文字列
