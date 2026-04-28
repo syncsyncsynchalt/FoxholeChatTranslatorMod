@@ -34,8 +34,10 @@ static std::string  g_model;
 static std::string  g_targetLang;
 static std::string  g_ollamaDir;       // 同梱 ollama.exe のディレクトリ
 static HANDLE       g_ollamaProcess = nullptr; // 自前起動した ollama serve プロセス
-static int          g_numCtx    = 256;
-static int          g_numThread = 2;
+static int          g_numCtx       = 256;
+static int          g_numThread    = 2;
+static float        g_temperature  = 0.1f;
+static int          g_numPredict   = 120;
 
 // ワーカースレッド
 struct QueueItem {
@@ -286,11 +288,20 @@ static std::string BuildRequestBody(const std::string& text) {
         " If the message is already in " + g_targetLang + ", output it unchanged."
         "\n\n" + text;
 
+    char tempBuf[16];
+    snprintf(tempBuf, sizeof(tempBuf), "%.2f", g_temperature);
+
+    std::string opts =
+        "\"num_ctx\":"     + std::to_string(g_numCtx) +
+        ",\"num_predict\":" + std::to_string(g_numPredict) +
+        ",\"temperature\":" + tempBuf;
+    if (g_numThread != 0)
+        opts += ",\"num_thread\":" + std::to_string(g_numThread);
+
     return "{\"model\":\"" + JsonEscape(g_model) +
            "\",\"prompt\":\"" + JsonEscape(prompt) +
            "\",\"stream\":false"
-           ",\"options\":{\"num_ctx\":" + std::to_string(g_numCtx) +
-           ",\"num_thread\":" + std::to_string(g_numThread) + "}}";
+           ",\"options\":{" + opts + "}}";
 }
 
 static std::string DoTranslate(const std::string& text) {
@@ -547,20 +558,23 @@ static bool EnsureOllama() {
 
 static void ApplyPreset(const std::string& preset) {
     if (preset == "High") {
-        g_model     = "gemma3:4b";
-        g_numCtx    = 512;
-        g_numThread = 0; // Ollama 自動決定 — 4b最速設定
+        g_model       = "gemma3:4b";
+        g_numCtx      = 512;
+        g_numThread   = 0;
+        g_temperature = 0.1f;
     } else if (preset == "Medium") {
-        g_model     = "gemma3:4b";
-        g_numCtx    = 256;
-        g_numThread = 4;
+        g_model       = "gemma3:1b";
+        g_numCtx      = 256;
+        g_numThread   = 0;
+        g_temperature = 0.1f;
     } else { // Low
-        g_model     = "gemma3:1b";
-        g_numCtx    = 256;
-        g_numThread = 2;
+        g_model       = "gemma3:1b";
+        g_numCtx      = 128;
+        g_numThread   = 2;
+        g_temperature = 0.1f;
     }
-    logging::Debug("[Translate] プリセット '%s' 適用: model=%s, num_ctx=%d, num_thread=%d",
-        preset.c_str(), g_model.c_str(), g_numCtx, g_numThread);
+    logging::Debug("[Translate] プリセット '%s' 適用: model=%s, num_ctx=%d, num_thread=%d, temperature=%.2f, num_predict=%d",
+        preset.c_str(), g_model.c_str(), g_numCtx, g_numThread, g_temperature, g_numPredict);
 }
 
 // ============================================================
