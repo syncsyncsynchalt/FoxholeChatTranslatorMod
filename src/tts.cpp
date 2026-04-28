@@ -173,6 +173,7 @@ struct TtsRequest {
     std::string sender; // 空の場合はランダム声色
 };
 
+static constexpr size_t     MAX_TTS_QUEUE_SIZE = 8;
 static std::thread          g_ttsThread;
 static std::mutex           g_ttsMutex;
 static std::condition_variable g_ttsCv;
@@ -493,6 +494,9 @@ void tts::Speak(const char* textUtf8, const char* senderUtf8) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
+        if (g_ttsQueue.size() >= MAX_TTS_QUEUE_SIZE) {
+            g_ttsQueue.pop(); // 最古を破棄してバックプレッシャーを維持
+        }
         TtsRequest req;
         req.text = textUtf8;
         if (senderUtf8 && *senderUtf8) req.sender = senderUtf8;
