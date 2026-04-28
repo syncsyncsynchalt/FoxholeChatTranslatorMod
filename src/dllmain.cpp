@@ -489,17 +489,21 @@ static void ReloadWorker() {
 // ============================================================
 
 static DWORD WINAPI InitThread(LPVOID param) {
-    // デバッグコンソールを開く
-    AllocConsole();
-    SetConsoleTitleA("Foxhole Chat Translator - Diagnostic Mode");
+    char configPath[MAX_PATH];
+    snprintf(configPath, MAX_PATH, "%sconfig.ini", g_workerDir);
 
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-
-    FILE* conOut = nullptr;
-    freopen_s(&conOut, "CONOUT$", "w", stdout);
-    freopen_s(&conOut, "CONOUT$", "w", stderr);
-    setvbuf(stdout, nullptr, _IOFBF, 4096);
+    // EnableConsole=0 の場合はコンソールを開かない
+    int enableConsole = GetPrivateProfileIntA("General", "EnableConsole", 1, configPath);
+    if (enableConsole) {
+        AllocConsole();
+        SetConsoleTitleA("Foxhole Chat Translator - Diagnostic Mode");
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+        FILE* conOut = nullptr;
+        freopen_s(&conOut, "CONOUT$", "w", stdout);
+        freopen_s(&conOut, "CONOUT$", "w", stderr);
+        setvbuf(stdout, nullptr, _IOFBF, 4096);
+    }
 
     LogLoader("========================================");
     LogLoader("  Foxhole Chat Translator");
@@ -515,9 +519,6 @@ static DWORD WINAPI InitThread(LPVOID param) {
         moduleSize = nt->OptionalHeader.SizeOfImage;
         LogLoader("メインモジュール: base=0x%llX size=0x%X", moduleBase, moduleSize);
     }
-
-    char configPath[MAX_PATH];
-    snprintf(configPath, MAX_PATH, "%sconfig.ini", g_workerDir);
 
     int initDelay = GetPrivateProfileIntA("General", "InitDelayMs", 10000, configPath);
     LogLoader("UE4 初期化を待機中 (%dms)...", initDelay);
