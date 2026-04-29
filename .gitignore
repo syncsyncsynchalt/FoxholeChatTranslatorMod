@@ -7,6 +7,10 @@ tools/ollama/models/
 # ビルド出力
 build/
 
+# ベンチマーク生データ (docs/benchmark-results.md に整理済み)
+benchmark_presets.csv
+benchmark_results.csv
+
 # ログ
 debug_log.txt
 
