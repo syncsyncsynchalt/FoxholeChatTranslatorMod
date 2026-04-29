@@ -787,7 +787,7 @@ static DWORD WINAPI InitThread(LPVOID param) {
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
     switch (reason) {
-    case DLL_PROCESS_ATTACH:
+    case DLL_PROCESS_ATTACH: {
         DisableThreadLibraryCalls(hModule);
 
         // 自身のディレクトリを記録
@@ -806,6 +806,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         HANDLE hInitThread = CreateThread(nullptr, 0, InitThread, nullptr, 0, nullptr);
         if (hInitThread) CloseHandle(hInitThread);
         break;
+    }
 
     case DLL_PROCESS_DETACH:
         if (g_loaderLogFile) { fclose(g_loaderLogFile); g_loaderLogFile = nullptr; }
