@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 #include <mutex>
 #include <string>
 
@@ -74,7 +75,7 @@ static const char* g_chatFuncNames[CHAT_FUNC_COUNT] = {
 };
 
 static int32_t g_chatFuncCIs[CHAT_FUNC_COUNT] = { -1, -1, -1 };
-static bool    g_chatCIsReady = false;
+static std::atomic<bool> g_chatCIsReady{false};
 
 static void SearchChatFNames() {
     logging::Debug("=== チャット関連FName検索 ===");
@@ -91,7 +92,9 @@ static void SearchChatFNames() {
         }
     }
     logging::Debug("  %d/%d 件検出", found, CHAT_FUNC_COUNT);
-    g_chatCIsReady = (found > 0);
+    // release で書くことで、この書き込みより前の g_chatFuncCIs[] への書き込みが
+    // acquire 側 (OnProcessEvent) から確実に見えることを保証する
+    g_chatCIsReady.store(found > 0, std::memory_order_release);
 }
 
 // ============================================================
@@ -197,7 +200,7 @@ static bool ReadChatParamsSafe(int chatFunc, void* parms, RawChatParams* out) {
 // FNameBlockOffsetBits 自動検出
 // ============================================================
 
-static bool g_shiftDetected = false;
+static std::atomic<bool> g_shiftDetected{false};
 
 static bool TryDetectShift(void* function) {
     __try {
@@ -251,18 +254,18 @@ void hooks::OnProcessEvent(void* thisObj, void* function, void* parms) {
         TryLazyGNamesResolve();
         return;
     }
-    if (!g_chatCIsReady) return;
+    if (!g_chatCIsReady.load(std::memory_order_acquire)) return;
 
     // FNameBlockOffsetBits 自動検出 (最初の100回)
-    if (!g_shiftDetected) {
+    if (!g_shiftDetected.load(std::memory_order_relaxed)) {
         static volatile long shiftAttempts = 0;
         long sa = InterlockedIncrement(&shiftAttempts);
         if (sa <= 100) {
             if (TryDetectShift(function)) {
-                g_shiftDetected = true;
+                g_shiftDetected.store(true, std::memory_order_relaxed);
             }
         } else {
-            g_shiftDetected = true;
+            g_shiftDetected.store(true, std::memory_order_relaxed);
         }
     }
 
