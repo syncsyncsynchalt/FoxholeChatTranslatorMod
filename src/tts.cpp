@@ -495,7 +495,8 @@ void tts::Speak(const char* textUtf8, const char* senderUtf8) {
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
         if (g_ttsQueue.size() >= MAX_TTS_QUEUE_SIZE) {
-            g_ttsQueue.pop(); // 最古を破棄してバックプレッシャーを維持
+            logging::Debug("[TTS] キュー満杯: 最古メッセージを破棄 (size=%zu)", g_ttsQueue.size());
+            g_ttsQueue.pop();
         }
         TtsRequest req;
         req.text = textUtf8;

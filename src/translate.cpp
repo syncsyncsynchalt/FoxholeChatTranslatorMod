@@ -104,20 +104,33 @@ static std::string ClassifyError(const std::string& errMsg) {
 // HTTP POST (WinHTTP)
 // ============================================================
 
+static const char* WinHttpErrorName(DWORD err) {
+    switch (err) {
+    case 12002: return "TIMEOUT";
+    case 12007: return "NAME_NOT_RESOLVED";
+    case 12029: return "CANNOT_CONNECT";
+    case 12030: return "CONNECTION_ERROR";
+    case 12152: return "INVALID_SERVER_RESPONSE";
+    default:    return "(unknown)";
+    }
+}
+
 static std::string HttpPost(const std::string& body) {
     if (!g_hSession) return "";
 
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) {
-        logging::Debug("[Translate] WinHttpConnect 失敗: %u", GetLastError());
+        DWORD err = GetLastError();
+        logging::Debug("[Translate] WinHttpConnect 失敗: %u (%s)", err, WinHttpErrorName(err));
         return "";
     }
 
     HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", g_path.c_str(),
         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
     if (!hRequest) {
+        DWORD err = GetLastError();
         WinHttpCloseHandle(hConnect);
-        logging::Debug("[Translate] WinHttpOpenRequest 失敗: %u", GetLastError());
+        logging::Debug("[Translate] WinHttpOpenRequest 失敗: %u (%s)", err, WinHttpErrorName(err));
         return "";
     }
 
@@ -131,7 +144,7 @@ static std::string HttpPost(const std::string& body) {
         DWORD err = GetLastError();
         WinHttpCloseHandle(hRequest);
         WinHttpCloseHandle(hConnect);
-        logging::Debug("[Translate] WinHttpSendRequest 失敗: %u (Ollama未起動?)", err);
+        logging::Debug("[Translate] WinHttpSendRequest 失敗: %u (%s, Ollama未起動?)", err, WinHttpErrorName(err));
         return "";
     }
 
@@ -139,7 +152,7 @@ static std::string HttpPost(const std::string& body) {
         DWORD err = GetLastError();
         WinHttpCloseHandle(hRequest);
         WinHttpCloseHandle(hConnect);
-        logging::Debug("[Translate] WinHttpReceiveResponse 失敗: %u", err);
+        logging::Debug("[Translate] WinHttpReceiveResponse 失敗: %u (%s)", err, WinHttpErrorName(err));
         return "";
     }
 
@@ -252,13 +265,14 @@ static void WorkerThread() {
             item.channel.c_str(), item.sender.c_str(),
             item.message.c_str(), translated.c_str());
 
-        if (g_resultCallback) {
+        auto cb = g_resultCallback;
+        if (cb) {
             translate::TranslateResult result;
             result.channel    = item.channel;
             result.sender     = item.sender;
             result.original   = item.message;
             result.translated = translated;
-            g_resultCallback(result);
+            cb(result);
         }
     }
     logging::Debug("[Translate] ワーカースレッド終了");
@@ -539,7 +553,8 @@ std::string translate::Sync(const std::string& text) {
 void translate::Queue(const std::string& channel, const std::string& sender, const std::string& message) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_queue.size() >= MAX_QUEUE_SIZE) {
-        g_queue.pop(); // 最古のメッセージを破棄
+        logging::Debug("[Translate] キュー満杯: 最古メッセージを破棄 (size=%zu)", g_queue.size());
+        g_queue.pop();
     }
     g_queue.push({channel, sender, message});
     g_cv.notify_one();
