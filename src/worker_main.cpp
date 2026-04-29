@@ -38,8 +38,10 @@ __declspec(dllexport) void* WorkerInit() {
 }
 
 __declspec(dllexport) void WorkerShutdown() {
-    translate::Shutdown();
+    // overlay を先に止める: HealthWorker が translate::IsHealthy() (→ g_hSession 使用) を
+    // 呼んでいる可能性があるため、translate::Shutdown() で g_hSession を閉じる前に join する
     overlay::Shutdown();
+    translate::Shutdown();
     hooks::Shutdown();
 }
 
