@@ -12,6 +12,8 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
+#include <mutex>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <MinHook.h>
@@ -158,6 +160,9 @@ static int              g_peHookCount = 0;
 static volatile WorkerCallbackFn g_workerCallback = nullptr;
 static FILE* g_loaderLogFile = nullptr;
 
+// インフライト呼び出しカウンタ: UnloadWorker が FreeLibrary する前に全呼び出しが完了するのを保証する
+static std::atomic<int> g_inflightHooks{0};
+
 static uintptr_t g_hookedPeAddr = 0;  // フックしたProcessEventのアドレス
 
 // ============================================================
@@ -175,33 +180,41 @@ typedef LRESULT (*WndProcCallbackFn)(HWND, UINT, WPARAM, LPARAM);
 static volatile WndProcCallbackFn g_wndProcCallback = nullptr;
 static WNDPROC g_originalWndProc = nullptr;
 static HWND    g_gameHwnd = nullptr;
+static std::once_flag g_wndProcOnce;
 
 static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
     WndProcCallbackFn cb = g_wndProcCallback;
+    LRESULT result = 0;
     if (cb) {
-        LRESULT result = cb(hwnd, msg, wParam, lParam);
-        if (result) return result;  // ImGui が入力を消費した
+        result = cb(hwnd, msg, wParam, lParam);
     }
+    g_inflightHooks.fetch_sub(1, std::memory_order_release);
+    if (result) return result;  // ImGui が入力を消費した
     return CallWindowProc(g_originalWndProc, hwnd, msg, wParam, lParam);
 }
 
 static void InstallWndProcHook(IDXGISwapChain* swapChain) {
-    if (g_gameHwnd) return;  // 既にインストール済み
-    DXGI_SWAP_CHAIN_DESC desc;
-    if (SUCCEEDED(swapChain->GetDesc(&desc)) && desc.OutputWindow) {
-        g_gameHwnd = desc.OutputWindow;
-        g_originalWndProc = reinterpret_cast<WNDPROC>(
-            SetWindowLongPtr(g_gameHwnd, GWLP_WNDPROC,
-                             reinterpret_cast<LONG_PTR>(HookedWndProc)));
-    }
+    // call_once で TOCTOU を排除: SetWindowLongPtr は厳密に1度だけ実行される
+    std::call_once(g_wndProcOnce, [&] {
+        DXGI_SWAP_CHAIN_DESC desc;
+        if (SUCCEEDED(swapChain->GetDesc(&desc)) && desc.OutputWindow) {
+            g_gameHwnd = desc.OutputWindow;
+            g_originalWndProc = reinterpret_cast<WNDPROC>(
+                SetWindowLongPtr(g_gameHwnd, GWLP_WNDPROC,
+                                 reinterpret_cast<LONG_PTR>(HookedWndProc)));
+        }
+    });
 }
 
 static HRESULT WINAPI HookedPresent(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags) {
     InstallWndProcHook(swapChain);
+    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
     RenderCallbackFn cb = g_renderCallback;
     if (cb) {
         cb(swapChain);
     }
+    g_inflightHooks.fetch_sub(1, std::memory_order_release);
     return g_originalPresent(swapChain, syncInterval, flags);
 }
 
@@ -215,10 +228,12 @@ static bool HookDXGIPresent();
 
 // 共通のコールバック処理
 static void InvokeWorkerCallback(void* thisObj, void* function, void* parms) {
+    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
     WorkerCallbackFn cb = g_workerCallback;
     if (cb) {
         cb(thisObj, function, parms);
     }
+    g_inflightHooks.fetch_sub(1, std::memory_order_release);
 }
 
 // フック関数テンプレート: 各PE実装に対応
@@ -274,7 +289,10 @@ typedef void* (*PFN_WorkerInit)();
 typedef void (*PFN_WorkerShutdown)();
 static char g_workerDir[MAX_PATH] = {};
 
+static std::mutex s_logMutex;
+
 static void LogLoader(const char* fmt, ...) {
+    std::lock_guard<std::mutex> lock(s_logMutex);
     va_list args;
     va_start(args, fmt);
     printf("[Loader] ");
@@ -376,12 +394,14 @@ static bool HookDXGIPresent() {
 static void UnloadWorker() {
     if (!g_hWorker) return;
 
-    // コールバックを先にクリア (アトミック)
+    // コールバックを先にクリア
     g_wndProcCallback = nullptr;
     g_renderCallback = nullptr;
     g_workerCallback = nullptr;
-    // インフライト呼び出しが完了するのを待つ
-    Sleep(200);
+    // インフライト呼び出しが全て完了するまで待機（最大 1 秒）
+    for (int i = 0; i < 100 && g_inflightHooks.load(std::memory_order_acquire) > 0; i++) {
+        Sleep(10);
+    }
 
     auto shutdownFn = reinterpret_cast<PFN_WorkerShutdown>(
         GetProcAddress(g_hWorker, "WorkerShutdown"));
