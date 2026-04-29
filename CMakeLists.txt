@@ -55,6 +55,15 @@ if(NOT imgui_POPULATED)
 endif()
 
 # ============================================================
+# nlohmann/json - JSON パース・シリアライズ
+# ============================================================
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # ============================================================
 # Loader DLL (version.dll) - プロキシ + ワーカーローダー
 # ゲーム起動中は変更不要。安定版。
@@ -97,7 +106,7 @@ add_library(chat_translator SHARED
 )
 
 target_include_directories(chat_translator PRIVATE src)
-target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm winhttp runtimeobject xaudio2)
+target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm winhttp runtimeobject xaudio2 nlohmann_json::nlohmann_json)
 
 target_compile_definitions(chat_translator PRIVATE
     WIN32_LEAN_AND_MEAN
@@ -170,7 +179,7 @@ add_executable(translate_test
     src/log.cpp
 )
 target_include_directories(translate_test PRIVATE src)
-target_link_libraries(translate_test PRIVATE winhttp)
+target_link_libraries(translate_test PRIVATE winhttp nlohmann_json::nlohmann_json)
 target_compile_definitions(translate_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(translate_test PRIVATE /utf-8)
 

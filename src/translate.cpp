@@ -21,6 +21,7 @@
 
 #include "translate.h"
 #include "log.h"
+#include <nlohmann/json.hpp>
 
 // ============================================================
 // 内部状態
@@ -86,122 +87,6 @@ static bool ParseUrl(const std::string& url) {
     return true;
 }
 
-// ============================================================
-// JSON 文字列エスケープ
-// ============================================================
-
-static std::string JsonEscape(const std::string& s) {
-    std::string result;
-    result.reserve(s.size() + 16);
-    for (unsigned char c : s) {
-        switch (c) {
-        case '"':  result += "\\\""; break;
-        case '\\': result += "\\\\"; break;
-        case '\n': result += "\\n";  break;
-        case '\r': result += "\\r";  break;
-        case '\t': result += "\\t";  break;
-        default:
-            if (c < 0x20) {
-                char buf[8];
-                snprintf(buf, sizeof(buf), "\\u%04x", c);
-                result += buf;
-            } else {
-                result += static_cast<char>(c);
-            }
-            break;
-        }
-    }
-    return result;
-}
-
-// ============================================================
-// Ollama JSON レスポンスから "response" フィールドを抽出
-// ============================================================
-
-static std::string ExtractResponse(const std::string& json) {
-    size_t pos = json.find("\"response\"");
-    if (pos == std::string::npos) return "";
-
-    pos = json.find(':', pos + 10);
-    if (pos == std::string::npos) return "";
-    pos++;
-
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-    if (pos >= json.size() || json[pos] != '"') return "";
-    pos++; // skip opening quote
-
-    std::string result;
-    while (pos < json.size()) {
-        if (json[pos] == '"') break;
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
-            pos++;
-            switch (json[pos]) {
-            case '"':  result += '"';  break;
-            case '\\': result += '\\'; break;
-            case '/':  result += '/';  break;
-            case 'n':  result += '\n'; break;
-            case 'r':  result += '\r'; break;
-            case 't':  result += '\t'; break;
-            case 'b':  result += '\b'; break;
-            case 'f':  result += '\f'; break;
-            case 'u': {
-                if (pos + 4 < json.size()) {
-                    unsigned int cp = 0;
-                    try { cp = std::stoul(json.substr(pos + 1, 4), nullptr, 16); }
-                    catch (...) { break; }
-                    // UTF-8 エンコード
-                    if (cp < 0x80) {
-                        result += static_cast<char>(cp);
-                    } else if (cp < 0x800) {
-                        result += static_cast<char>(0xC0 | (cp >> 6));
-                        result += static_cast<char>(0x80 | (cp & 0x3F));
-                    } else {
-                        result += static_cast<char>(0xE0 | (cp >> 12));
-                        result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
-                        result += static_cast<char>(0x80 | (cp & 0x3F));
-                    }
-                    pos += 4;
-                }
-                break;
-            }
-            default: result += json[pos]; break;
-            }
-        } else {
-            result += json[pos];
-        }
-        pos++;
-    }
-    return result;
-}
-
-// ============================================================
-// Ollama JSON レスポンスから "error" フィールドを抽出
-// ============================================================
-
-static std::string ExtractError(const std::string& json) {
-    size_t pos = json.find("\"error\"");
-    if (pos == std::string::npos) return "";
-
-    pos = json.find(':', pos + 7);
-    if (pos == std::string::npos) return "";
-    pos++;
-
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-    if (pos >= json.size() || json[pos] != '"') return "";
-    pos++;
-
-    std::string result;
-    while (pos < json.size() && json[pos] != '"') {
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
-            pos++;
-            result += json[pos];
-        } else {
-            result += json[pos];
-        }
-        pos++;
-    }
-    return result;
-}
 
 // エラー文字列を日本語メッセージに変換
 static std::string ClassifyError(const std::string& errMsg) {
@@ -288,20 +173,19 @@ static std::string BuildRequestBody(const std::string& text) {
         " If the message is already in " + g_targetLang + ", output it unchanged."
         "\n\n" + text;
 
-    char tempBuf[16];
-    snprintf(tempBuf, sizeof(tempBuf), "%.2f", g_temperature);
-
-    std::string opts =
-        "\"num_ctx\":"     + std::to_string(g_numCtx) +
-        ",\"num_predict\":" + std::to_string(g_numPredict) +
-        ",\"temperature\":" + tempBuf;
+    nlohmann::json opts;
+    opts["num_ctx"]     = g_numCtx;
+    opts["num_predict"] = g_numPredict;
+    opts["temperature"] = g_temperature;
     if (g_numThread != 0)
-        opts += ",\"num_thread\":" + std::to_string(g_numThread);
+        opts["num_thread"] = g_numThread;
 
-    return "{\"model\":\"" + JsonEscape(g_model) +
-           "\",\"prompt\":\"" + JsonEscape(prompt) +
-           "\",\"stream\":false"
-           ",\"options\":{" + opts + "}}";
+    return nlohmann::json{
+        {"model",   g_model},
+        {"prompt",  prompt},
+        {"stream",  false},
+        {"options", opts}
+    }.dump();
 }
 
 static std::string DoTranslate(const std::string& text) {
@@ -312,15 +196,19 @@ static std::string DoTranslate(const std::string& text) {
         return u8"(接続失敗: Ollamaが起動していません)";
     }
 
-    std::string preview = response.substr(0, 200);
-    logging::Debug("[Translate] レスポンス (先頭200): %s", preview.c_str());
+    logging::Debug("[Translate] レスポンス (先頭200): %s", response.substr(0, 200).c_str());
 
-    std::string result = ExtractResponse(response);
-    if (!result.empty()) return result;
+    auto j = nlohmann::json::parse(response, nullptr, /*allow_exceptions=*/false);
+    if (j.is_discarded()) {
+        logging::Debug("[Translate] レスポンス解析失敗 (JSONパースエラー)");
+        return u8"(解析失敗)";
+    }
 
-    // "response" フィールドがない場合は "error" フィールドを確認
-    std::string errMsg = ExtractError(response);
-    if (!errMsg.empty()) {
+    if (j.contains("response") && j["response"].is_string())
+        return j["response"].get<std::string>();
+
+    if (j.contains("error") && j["error"].is_string()) {
+        std::string errMsg = j["error"].get<std::string>();
         logging::Debug("[Translate] Ollamaエラー: %s", errMsg.c_str());
         return ClassifyError(errMsg);
     }
@@ -478,7 +366,7 @@ static bool StartOllamaServe(const std::string& exePath) {
 
 // モデルが利用可能か確認 (POST /api/show)
 static bool IsModelAvailable() {
-    std::string body = "{\"name\":\"" + JsonEscape(g_model) + "\"}";
+    std::string body = nlohmann::json{{"name", g_model}}.dump();
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) return false;
     HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/show",
@@ -501,7 +389,7 @@ static bool IsModelAvailable() {
 // モデルを pull (POST /api/pull, stream=false)
 static bool PullModel() {
     logging::Debug("[Translate] モデル '%s' をダウンロード中...", g_model.c_str());
-    std::string body = "{\"name\":\"" + JsonEscape(g_model) + "\",\"stream\":false}";
+    std::string body = nlohmann::json{{"name", g_model}, {"stream", false}}.dump();
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) return false;
     HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/pull",
