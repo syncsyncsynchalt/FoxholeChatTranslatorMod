@@ -107,7 +107,7 @@ def ollama_version(endpoint: str, timeout: float = 3.0):
 
 def do_translate(endpoint: str, model: str, target_lang: str,
                  num_ctx: int, num_thread: int, text: str,
-                 num_predict: int = 120, temperature: float = 0.8) -> tuple:
+                 num_predict: int = 120, temperature: float = 0.1) -> tuple:
     prompt = (
         "You are a translator. The user sends a chat message in any language."
         f" Translate it to {target_lang}."
