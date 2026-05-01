@@ -256,7 +256,7 @@ _TOTAL_RAM_MB = _total_ram_mb()
 
 
 class _Monitor(threading.Thread):
-    INTERVAL = 2.0
+    INTERVAL = 0.5
 
     def __init__(self):
         super().__init__(daemon=True, name="ResourceMonitor")
@@ -378,7 +378,7 @@ def _dim_color(hex_color: str, factor: float = 0.25) -> str:
 
 class _Graph(tk.Frame):
     _H       = 50
-    _SAMPLES = 60   # 60サンプル × 2秒 = 約2分
+    _SAMPLES = 120  # 120サンプル × 0.5秒 = 約1分
 
     def __init__(self, parent, label: str, color: str = "#4a9eff",
                  traffic_light: bool = True):
@@ -420,6 +420,13 @@ class _Graph(tk.Frame):
             return "#e09020"
         return "#e03030"
 
+    @staticmethod
+    def _nice_max(v: float) -> float:
+        for t in (5, 10, 20, 25, 50, 100):
+            if v <= t:
+                return float(t)
+        return 100.0
+
     def _redraw(self):
         w = self._cv.winfo_width()
         h = self._cv.winfo_height()
@@ -427,12 +434,18 @@ class _Graph(tk.Frame):
             return
         self._cv.delete("all")
 
+        vals    = list(self._vals)
+        n       = len(vals)
+        present = [v for v in vals if v is not None]
+        y_max   = self._nice_max(max(present) if present else 0)
+
         for g in (25, 50, 75):
             y = int(h * (1 - g / 100))
             self._cv.create_line(0, y, w, y, fill="#2a2a3e", dash=(2, 4))
 
-        vals = list(self._vals)
-        n    = len(vals)
+        self._cv.create_text(w - 3, 2, text=f"{y_max:.0f}%",
+                             fill="#777", font=("", 7), anchor=tk.NE)
+
         last = next((v for v in reversed(vals) if v is not None), None)
         lc   = self._line_color(last) if last is not None else self._color
 
@@ -440,7 +453,7 @@ class _Graph(tk.Frame):
         for i, v in enumerate(vals):
             x = int(w * i / (n - 1)) if n > 1 else w - 1
             if v is not None:
-                y = max(1, min(h - 1, int(h * (1 - v / 100))))
+                y = max(1, min(h - 1, int(h * (1 - v / y_max))))
                 seg.append((x, y))
             else:
                 if len(seg) >= 2:
@@ -917,7 +930,7 @@ class App:
         self._res_update()
 
     def _res_update(self):
-        self._res_timer = self.root.after(2000, self._res_update)
+        self._res_timer = self.root.after(500, self._res_update)
         d = self._monitor.get_data()
 
         if not d["alive"] and self._server_pid:
@@ -936,7 +949,7 @@ class App:
             return
 
         self._res_note.config(
-            text=f"PID {self._server_pid}  |  システムRAM {_TOTAL_RAM_MB:,} MB  |  2秒更新")
+            text=f"PID {self._server_pid}  |  システムRAM {_TOTAL_RAM_MB:,} MB  |  0.5秒更新")
 
         self._bar_cpu.set(d["cpu_pct"],
                           f"{d['cpu_pct']:.1f}%  ({_NUM_CPUS} コア)")
