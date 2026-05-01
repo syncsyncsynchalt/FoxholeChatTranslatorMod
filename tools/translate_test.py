@@ -1012,7 +1012,7 @@ class App:
 # ============================================================
 
 def main():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     root = tk.Tk()
     App(root, base_dir)
     root.mainloop()

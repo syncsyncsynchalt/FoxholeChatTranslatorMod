@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Translate Test Tool",
+      "type": "shell",
+      "command": "C:\\src\\2dtest2\\.venv\\Scripts\\python.exe",
+      "args": ["./tools/translate_test.py"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run TTS Test Tool",
+      "type": "shell",
+      "command": "C:\\src\\2dtest2\\.venv\\Scripts\\python.exe",
+      "args": ["./tools/tts_test.py"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
