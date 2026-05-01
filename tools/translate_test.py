@@ -19,6 +19,7 @@ import urllib.error
 import subprocess
 import ctypes
 import ctypes.wintypes as _wt
+import collections
 
 # ============================================================
 # 定数
@@ -367,14 +368,25 @@ def _launch_ollama(exe_path: str):
 # リソースバー ウィジェット
 # ============================================================
 
-class _Bar(tk.Frame):
-    _H = 15
+def _dim_color(hex_color: str, factor: float = 0.25) -> str:
+    h = hex_color.lstrip("#")
+    r = int(int(h[0:2], 16) * factor)
+    g = int(int(h[2:4], 16) * factor)
+    b = int(int(h[4:6], 16) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+class _Graph(tk.Frame):
+    _H       = 50
+    _SAMPLES = 60   # 60サンプル × 2秒 = 約2分
 
     def __init__(self, parent, label: str, color: str = "#4a9eff",
                  traffic_light: bool = True):
         super().__init__(parent)
-        self._base  = color
+        self._color = color
         self._tl    = traffic_light
+        self._fill  = _dim_color(color)
+        self._vals  = collections.deque([None] * self._SAMPLES, maxlen=self._SAMPLES)
 
         row = tk.Frame(self)
         row.pack(fill=tk.X)
@@ -383,27 +395,66 @@ class _Bar(tk.Frame):
         self._lbl = ttk.Label(row, text="—", font=("", 8), foreground="#555")
         self._lbl.pack(side=tk.RIGHT)
 
-        self._cv   = tk.Canvas(self, height=self._H, bg="#d0d0d0",
-                                highlightthickness=0)
+        self._cv = tk.Canvas(self, height=self._H, bg="#1e1e2e",
+                              highlightthickness=1, highlightbackground="#555")
         self._cv.pack(fill=tk.X, pady=(1, 4))
-        self._rect = self._cv.create_rectangle(0, 0, 0, self._H,
-                                               fill=color, width=0)
+        self._cv.bind("<Configure>", lambda e: self._redraw())
 
     def set(self, pct: float, text: str = ""):
         pct = max(0.0, min(100.0, float(pct)))
+        self._vals.append(pct)
         self._lbl.config(text=text or f"{pct:.0f}%")
-        w  = self._cv.winfo_width() or 220
-        bw = int(w * pct / 100)
-        self._cv.coords(self._rect, 0, 0, bw, self._H)
-        if self._tl:
-            color = "#3ab858" if pct <= 50 else ("#e09020" if pct <= 80 else "#e03030")
-        else:
-            color = self._base
-        self._cv.itemconfig(self._rect, fill=color)
+        self._redraw()
 
     def set_na(self, text: str = "N/A"):
+        self._vals.append(None)
         self._lbl.config(text=text)
-        self._cv.coords(self._rect, 0, 0, 0, self._H)
+        self._redraw()
+
+    def _line_color(self, pct: float) -> str:
+        if not self._tl:
+            return self._color
+        if pct <= 50:
+            return "#3ab858"
+        if pct <= 80:
+            return "#e09020"
+        return "#e03030"
+
+    def _redraw(self):
+        w = self._cv.winfo_width()
+        h = self._cv.winfo_height()
+        if w <= 1:
+            return
+        self._cv.delete("all")
+
+        for g in (25, 50, 75):
+            y = int(h * (1 - g / 100))
+            self._cv.create_line(0, y, w, y, fill="#2a2a3e", dash=(2, 4))
+
+        vals = list(self._vals)
+        n    = len(vals)
+        last = next((v for v in reversed(vals) if v is not None), None)
+        lc   = self._line_color(last) if last is not None else self._color
+
+        seg = []
+        for i, v in enumerate(vals):
+            x = int(w * i / (n - 1)) if n > 1 else w - 1
+            if v is not None:
+                y = max(1, min(h - 1, int(h * (1 - v / 100))))
+                seg.append((x, y))
+            else:
+                if len(seg) >= 2:
+                    self._draw_seg(seg, lc, h)
+                seg = []
+        if len(seg) >= 2:
+            self._draw_seg(seg, lc, h)
+
+    def _draw_seg(self, pts, lc, h):
+        poly = [(pts[0][0], h), *pts, (pts[-1][0], h)]
+        self._cv.create_polygon([c for p in poly for c in p],
+                                fill=self._fill, outline="")
+        self._cv.create_line([c for p in pts for c in p],
+                             fill=lc, width=1)
 
 # ============================================================
 # メイン App
@@ -415,12 +466,12 @@ class App:
         self.base_dir     = base_dir
         self.cfg          = load_config(base_dir)
         self.log_messages: list = []
-        self._cancel_flag = threading.Event()
-        self._our_proc    = None   # 自前起動した Popen
-        self._server_pid  = None
-        self._monitor     = _Monitor()
+        self._our_proc       = None   # 自前起動した Popen
+        self._server_pid     = None
+        self._monitor        = _Monitor()
         self._monitor.start()
-        self._res_timer   = None
+        self._res_timer      = None
+        self._stopped_poll_id = None
 
         root.title("翻訳テストツール — ChatTranslator")
         root.geometry("1060x760")
@@ -450,9 +501,27 @@ class App:
             self._monitor.set_pid(pid)
             self._set_server_ui("external", ver, pid)
             self._start_res_loop()
+            self._update_status_bar(ver)
+            self._start_warmup()
         else:
-            self._set_server_ui("stopped")
-        self._update_status_bar(ver)
+            if self._our_proc is not None:
+                return  # すでに起動処理中
+            exe = _find_bundled_ollama(self.base_dir)
+            if exe:
+                self.status_var.set("Ollama が停止しています — 自動起動します...")
+                proc = _launch_ollama(exe)
+                if proc:
+                    self._our_proc = proc
+                    self._set_server_ui("starting")
+                    threading.Thread(target=self._wait_for_start, daemon=True).start()
+                else:
+                    self._set_server_ui("stopped")
+                    self._update_status_bar(None)
+                    self._start_stopped_poll()
+            else:
+                self._set_server_ui("stopped")
+                self._update_status_bar(None)
+                self._start_stopped_poll()
 
     # ----------------------------------------------------------
     # UI 構築
@@ -518,20 +587,18 @@ class App:
         self._stop_btn = ttk.Button(btn_row, text="停止", width=7,
                                     command=self._stop_server, state=tk.DISABLED)
         self._stop_btn.pack(side=tk.LEFT, padx=(4, 0))
-        ttk.Button(btn_row, text="再確認", width=7,
-                   command=self._recheck).pack(side=tk.LEFT, padx=(4, 0))
 
         # リソースモニター
         rf = ttk.LabelFrame(parent, text=" リソースモニター ", padding=8)
         rf.pack(fill=tk.X, padx=4, pady=2)
 
-        self._bar_cpu  = _Bar(rf, "CPU",  traffic_light=True)
+        self._bar_cpu  = _Graph(rf, "CPU",  traffic_light=True)
         self._bar_cpu.pack(fill=tk.X)
-        self._bar_ram  = _Bar(rf, "RAM",  color="#9040e0", traffic_light=True)
+        self._bar_ram  = _Graph(rf, "RAM",  color="#9040e0", traffic_light=True)
         self._bar_ram.pack(fill=tk.X)
-        self._bar_gpu  = _Bar(rf, "GPU",  color="#20a080", traffic_light=True)
+        self._bar_gpu  = _Graph(rf, "GPU",  color="#20a080", traffic_light=True)
         self._bar_gpu.pack(fill=tk.X)
-        self._bar_vram = _Bar(rf, "VRAM", color="#20a080", traffic_light=False)
+        self._bar_vram = _Graph(rf, "VRAM", color="#20a080", traffic_light=False)
         self._bar_vram.pack(fill=tk.X)
 
         self._res_note = ttk.Label(rf, text="Ollamaが起動すると表示されます",
@@ -656,9 +723,6 @@ class App:
         self.translate_btn = ttk.Button(cf2, text="▶  翻訳", width=10,
                                         command=self._start_translate)
         self.translate_btn.pack(side=tk.LEFT, padx=(0, 6))
-        self.cancel_btn = ttk.Button(cf2, text="■  キャンセル", width=12,
-                                     command=self._cancel_translate, state=tk.DISABLED)
-        self.cancel_btn.pack(side=tk.LEFT)
         ttk.Button(cf2, text="クリア", width=6,
                    command=self._clear_all).pack(side=tk.LEFT, padx=8)
 
@@ -731,8 +795,10 @@ class App:
         threading.Thread(target=self._wait_for_start, daemon=True).start()
 
     def _wait_for_start(self):
-        endpoint = self.cfg["ollama_endpoint"]
-        for _ in range(60):
+        endpoint   = self.cfg["ollama_endpoint"]
+        t0         = time.time()
+        dot_colors = ["#e0a000", "#b07800", "#e0c000"]
+        for i in range(60):
             if self._our_proc and self._our_proc.poll() is not None:
                 self.root.after(0, self._on_start_failed)
                 return
@@ -741,8 +807,15 @@ class App:
                 pid = _find_running_pid()
                 self.root.after(0, lambda v=ver, p=pid: self._on_start_ok(v, p))
                 return
+            elapsed  = int(time.time() - t0)
+            dc       = dot_colors[i % len(dot_colors)]
+            self.root.after(0, lambda e=elapsed, c=dc: self._on_start_progress(e, c))
             time.sleep(0.5)
         self.root.after(0, self._on_start_failed)
+
+    def _on_start_progress(self, elapsed: int, dot_color: str):
+        self._dot_lbl.config(foreground=dot_color)
+        self.status_var.set(f"Ollama を起動中... ({elapsed} 秒経過)")
 
     def _on_start_ok(self, ver, pid):
         self._server_pid = pid
@@ -750,11 +823,13 @@ class App:
         self._set_server_ui("running", ver, pid)
         self._update_status_bar(ver)
         self._start_res_loop()
+        self._start_warmup()
 
     def _on_start_failed(self):
         self._our_proc = None
         self._set_server_ui("stopped")
         self.status_var.set("Ollama の起動に失敗しました")
+        self._start_stopped_poll()
 
     def _stop_server(self):
         if self._res_timer:
@@ -775,8 +850,62 @@ class App:
         self._set_server_ui("stopped")
         self._update_status_bar(None)
 
-    def _recheck(self):
-        threading.Thread(target=self._bg_init_check, daemon=True).start()
+    # ----------------------------------------------------------
+    # 停止中ポーリング（外部起動の自動検知）
+    # ----------------------------------------------------------
+
+    def _start_stopped_poll(self):
+        if self._stopped_poll_id:
+            self.root.after_cancel(self._stopped_poll_id)
+        self._stopped_poll_id = self.root.after(5000, self._auto_poll_tick)
+
+    def _auto_poll_tick(self):
+        self._stopped_poll_id = None
+        if self._server_pid or self._our_proc:
+            return  # 既に起動中または起動処理中
+        threading.Thread(target=self._bg_poll_check, daemon=True).start()
+
+    def _bg_poll_check(self):
+        ver = ollama_version(self.cfg["ollama_endpoint"], timeout=3.0)
+        pid = _find_running_pid() if ver else None
+        self.root.after(0, lambda v=ver, p=pid: self._on_poll_result(v, p))
+
+    def _on_poll_result(self, ver, pid):
+        if ver:
+            self._server_pid = pid
+            self._monitor.set_pid(pid)
+            self._set_server_ui("external", ver, pid)
+            self._start_res_loop()
+            self._update_status_bar(ver)
+            self._start_warmup()
+        else:
+            self._start_stopped_poll()  # 見つからなければ再スケジュール
+
+    # ----------------------------------------------------------
+    # ウォームアップ
+    # ----------------------------------------------------------
+
+    def _start_warmup(self):
+        preset = PRESETS.get(self.preset_var.get(), PRESETS["Medium"])
+        model  = self.model_var.get().strip() or preset["model"]
+        self.status_var.set(f"モデル ({model}) をウォームアップ中...")
+        self.translate_btn.config(state=tk.DISABLED)
+
+        endpoint   = self.cfg["ollama_endpoint"]
+        num_ctx    = preset["num_ctx"]
+        num_thread = preset["num_thread"]
+
+        def run():
+            do_translate(endpoint, model, "Japanese",
+                         num_ctx, num_thread, "hello",
+                         num_predict=1, temperature=0.1)
+            self.root.after(0, self._on_warmup_done)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_warmup_done(self):
+        self.translate_btn.config(state=tk.NORMAL)
+        self.status_var.set("準備完了 — テキストを入力して「翻訳」を押してください")
 
     # ----------------------------------------------------------
     # リソースモニター更新 (2秒ごと)
@@ -799,6 +928,7 @@ class App:
             self._our_proc   = None
             self._set_server_ui("stopped")
             self._update_status_bar(None)
+            self._start_stopped_poll()
             return
 
         if not d["alive"]:
@@ -852,8 +982,6 @@ class App:
             self.status_var.set("テキストを入力してください")
             return
         self.translate_btn.config(state=tk.DISABLED)
-        self.cancel_btn.config(state=tk.NORMAL)
-        self._cancel_flag.clear()
         self._set_result("翻訳中...")
         self.perf_lbl.config(text="")
 
@@ -869,9 +997,6 @@ class App:
             result, elapsed, cnt = do_translate(
                 endpoint, model, target_lang, num_ctx, num_thread, text, num_predict,
                 temperature)
-            if self._cancel_flag.is_set():
-                self.root.after(0, lambda: self._on_done(None, 0, 0, text, model))
-                return
             self.root.after(0, lambda r=result, e=elapsed, c=cnt:
                             self._on_done(r, e, c, text, model))
 
@@ -879,21 +1004,12 @@ class App:
 
     def _on_done(self, result, elapsed, cnt, src, model):
         self.translate_btn.config(state=tk.NORMAL)
-        self.cancel_btn.config(state=tk.DISABLED)
-        if result is None:
-            self._set_result("")
-            self.status_var.set("キャンセルしました")
-            return
         self._set_result(result)
         speed = f"  {cnt / (elapsed / 1000):.1f} tok/s" if cnt and elapsed else ""
         perf  = f"{elapsed} ms  |  {cnt} tokens{speed}"
         self.perf_lbl.config(text=perf)
         self.status_var.set(f"完了 — {perf}  [{model}]")
         self._append_history(src, result, model, elapsed)
-
-    def _cancel_translate(self):
-        self._cancel_flag.set()
-        self.cancel_btn.config(state=tk.DISABLED)
 
     # ----------------------------------------------------------
     # 結果 / 履歴
@@ -995,6 +1111,8 @@ class App:
     def _on_close(self):
         if self._res_timer:
             self.root.after_cancel(self._res_timer)
+        if self._stopped_poll_id:
+            self.root.after_cancel(self._stopped_poll_id)
         self._monitor.stop()
         if self._our_proc:
             try:
