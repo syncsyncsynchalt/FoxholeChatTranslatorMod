@@ -125,42 +125,17 @@ static std::wstring EscapeXml(const std::wstring& text) {
     return out;
 }
 
-// テキストを SSML でラップする
-// sender のハッシュ値からピッチとレートを変化させて人ごとに個性を付ける
-static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, const std::string& sender) {
-    // ピッチ: -20% ~ +20% の 9 段階
-    static const wchar_t* kPitches[] = {
-        L"-20%", L"-15%", L"-10%", L"-5%", L"0%", L"+5%", L"+10%", L"+15%", L"+20%"
-    };
-    // レート: 95% ~ 115% の 5 段階。kSpeakingRate を乗算して最終レートを決定する。
-    // SSML の <prosody rate> が WinRT の SpeakingRate プロパティより優先されるため、
-    // SpeakingRate は SSML 側に直接反映させる (tts_test.py の apply_speaking_rate と同一ロジック)。
-    static const int kRates[] = { 95, 100, 105, 110, 115 };
-    static const double kSpeakingRate = 1.1;
-
-    const wchar_t* pitch = L"0%";
-    wchar_t rateBuf[16];
-    if (!sender.empty()) {
-        std::hash<std::string> hasher;
-        size_t h = hasher(sender);
-        pitch = kPitches[h % 9];
-        int r = static_cast<int>(kRates[(h >> 8) % 5] * kSpeakingRate + 0.5);
-        swprintf_s(rateBuf, L"%d%%", r);
-    } else {
-        // sender なし: 100% * kSpeakingRate
-        swprintf_s(rateBuf, L"%d%%", static_cast<int>(100 * kSpeakingRate + 0.5));
-    }
+// テキストを SSML でラップする (素のデフォルト音声で読み上げ)
+static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, const std::string& sender, double speakingRate) {
+    (void)sender;
+    (void)speakingRate;
 
     std::wstring ssml;
     ssml  = L"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='";
     ssml += langTag;
-    ssml += L"'><prosody pitch='";
-    ssml += pitch;
-    ssml += L"' rate='";
-    ssml += rateBuf;
     ssml += L"'>";
     ssml += EscapeXml(text);
-    ssml += L"</prosody></speak>";
+    ssml += L"</speak>";
     return ssml;
 }
 
@@ -182,6 +157,7 @@ static std::atomic<bool>    g_ttsRunning{false};
 static std::atomic<bool>    g_ttsStop{false};
 // "auto" の場合はテキストから自動判定、それ以外は固定言語
 static std::string          g_ttsLanguage = "auto";
+static double               g_speakingRate = 1.0;
 
 static void TtsWorker() {
     // ゲームのレンダリングを邪魔しないよう優先度を下げる
@@ -327,7 +303,7 @@ static void TtsWorker() {
 
         // SSML で合成 (xml:lang 明示によりニューラル音声の韻律処理精度が向上)
         std::wstring wtext = Utf8ToWide(text.c_str());
-        std::wstring ssml = BuildSsml(wtext, langTag, req.sender);
+        std::wstring ssml = BuildSsml(wtext, langTag, req.sender, g_speakingRate);
         HStringReference ssmlRef(ssml.c_str());
 
         ComPtr<IAsyncOperation<SpeechSynthesisStream*>> asyncOp;
@@ -482,10 +458,11 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language) {
+void tts::Init(const char* language, double speakingRate) {
     if (g_ttsRunning.load()) return;
     g_ttsLanguage = (language && *language) ? language : "auto";
-    logging::Debug("[TTS] Init (language=%s)", g_ttsLanguage.c_str());
+    g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0) ? speakingRate : 1.0;
+    logging::Debug("[TTS] Init (language=%s, rate=%.2f)", g_ttsLanguage.c_str(), g_speakingRate);
     g_ttsRunning.store(true);
     g_ttsThread = std::thread(TtsWorker);
 }

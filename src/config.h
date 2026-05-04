@@ -25,6 +25,7 @@ struct Config {
     // "auto" = テキスト内容から自動判定
     // "ja", "en", "ru", "zh", "ko" = 強制指定
     std::string ttsLanguage    = "auto";
+    double      ttsSpeakingRate = 1.0;
 };
 
 namespace config {
