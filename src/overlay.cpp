@@ -502,6 +502,24 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
     if (g_radioState.load() != RadioState::ON) return;
     if (message.empty()) return;
 
+    // 1単語のみ (lol/ok/gg 等の短文ASCII) は翻訳・読み上げをスキップ。
+    // CJK等のマルチバイト文字を含む場合は短くても対象とする。
+    {
+        size_t a = message.find_first_not_of(" \t\r\n");
+        size_t b = message.find_last_not_of(" \t\r\n");
+        if (a == std::string::npos) return;
+        std::string trimmed = message.substr(a, b - a + 1);
+        bool hasSpace = trimmed.find_first_of(" \t") != std::string::npos;
+        bool hasMultiByte = false;
+        for (unsigned char c : trimmed) {
+            if (c >= 0x80) { hasMultiByte = true; break; }
+        }
+        if (!hasSpace && !hasMultiByte) {
+            logging::Debug("[Overlay] 1単語のためスキップ: %s", trimmed.c_str());
+            return;
+        }
+    }
+
     translate::Queue("", sender, message);
 }
 
