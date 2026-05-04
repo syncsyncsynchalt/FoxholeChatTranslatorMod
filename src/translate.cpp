@@ -465,7 +465,7 @@ static void ApplyPreset(const std::string& preset) {
         g_numThread   = 0;
         g_temperature = 0.1f;
     } else if (preset == "Medium") {
-        g_model       = "gemma3:1b";
+        g_model       = "gemma3:4b";
         g_numCtx      = 256;
         g_numThread   = 0;
         g_temperature = 0.1f;
