@@ -449,7 +449,7 @@ bool overlay::Init() {
             g_translatedText = r.translated;
         }
         g_textChanged.store(true);
-        tts::Speak(r.translated.c_str(), r.sender.empty() ? nullptr : r.sender.c_str());
+        tts::Speak(r.original.c_str(), r.sender.empty() ? nullptr : r.sender.c_str());
     });
 
     // ワーカースレッド起動 (HealthWorker のみ)
