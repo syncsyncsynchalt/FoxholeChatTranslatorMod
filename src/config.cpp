@@ -41,6 +41,8 @@ void config::Load(const char* baseDir) {
     } catch (...) {
         g_config.ttsSpeakingRate = 1.0;
     }
+
+    g_config.ttsRadioEffect = GetPrivateProfileIntA("TTS", "RadioEffect", 1, configPath.c_str()) != 0;
 }
 
 const Config& config::Get() {

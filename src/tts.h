@@ -8,7 +8,8 @@ namespace tts {
 // 初期化 (ワーカースレッド起動)
 // language: "auto"=テキストから自動判定 / "ja" "en" "ru" "zh" "ko"=強制指定
 // speakingRate: 読み上げ速度倍率 (1.0=標準)
-void Init(const char* language = "auto", double speakingRate = 1.0);
+// radioEffect: 無線ラジオ風エフェクトを有効にする
+void Init(const char* language = "auto", double speakingRate = 1.0, bool radioEffect = true);
 
 // テキストを非同期で読み上げ (言語は自動判定)
 // sender が非NULLの場合、送信者名から決定論的に声色を選択する

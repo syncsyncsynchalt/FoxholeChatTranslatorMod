@@ -125,18 +125,115 @@ static std::wstring EscapeXml(const std::wstring& text) {
     return out;
 }
 
-// テキストを SSML でラップする (素のデフォルト音声で読み上げ)
-static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag, const std::string& sender, double speakingRate) {
-    (void)sender;
-    (void)speakingRate;
-
+// テキストを SSML でラップする (英語・ロシア語は戦争映画風prosody付き)
+static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag,
+                               Lang lang, const std::string& sender, double speakingRate) {
     std::wstring ssml;
     ssml  = L"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='";
     ssml += langTag;
     ssml += L"'>";
-    ssml += EscapeXml(text);
+
+    if (lang == Lang::EN || lang == Lang::RU) {
+        // 英語: 深い声(-20%ベース) + 10%早い話し方で戦争映画風に
+        // ロシア語: やや深い声(-10%)で重厚感
+        static const wchar_t* kEnPitches[] = { L"-25%", L"-22%", L"-20%", L"-18%", L"-15%" };
+        static const wchar_t* kRuPitches[] = { L"-12%", L"-10%", L"-8%" };
+
+        const wchar_t* pitch;
+        double rate;
+        if (lang == Lang::EN) {
+            size_t idx = sender.empty() ? 2 : (std::hash<std::string>{}(sender) % 5);
+            pitch = kEnPitches[idx];
+            rate  = speakingRate * 1.1;
+        } else {
+            size_t idx = sender.empty() ? 1 : (std::hash<std::string>{}(sender) % 3);
+            pitch = kRuPitches[idx];
+            rate  = speakingRate;
+        }
+
+        wchar_t prosody[64];
+        swprintf_s(prosody, L"<prosody pitch='%ls' rate='%.0f%%'>", pitch, rate * 100.0);
+        ssml += prosody;
+        ssml += EscapeXml(text);
+        ssml += L"</prosody>";
+    } else {
+        ssml += EscapeXml(text);
+    }
+
     ssml += L"</speak>";
     return ssml;
+}
+
+// ============================================================
+// 無線ラジオ風オーディオエフェクト (バンドパスフィルター + クリッピング)
+// ============================================================
+
+struct BiquadCoeffs { double b0, b1, b2, a1, a2; };
+struct BiquadState  { double x1=0, x2=0, y1=0, y2=0; };
+
+// 2次Butterworth ハイパスフィルター (RBJ EQ Cookbook)
+static BiquadCoeffs DesignHPF(double fc, double fs) {
+    const double pi = 3.14159265358979323846;
+    double w0    = 2.0 * pi * fc / fs;
+    double alpha = sin(w0) / (2.0 * 0.7071067811865476); // Q=1/√2
+    double cosw0 = cos(w0);
+    double a0    = 1.0 + alpha;
+    return { (1+cosw0)/2/a0, -(1+cosw0)/a0, (1+cosw0)/2/a0,
+             -2*cosw0/a0, (1-alpha)/a0 };
+}
+
+// 2次Butterworth ローパスフィルター
+static BiquadCoeffs DesignLPF(double fc, double fs) {
+    const double pi = 3.14159265358979323846;
+    double w0    = 2.0 * pi * fc / fs;
+    double alpha = sin(w0) / (2.0 * 0.7071067811865476);
+    double cosw0 = cos(w0);
+    double a0    = 1.0 + alpha;
+    return { (1-cosw0)/2/a0, (1-cosw0)/a0, (1-cosw0)/2/a0,
+             -2*cosw0/a0, (1-alpha)/a0 };
+}
+
+// バンドパス(300-3400 Hz) + ハードクリッピングで無線通信音質を再現
+static void ApplyRadioEffect(BYTE* dataChunk, DWORD dataSize, const WAVEFORMATEX& wfx) {
+    if (wfx.wFormatTag != WAVE_FORMAT_PCM || wfx.wBitsPerSample != 16 || !wfx.nSamplesPerSec) return;
+
+    int16_t* s16   = reinterpret_cast<int16_t*>(dataChunk);
+    size_t   n     = dataSize / 2;
+    int      ch    = wfx.nChannels;
+    size_t   frames = n / ch;
+    double   fs    = static_cast<double>(wfx.nSamplesPerSec);
+
+    std::vector<float> buf(n);
+    for (size_t i = 0; i < n; i++) buf[i] = s16[i] / 32768.0f;
+
+    BiquadCoeffs hpf = DesignHPF(300.0,  fs);
+    BiquadCoeffs lpf = DesignLPF(3400.0, fs);
+
+    for (int c = 0; c < ch; c++) {
+        BiquadState hs, ls;
+        for (size_t f = 0; f < frames; f++) {
+            float* p = &buf[f * ch + c];
+            double y = hpf.b0 * *p + hpf.b1*hs.x1 + hpf.b2*hs.x2 - hpf.a1*hs.y1 - hpf.a2*hs.y2;
+            hs.x2=hs.x1; hs.x1=*p;  hs.y2=hs.y1; hs.y1=y;
+            double z = lpf.b0 * y   + lpf.b1*ls.x1 + lpf.b2*ls.x2 - lpf.a1*ls.y1 - lpf.a2*ls.y2;
+            ls.x2=ls.x1; ls.x1=y;   ls.y2=ls.y1; ls.y1=z;
+            *p = static_cast<float>(z);
+        }
+    }
+
+    // 1.4倍ブースト後にハードクリップ → 正規化でラジオ圧縮感を再現
+    const float kClip = 0.85f;
+    for (size_t i = 0; i < n; i++) {
+        float v = buf[i] * 1.4f;
+        v = v > kClip ? kClip : (v < -kClip ? -kClip : v);
+        buf[i] = v / kClip;
+    }
+    for (size_t i = 0; i < n; i++) {
+        float v = buf[i];
+        if (v >  1.0f) v =  1.0f;
+        if (v < -1.0f) v = -1.0f;
+        s16[i] = static_cast<int16_t>(v * 32767.0f);
+    }
 }
 
 // ============================================================
@@ -158,6 +255,7 @@ static std::atomic<bool>    g_ttsStop{false};
 // "auto" の場合はテキストから自動判定、それ以外は固定言語
 static std::string          g_ttsLanguage = "auto";
 static double               g_speakingRate = 1.0;
+static bool                 g_radioEffect  = true;
 
 static void TtsWorker() {
     // ゲームのレンダリングを邪魔しないよう優先度を下げる
@@ -303,7 +401,7 @@ static void TtsWorker() {
 
         // SSML で合成 (xml:lang 明示によりニューラル音声の韻律処理精度が向上)
         std::wstring wtext = Utf8ToWide(text.c_str());
-        std::wstring ssml = BuildSsml(wtext, langTag, req.sender, g_speakingRate);
+        std::wstring ssml = BuildSsml(wtext, langTag, lang, req.sender, g_speakingRate);
         HStringReference ssmlRef(ssml.c_str());
 
         ComPtr<IAsyncOperation<SpeechSynthesisStream*>> asyncOp;
@@ -389,14 +487,14 @@ static void TtsWorker() {
 
         // WAVヘッダー解析 (SpeechSynthesisStream は WAV形式)
         if (bytesLoaded < 44) continue;
-        const BYTE* data = wavData.data();
+        BYTE* data = wavData.data();
 
         // "RIFF" チェック
         if (memcmp(data, "RIFF", 4) != 0) continue;
 
         // "fmt " チャンク探索
-        const BYTE* fmt = nullptr;
-        const BYTE* dataChunk = nullptr;
+        BYTE* fmt = nullptr;
+        BYTE* dataChunk = nullptr;
         DWORD dataSize = 0;
 
         size_t pos = 12; // skip RIFF header
@@ -419,6 +517,10 @@ static void TtsWorker() {
         // WAVEFORMATEX from fmt chunk
         WAVEFORMATEX wfx = {};
         memcpy(&wfx, fmt, sizeof(WAVEFORMATEX) < 18 ? sizeof(WAVEFORMATEX) : 18);
+
+        // 無線ラジオ風エフェクト (バンドパスフィルター + クリッピング)
+        if (g_radioEffect)
+            ApplyRadioEffect(dataChunk, dataSize, wfx);
 
         // XAudio2 で再生
         IXAudio2SourceVoice* sourceVoice = nullptr;
@@ -458,11 +560,13 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language, double speakingRate) {
+void tts::Init(const char* language, double speakingRate, bool radioEffect) {
     if (g_ttsRunning.load()) return;
     g_ttsLanguage = (language && *language) ? language : "auto";
     g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0) ? speakingRate : 1.0;
-    logging::Debug("[TTS] Init (language=%s, rate=%.2f)", g_ttsLanguage.c_str(), g_speakingRate);
+    g_radioEffect  = radioEffect;
+    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radioEffect=%d)",
+                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect);
     g_ttsRunning.store(true);
     g_ttsThread = std::thread(TtsWorker);
 }

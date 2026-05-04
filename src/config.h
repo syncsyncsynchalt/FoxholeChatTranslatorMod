@@ -26,6 +26,7 @@ struct Config {
     // "ja", "en", "ru", "zh", "ko" = 強制指定
     std::string ttsLanguage    = "auto";
     double      ttsSpeakingRate = 1.0;
+    bool        ttsRadioEffect = true;
 };
 
 namespace config {
