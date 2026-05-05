@@ -134,7 +134,7 @@ static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag,
     ssml += L"'>";
 
     if (lang == Lang::EN || lang == Lang::RU) {
-        // 英語: 深い声(-20%ベース) + 10%早い話し方で戦争映画風に
+        // 英語: 深い声(-20%ベース)で戦争映画風に
         // ロシア語: やや深い声(-10%)で重厚感
         static const wchar_t* kEnPitches[] = { L"-25%", L"-22%", L"-20%", L"-18%", L"-15%" };
         static const wchar_t* kRuPitches[] = { L"-12%", L"-10%", L"-8%" };
@@ -144,7 +144,7 @@ static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag,
         if (lang == Lang::EN) {
             size_t idx = sender.empty() ? 2 : (std::hash<std::string>{}(sender) % 5);
             pitch = kEnPitches[idx];
-            rate  = speakingRate * 1.1;
+            rate  = speakingRate;
         } else {
             size_t idx = sender.empty() ? 1 : (std::hash<std::string>{}(sender) % 3);
             pitch = kRuPitches[idx];
