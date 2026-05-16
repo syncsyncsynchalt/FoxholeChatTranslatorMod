@@ -1,50 +1,77 @@
 // ============================================================
-// tts.cpp - 多言語TTS読み上げ (Windows OneCore / WinRT)
-// Windows.Media.SpeechSynthesis + XAudio2 で非同期再生
+// tts.cpp - ニューラルTTS (Sherpa-ONNX Piper VITS)
+//
+// sherpa-onnx.dll を tools/tts/ から動的ロード
+// Piper VITS モデルで自然な発音を実現
+// 再生: XAudio2, エフェクト: バンドパスDSP (変更なし)
 // ============================================================
 
 #include "tts.h"
 #include "log.h"
 
 #include <windows.h>
-#include <roapi.h>
-#include <hstring.h>
-#include <winstring.h>
-
-// WinRT Speech headers
-#include <windows.media.speechsynthesis.h>
-#include <windows.storage.streams.h>
-
-// XAudio2 for playback
 #include <xaudio2.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <map>
 #include <mutex>
 #include <queue>
-#include <random>
 #include <string>
 #include <thread>
 #include <vector>
-#include <wrl/client.h>
-#include <wrl/wrappers/corewrappers.h>
 
-using namespace Microsoft::WRL;
-using namespace Microsoft::WRL::Wrappers;
-using namespace ABI::Windows::Media::SpeechSynthesis;
-using namespace ABI::Windows::Storage::Streams;
-using namespace ABI::Windows::Foundation;
+// ============================================================
+// Sherpa-ONNX C API 構造体 (v1.10.x ABI 互換)
+// ============================================================
+
+struct SherpaOnnxOfflineTtsVitsModelConfig {
+    const char* model;
+    const char* lexicon;
+    const char* tokens;
+    const char* data_dir;
+    float       noise_scale;
+    float       noise_scale_w;
+    float       length_scale;
+    const char* dict_dir;
+};
+
+struct SherpaOnnxOfflineTtsModelConfig {
+    SherpaOnnxOfflineTtsVitsModelConfig vits;
+    int32_t     num_threads;
+    int32_t     debug;
+    const char* provider;
+};
+
+struct SherpaOnnxOfflineTtsConfig {
+    SherpaOnnxOfflineTtsModelConfig model;
+    const char* rule_fsts;
+    int32_t     max_num_sentences;
+    const char* rule_fars;
+};
+
+struct SherpaOnnxGeneratedAudio {
+    const float* samples;
+    int32_t      num_samples;
+    int32_t      sample_rate;
+};
+
+struct SherpaOnnxOfflineTts; // opaque
+
+typedef SherpaOnnxOfflineTts*           (*PFN_CreateTts)(const SherpaOnnxOfflineTtsConfig*);
+typedef void                            (*PFN_DestroyTts)(SherpaOnnxOfflineTts*);
+typedef const SherpaOnnxGeneratedAudio* (*PFN_Generate)(const SherpaOnnxOfflineTts*, const char*, int32_t, float);
+typedef void                            (*PFN_DestroyAudio)(const SherpaOnnxGeneratedAudio*);
 
 // ============================================================
 // 言語判定
 // ============================================================
 
-enum class Lang { EN, RU, KO, ZH, JA, UNKNOWN };
+enum class Lang { EN, RU, KO, ZH, JA };
 
 static Lang DetectLanguage(const char* textUtf8) {
-    // UTF-8 をデコードして最初の非ASCII文字の範囲で判定
     const unsigned char* p = reinterpret_cast<const unsigned char*>(textUtf8);
-    int cyrillic = 0, hangul = 0, cjk = 0, hiragana = 0, katakana = 0, latin = 0;
+    int cyrillic = 0, hangul = 0, cjk = 0, hiragana = 0, katakana = 0;
     int total = 0;
 
     while (*p && total < 200) {
@@ -66,123 +93,37 @@ static Lang DetectLanguage(const char* textUtf8) {
         p += bytes;
         total++;
 
-        if (cp >= 0x0400 && cp <= 0x04FF) cyrillic++;
+        if      (cp >= 0x0400 && cp <= 0x04FF) cyrillic++;
         else if (cp >= 0xAC00 && cp <= 0xD7AF) hangul++;
         else if (cp >= 0x3040 && cp <= 0x309F) hiragana++;
         else if (cp >= 0x30A0 && cp <= 0x30FF) katakana++;
         else if (cp >= 0x4E00 && cp <= 0x9FFF) cjk++;
-        else if (cp >= 0x41 && cp <= 0x7A) latin++;
     }
 
-    if (cyrillic > 0) return Lang::RU;
-    if (hangul > 0) return Lang::KO;
+    if (cyrillic > 0)              return Lang::RU;
+    if (hangul > 0)                return Lang::KO;
     if (hiragana > 0 || katakana > 0) return Lang::JA;
-    if (cjk > 0) return Lang::ZH;
+    if (cjk > 0)                   return Lang::ZH;
     return Lang::EN;
 }
 
-static const wchar_t* LangToVoiceTag(Lang lang) {
-    switch (lang) {
-    case Lang::EN: return L"en-US";
-    case Lang::RU: return L"ru-RU";
-    case Lang::KO: return L"ko-KR";
-    case Lang::ZH: return L"zh-CN";
-    case Lang::JA: return L"ja-JP";
-    default:       return L"en-US";
-    }
-}
-
 // ============================================================
-// UTF-8 → wstring 変換
-// ============================================================
-
-static std::wstring Utf8ToWide(const char* utf8) {
-    if (!utf8 || !*utf8) return L"";
-    int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
-    std::wstring result(len - 1, 0);
-    MultiByteToWideChar(CP_UTF8, 0, utf8, -1, &result[0], len);
-    return result;
-}
-
-// ============================================================
-// SSML 生成
-// ============================================================
-
-// SSML の XML 特殊文字をエスケープ
-static std::wstring EscapeXml(const std::wstring& text) {
-    std::wstring out;
-    out.reserve(text.size() + 32);
-    for (wchar_t c : text) {
-        switch (c) {
-        case L'&':  out += L"&amp;";  break;
-        case L'<':  out += L"&lt;";   break;
-        case L'>':  out += L"&gt;";   break;
-        case L'"':  out += L"&quot;"; break;
-        case L'\'': out += L"&apos;"; break;
-        default:    out += c;         break;
-        }
-    }
-    return out;
-}
-
-// テキストを SSML でラップする (英語・ロシア語は戦争映画風prosody付き)
-static std::wstring BuildSsml(const std::wstring& text, const wchar_t* langTag,
-                               Lang lang, const std::string& sender, double speakingRate) {
-    std::wstring ssml;
-    ssml  = L"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='";
-    ssml += langTag;
-    ssml += L"'>";
-
-    if (lang == Lang::EN || lang == Lang::RU) {
-        // 英語: 深い声(-20%ベース)で戦争映画風に
-        // ロシア語: やや深い声(-10%)で重厚感
-        static const wchar_t* kEnPitches[] = { L"-25%", L"-22%", L"-20%", L"-18%", L"-15%" };
-        static const wchar_t* kRuPitches[] = { L"-12%", L"-10%", L"-8%" };
-
-        const wchar_t* pitch;
-        double rate;
-        if (lang == Lang::EN) {
-            size_t idx = sender.empty() ? 2 : (std::hash<std::string>{}(sender) % 5);
-            pitch = kEnPitches[idx];
-            rate  = speakingRate;
-        } else {
-            size_t idx = sender.empty() ? 1 : (std::hash<std::string>{}(sender) % 3);
-            pitch = kRuPitches[idx];
-            rate  = speakingRate;
-        }
-
-        wchar_t prosody[64];
-        swprintf_s(prosody, L"<prosody pitch='%ls' rate='%.0f%%'>", pitch, rate * 100.0);
-        ssml += prosody;
-        ssml += EscapeXml(text);
-        ssml += L"</prosody>";
-    } else {
-        ssml += EscapeXml(text);
-    }
-
-    ssml += L"</speak>";
-    return ssml;
-}
-
-// ============================================================
-// 無線ラジオ風オーディオエフェクト (バンドパスフィルター + クリッピング)
+// 無線ラジオ風オーディオエフェクト (バンドパス + クリッピング)
 // ============================================================
 
 struct BiquadCoeffs { double b0, b1, b2, a1, a2; };
 struct BiquadState  { double x1=0, x2=0, y1=0, y2=0; };
 
-// 2次Butterworth ハイパスフィルター (RBJ EQ Cookbook)
 static BiquadCoeffs DesignHPF(double fc, double fs) {
     const double pi = 3.14159265358979323846;
     double w0    = 2.0 * pi * fc / fs;
-    double alpha = sin(w0) / (2.0 * 0.7071067811865476); // Q=1/√2
+    double alpha = sin(w0) / (2.0 * 0.7071067811865476);
     double cosw0 = cos(w0);
     double a0    = 1.0 + alpha;
     return { (1+cosw0)/2/a0, -(1+cosw0)/a0, (1+cosw0)/2/a0,
              -2*cosw0/a0, (1-alpha)/a0 };
 }
 
-// 2次Butterworth ローパスフィルター
 static BiquadCoeffs DesignLPF(double fc, double fs) {
     const double pi = 3.14159265358979323846;
     double w0    = 2.0 * pi * fc / fs;
@@ -193,15 +134,14 @@ static BiquadCoeffs DesignLPF(double fc, double fs) {
              -2*cosw0/a0, (1-alpha)/a0 };
 }
 
-// バンドパス(300-3400 Hz) + ハードクリッピングで無線通信音質を再現
 static void ApplyRadioEffect(BYTE* dataChunk, DWORD dataSize, const WAVEFORMATEX& wfx) {
     if (wfx.wFormatTag != WAVE_FORMAT_PCM || wfx.wBitsPerSample != 16 || !wfx.nSamplesPerSec) return;
 
-    int16_t* s16   = reinterpret_cast<int16_t*>(dataChunk);
-    size_t   n     = dataSize / 2;
-    int      ch    = wfx.nChannels;
+    int16_t* s16    = reinterpret_cast<int16_t*>(dataChunk);
+    size_t   n      = dataSize / 2;
+    int      ch     = wfx.nChannels;
     size_t   frames = n / ch;
-    double   fs    = static_cast<double>(wfx.nSamplesPerSec);
+    double   fs     = static_cast<double>(wfx.nSamplesPerSec);
 
     std::vector<float> buf(n);
     for (size_t i = 0; i < n; i++) buf[i] = s16[i] / 32768.0f;
@@ -221,7 +161,6 @@ static void ApplyRadioEffect(BYTE* dataChunk, DWORD dataSize, const WAVEFORMATEX
         }
     }
 
-    // 1.4倍ブースト後にハードクリップ → 正規化でラジオ圧縮感を再現
     const float kClip = 0.85f;
     for (size_t i = 0; i < n; i++) {
         float v = buf[i] * 1.4f;
@@ -237,88 +176,170 @@ static void ApplyRadioEffect(BYTE* dataChunk, DWORD dataSize, const WAVEFORMATEX
 }
 
 // ============================================================
+// DLL ベースディレクトリ取得
+// ============================================================
+
+static std::string GetTtsToolDir() {
+    char path[MAX_PATH];
+    HMODULE hSelf = nullptr;
+    GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        reinterpret_cast<LPCSTR>(&tts::Init), &hSelf);
+    GetModuleFileNameA(hSelf, path, MAX_PATH);
+    std::string dir(path);
+    size_t pos = dir.rfind('\\');
+    if (pos != std::string::npos) dir = dir.substr(0, pos + 1);
+    return dir + "tools\\tts\\";
+}
+
+// ============================================================
+// Sherpa-ONNX DLL 動的ロード
+// ============================================================
+
+static HMODULE    g_sherpaLib    = nullptr;
+static PFN_CreateTts   g_fnCreate   = nullptr;
+static PFN_DestroyTts  g_fnDestroy  = nullptr;
+static PFN_Generate    g_fnGenerate = nullptr;
+static PFN_DestroyAudio g_fnFreeAudio = nullptr;
+
+static bool LoadSherpaLib(const std::string& ttsDir) {
+    std::string dllPath = ttsDir + "sherpa-onnx.dll";
+
+    // DLL とその依存 (onnxruntime.dll 等) を同じディレクトリから探す
+    g_sherpaLib = LoadLibraryExA(dllPath.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (!g_sherpaLib) {
+        logging::Debug("[TTS] sherpa-onnx.dll ロード失敗: %s (err=%lu)", dllPath.c_str(), GetLastError());
+        return false;
+    }
+
+    g_fnCreate    = reinterpret_cast<PFN_CreateTts>  (GetProcAddress(g_sherpaLib, "SherpaOnnxCreateOfflineTts"));
+    g_fnDestroy   = reinterpret_cast<PFN_DestroyTts> (GetProcAddress(g_sherpaLib, "SherpaOnnxDestroyOfflineTts"));
+    g_fnGenerate  = reinterpret_cast<PFN_Generate>   (GetProcAddress(g_sherpaLib, "SherpaOnnxOfflineTtsGenerate"));
+    g_fnFreeAudio = reinterpret_cast<PFN_DestroyAudio>(GetProcAddress(g_sherpaLib, "SherpaOnnxDestroyOfflineTtsGeneratedAudio"));
+
+    if (!g_fnCreate || !g_fnDestroy || !g_fnGenerate || !g_fnFreeAudio) {
+        logging::Debug("[TTS] sherpa-onnx エクスポート取得失敗");
+        FreeLibrary(g_sherpaLib);
+        g_sherpaLib = nullptr;
+        return false;
+    }
+
+    logging::Debug("[TTS] sherpa-onnx.dll ロード完了");
+    return true;
+}
+
+// ============================================================
+// 言語別モデル管理 (遅延初期化)
+// ============================================================
+
+struct LangModel {
+    SherpaOnnxOfflineTts* handle = nullptr;
+    bool                  tried  = false; // 初期化済み (失敗含む)
+};
+
+static std::mutex              g_modelMutex;
+static std::map<Lang, LangModel> g_models;
+static std::string             g_ttsDir;
+
+static const char* LangSubdir(Lang lang) {
+    switch (lang) {
+    case Lang::EN: return "en";
+    case Lang::RU: return "ru";
+    case Lang::KO: return "ko";
+    case Lang::ZH: return "zh";
+    case Lang::JA: return "ja";
+    }
+    return "en";
+}
+
+static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
+    std::string modelDir  = g_ttsDir + "models\\" + LangSubdir(lang) + "\\";
+    std::string modelPath = modelDir + "model.onnx";
+    std::string tokensPath = modelDir + "tokens.txt";
+    std::string espeakDir = g_ttsDir + "espeak-ng-data";
+
+    if (GetFileAttributesA(modelPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        logging::Debug("[TTS] モデルなし: %s", modelPath.c_str());
+        return nullptr;
+    }
+
+    // 文字列をローカル変数で保持 (CreateOfflineTts が内部でコピーする)
+    std::string lexiconPath;
+    std::string dictDir;
+
+    // Chinese: jieba 辞書があれば指定
+    if (lang == Lang::ZH) {
+        std::string jiebaDir = modelDir + "dict";
+        if (GetFileAttributesA(jiebaDir.c_str()) != INVALID_FILE_ATTRIBUTES)
+            dictDir = jiebaDir;
+    }
+
+    bool hasEspeak = GetFileAttributesA(espeakDir.c_str()) != INVALID_FILE_ATTRIBUTES;
+
+    SherpaOnnxOfflineTtsConfig cfg = {};
+    cfg.model.vits.model         = modelPath.c_str();
+    cfg.model.vits.tokens        = tokensPath.c_str();
+    cfg.model.vits.lexicon       = lexiconPath.empty() ? nullptr : lexiconPath.c_str();
+    cfg.model.vits.dict_dir      = dictDir.empty() ? nullptr : dictDir.c_str();
+    cfg.model.vits.data_dir      = (hasEspeak && lang != Lang::ZH) ? espeakDir.c_str() : nullptr;
+    cfg.model.vits.noise_scale   = 0.667f;
+    cfg.model.vits.noise_scale_w = 0.8f;
+    cfg.model.vits.length_scale  = 1.0f;
+    cfg.model.num_threads        = 2;
+    cfg.model.debug              = 0;
+    cfg.model.provider           = "cpu";
+    cfg.max_num_sentences        = 1;
+
+    SherpaOnnxOfflineTts* handle = g_fnCreate(&cfg);
+    if (!handle)
+        logging::Debug("[TTS] モデル作成失敗 (lang=%s)", LangSubdir(lang));
+    else
+        logging::Debug("[TTS] モデル作成完了 (lang=%s)", LangSubdir(lang));
+    return handle;
+}
+
+static SherpaOnnxOfflineTts* GetModel(Lang lang) {
+    std::lock_guard<std::mutex> lock(g_modelMutex);
+    auto& entry = g_models[lang];
+    if (!entry.tried) {
+        entry.tried  = true;
+        entry.handle = CreateModel(lang);
+    }
+    return entry.handle;
+}
+
+// ============================================================
 // TTS ワーカースレッド
 // ============================================================
 
 struct TtsRequest {
     std::string text;
-    std::string sender; // 空の場合はランダム声色
+    std::string sender;
 };
 
-static constexpr size_t     MAX_TTS_QUEUE_SIZE = 8;
-static std::thread          g_ttsThread;
-static std::mutex           g_ttsMutex;
+static constexpr size_t MAX_TTS_QUEUE_SIZE = 8;
+
+static std::thread             g_ttsThread;
+static std::mutex              g_ttsMutex;
 static std::condition_variable g_ttsCv;
-static std::queue<TtsRequest> g_ttsQueue;
-static std::atomic<bool>    g_ttsRunning{false};
-static std::atomic<bool>    g_ttsStop{false};
-// "auto" の場合はテキストから自動判定、それ以外は固定言語
-static std::string          g_ttsLanguage = "auto";
-static double               g_speakingRate = 1.0;
-static bool                 g_radioEffect  = true;
+static std::queue<TtsRequest>  g_ttsQueue;
+static std::atomic<bool>       g_ttsRunning{false};
+static std::atomic<bool>       g_ttsStop{false};
+static std::string             g_ttsLanguage = "auto";
+static float                   g_speakingRate = 1.0f;
+static bool                    g_radioEffect  = true;
 
 static void TtsWorker() {
-    // ゲームのレンダリングを邪魔しないよう優先度を下げる
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 
-    // COM / WinRT 初期化
-    HRESULT hr = RoInitialize(RO_INIT_MULTITHREADED);
-    if (FAILED(hr)) {
-        logging::Debug("[TTS] RoInitialize 失敗: 0x%08X", hr);
-        return;
-    }
-
-    // SpeechSynthesizer 作成
-    ComPtr<ISpeechSynthesizer> synth;
-    {
-        HStringReference className(RuntimeClass_Windows_Media_SpeechSynthesis_SpeechSynthesizer);
-        ComPtr<IInspectable> inspectable;
-        hr = RoActivateInstance(className.Get(), &inspectable);
-        if (FAILED(hr)) {
-            logging::Debug("[TTS] SpeechSynthesizer 作成失敗: 0x%08X", hr);
-            RoUninitialize();
-            return;
-        }
-        inspectable.As(&synth);
-    }
-
-    // 利用可能な音声一覧を取得
-    ComPtr<IInstalledVoicesStatic> voicesStatic;
-    {
-        HStringReference className(RuntimeClass_Windows_Media_SpeechSynthesis_SpeechSynthesizer);
-        ComPtr<IActivationFactory> factory;
-        RoGetActivationFactory(className.Get(), IID_PPV_ARGS(&factory));
-        factory.As(&voicesStatic);
-    }
-
-    ComPtr<__FIVectorView_1_Windows__CMedia__CSpeechSynthesis__CVoiceInformation> voices;
-    if (voicesStatic) {
-        voicesStatic->get_AllVoices(&voices);
-        if (voices) {
-            unsigned count = 0;
-            voices->get_Size(&count);
-            for (unsigned i = 0; i < count; i++) {
-                ComPtr<IVoiceInformation> vi;
-                voices->GetAt(i, &vi);
-                HSTRING name;
-                vi->get_DisplayName(&name);
-                HSTRING lang;
-                vi->get_Language(&lang);
-                logging::Debug("[TTS] 音声: %ls (%ls)",
-                    WindowsGetStringRawBuffer(name, nullptr),
-                    WindowsGetStringRawBuffer(lang, nullptr));
-            }
-        }
-    }
-
-    // XAudio2 初期化
-    ComPtr<IXAudio2> xaudio;
-    hr = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
+    IXAudio2* xaudio = nullptr;
+    HRESULT hr = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
     if (FAILED(hr)) {
         logging::Debug("[TTS] XAudio2Create 失敗: 0x%08X", hr);
-        RoUninitialize();
         return;
     }
+
     IXAudio2MasteringVoice* masterVoice = nullptr;
     xaudio->CreateMasteringVoice(&masterVoice);
 
@@ -333,209 +354,84 @@ static void TtsWorker() {
             req = g_ttsQueue.front();
             g_ttsQueue.pop();
         }
-        const std::string& text = req.text;
 
         g_ttsStop.store(false);
 
-        // 言語判定 (設定で強制指定されている場合はそちらを優先)
-        Lang lang;
+        // 言語判定
+        Lang lang = Lang::EN;
         if (g_ttsLanguage == "auto") {
-            lang = DetectLanguage(text.c_str());
+            lang = DetectLanguage(req.text.c_str());
         } else if (g_ttsLanguage == "ja") { lang = Lang::JA;
         } else if (g_ttsLanguage == "en") { lang = Lang::EN;
         } else if (g_ttsLanguage == "ru") { lang = Lang::RU;
         } else if (g_ttsLanguage == "zh") { lang = Lang::ZH;
         } else if (g_ttsLanguage == "ko") { lang = Lang::KO;
         } else {
-            lang = DetectLanguage(text.c_str());
-        }
-        const wchar_t* langTag = LangToVoiceTag(lang);
-
-        // 対応する音声を選択 (sender指定時はハッシュで固定、なければランダム)
-        // Natural (ニューラル) 音声を優先的に選択する
-        if (voices) {
-            std::vector<unsigned> candidates;
-            std::vector<unsigned> naturalCandidates;
-            unsigned count = 0;
-            voices->get_Size(&count);
-            for (unsigned i = 0; i < count; i++) {
-                ComPtr<IVoiceInformation> vi;
-                voices->GetAt(i, &vi);
-                HSTRING voiceLang;
-                vi->get_Language(&voiceLang);
-                const wchar_t* voiceLangStr = WindowsGetStringRawBuffer(voiceLang, nullptr);
-                if (voiceLangStr && _wcsnicmp(voiceLangStr, langTag, wcslen(langTag)) == 0) {
-                    candidates.push_back(i);
-                    // "Natural" を含む音声はニューラルTTS (高品質)
-                    HSTRING name;
-                    vi->get_DisplayName(&name);
-                    const wchar_t* nameStr = WindowsGetStringRawBuffer(name, nullptr);
-                    if (nameStr && wcsstr(nameStr, L"Natural")) {
-                        naturalCandidates.push_back(i);
-                    }
-                }
-            }
-            // Natural音声が利用可能ならそちらを優先、なければ全候補にフォールバック
-            const std::vector<unsigned>& pool = naturalCandidates.empty() ? candidates : naturalCandidates;
-            if (!pool.empty()) {
-                unsigned pick;
-                if (!req.sender.empty()) {
-                    // sender名のハッシュで声色を決定論的に選択
-                    std::hash<std::string> hasher;
-                    pick = pool[hasher(req.sender) % pool.size()];
-                } else {
-                    static std::mt19937 rng(std::random_device{}());
-                    pick = pool[rng() % pool.size()];
-                }
-                ComPtr<IVoiceInformation> vi;
-                voices->GetAt(pick, &vi);
-                synth->put_Voice(vi.Get());
-                HSTRING name;
-                vi->get_DisplayName(&name);
-                logging::Debug("[TTS] 音声選択: %ls (sender=%s, natural=%s)",
-                    WindowsGetStringRawBuffer(name, nullptr),
-                    req.sender.empty() ? "(none)" : req.sender.c_str(),
-                    naturalCandidates.empty() ? "no" : "yes");
-            }
+            lang = DetectLanguage(req.text.c_str());
         }
 
-        // SSML で合成 (xml:lang 明示によりニューラル音声の韻律処理精度が向上)
-        std::wstring wtext = Utf8ToWide(text.c_str());
-        std::wstring ssml = BuildSsml(wtext, langTag, lang, req.sender, g_speakingRate);
-        HStringReference ssmlRef(ssml.c_str());
-
-        ComPtr<IAsyncOperation<SpeechSynthesisStream*>> asyncOp;
-        hr = synth->SynthesizeSsmlToStreamAsync(ssmlRef.Get(), &asyncOp);
-        if (FAILED(hr)) {
-            logging::Debug("[TTS] SynthesizeSsmlToStreamAsync 失敗: 0x%08X", hr);
+        // モデル取得 (遅延初期化)
+        SherpaOnnxOfflineTts* model = GetModel(lang);
+        if (!model && lang != Lang::EN)
+            model = GetModel(Lang::EN); // 英語でフォールバック
+        if (!model) {
+            logging::Debug("[TTS] 利用可能なモデルなし");
             continue;
-        }
-
-        // 合成完了を待つ
-        ComPtr<ISpeechSynthesisStream> synthStream;
-        {
-            ComPtr<IAsyncInfo> asyncInfo;
-            asyncOp->QueryInterface(IID_PPV_ARGS(&asyncInfo));
-            DWORD start = GetTickCount();
-            bool ok = false;
-            while (GetTickCount() - start < 15000) {
-                AsyncStatus status;
-                asyncInfo->get_Status(&status);
-                if (status == AsyncStatus::Completed) {
-                    asyncOp->GetResults(&synthStream);
-                    ok = true;
-                    break;
-                }
-                if (status != AsyncStatus::Started) break;
-                Sleep(10);
-            }
-            if (!ok || !synthStream) {
-                logging::Debug("[TTS] 合成待ち失敗");
-                continue;
-            }
         }
 
         if (g_ttsStop.load()) continue;
 
-        // ストリームからPCMデータ読み取り
-        ComPtr<IInputStream> inputStream;
-        synthStream->QueryInterface(IID_PPV_ARGS(&inputStream));
-
-        ComPtr<IRandomAccessStream> ras;
-        synthStream.As(&ras);
-        UINT64 streamSize = 0;
-        ras->get_Size(&streamSize);
-
-        if (streamSize == 0) continue;
-
-        // DataReader で読み取り
-        ComPtr<IDataReaderFactory> drFactory;
-        {
-            HStringReference className(RuntimeClass_Windows_Storage_Streams_DataReader);
-            ComPtr<IActivationFactory> factory;
-            RoGetActivationFactory(className.Get(), IID_PPV_ARGS(&factory));
-            factory.As(&drFactory);
+        // 音声合成: speed=1.0 は標準速度
+        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, req.text.c_str(), 0, g_speakingRate);
+        if (!audio || audio->num_samples <= 0) {
+            if (audio) g_fnFreeAudio(audio);
+            logging::Debug("[TTS] 合成失敗またはサンプルなし");
+            continue;
         }
 
-        ComPtr<IDataReader> reader;
-        drFactory->CreateDataReader(inputStream.Get(), &reader);
-
-        ComPtr<IAsyncOperation<UINT32>> loadOp;
-        reader->LoadAsync(static_cast<UINT32>(streamSize), &loadOp);
-
-        UINT32 bytesLoaded = 0;
-        {
-            ComPtr<IAsyncInfo> asyncInfo;
-            loadOp->QueryInterface(IID_PPV_ARGS(&asyncInfo));
-            DWORD start = GetTickCount();
-            for (;;) {
-                AsyncStatus status;
-                asyncInfo->get_Status(&status);
-                if (status == AsyncStatus::Completed) {
-                    loadOp->GetResults(&bytesLoaded);
-                    break;
-                }
-                if (status != AsyncStatus::Started || GetTickCount() - start > 15000) break;
-                Sleep(10);
-            }
+        if (g_ttsStop.load()) {
+            g_fnFreeAudio(audio);
+            continue;
         }
 
-        if (bytesLoaded == 0 || g_ttsStop.load()) continue;
-
-        std::vector<BYTE> wavData(bytesLoaded);
-        reader->ReadBytes(bytesLoaded, wavData.data());
-
-        // WAVヘッダー解析 (SpeechSynthesisStream は WAV形式)
-        if (bytesLoaded < 44) continue;
-        BYTE* data = wavData.data();
-
-        // "RIFF" チェック
-        if (memcmp(data, "RIFF", 4) != 0) continue;
-
-        // "fmt " チャンク探索
-        BYTE* fmt = nullptr;
-        BYTE* dataChunk = nullptr;
-        DWORD dataSize = 0;
-
-        size_t pos = 12; // skip RIFF header
-        while (pos + 8 <= bytesLoaded) {
-            DWORD chunkSize = *reinterpret_cast<const DWORD*>(data + pos + 4);
-            if (memcmp(data + pos, "fmt ", 4) == 0) {
-                fmt = data + pos + 8;
-            }
-            if (memcmp(data + pos, "data", 4) == 0) {
-                dataChunk = data + pos + 8;
-                dataSize = chunkSize;
-                break;
-            }
-            pos += 8 + chunkSize;
-            if (pos % 2) pos++; // word align
+        // float32 PCM [-1,1] → int16
+        int sampleRate  = audio->sample_rate;
+        int numSamples  = audio->num_samples;
+        std::vector<int16_t> pcm16(numSamples);
+        for (int i = 0; i < numSamples; i++) {
+            float v = audio->samples[i];
+            if (v >  1.0f) v =  1.0f;
+            if (v < -1.0f) v = -1.0f;
+            pcm16[i] = static_cast<int16_t>(v * 32767.0f);
         }
+        g_fnFreeAudio(audio);
 
-        if (!fmt || !dataChunk || dataSize == 0) continue;
-
-        // WAVEFORMATEX from fmt chunk
+        // 無線ラジオ風エフェクト
         WAVEFORMATEX wfx = {};
-        memcpy(&wfx, fmt, sizeof(WAVEFORMATEX) < 18 ? sizeof(WAVEFORMATEX) : 18);
+        wfx.wFormatTag      = WAVE_FORMAT_PCM;
+        wfx.nChannels       = 1;
+        wfx.nSamplesPerSec  = static_cast<DWORD>(sampleRate);
+        wfx.wBitsPerSample  = 16;
+        wfx.nBlockAlign     = 2; // 1ch * 16bit / 8
+        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
 
-        // 無線ラジオ風エフェクト (バンドパスフィルター + クリッピング)
+        DWORD dataSize = static_cast<DWORD>(pcm16.size() * 2);
         if (g_radioEffect)
-            ApplyRadioEffect(dataChunk, dataSize, wfx);
+            ApplyRadioEffect(reinterpret_cast<BYTE*>(pcm16.data()), dataSize, wfx);
 
-        // XAudio2 で再生
+        // XAudio2 再生
         IXAudio2SourceVoice* sourceVoice = nullptr;
         hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
         if (FAILED(hr) || !sourceVoice) continue;
 
         XAUDIO2_BUFFER buf = {};
         buf.AudioBytes = dataSize;
-        buf.pAudioData = dataChunk;
-        buf.Flags = XAUDIO2_END_OF_STREAM;
+        buf.pAudioData = reinterpret_cast<const BYTE*>(pcm16.data());
+        buf.Flags      = XAUDIO2_END_OF_STREAM;
 
         sourceVoice->SubmitSourceBuffer(&buf);
         sourceVoice->Start(0);
 
-        // 再生完了を待つ
         for (;;) {
             if (g_ttsStop.load() || !g_ttsRunning.load()) {
                 sourceVoice->Stop(0);
@@ -551,8 +447,7 @@ static void TtsWorker() {
     }
 
     if (masterVoice) masterVoice->DestroyVoice();
-    xaudio.Reset();
-    RoUninitialize();
+    if (xaudio)      xaudio->Release();
     logging::Debug("[TTS] ワーカー終了");
 }
 
@@ -562,26 +457,35 @@ static void TtsWorker() {
 
 void tts::Init(const char* language, double speakingRate, bool radioEffect) {
     if (g_ttsRunning.load()) return;
-    g_ttsLanguage = (language && *language) ? language : "auto";
-    g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0) ? speakingRate : 1.0;
+
+    g_ttsLanguage  = (language && *language) ? language : "auto";
+    g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0)
+                     ? static_cast<float>(speakingRate) : 1.0f;
     g_radioEffect  = radioEffect;
-    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radioEffect=%d)",
-                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect);
+
+    g_ttsDir = GetTtsToolDir();
+    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radio=%d, dir=%s)",
+                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect, g_ttsDir.c_str());
+
+    if (!LoadSherpaLib(g_ttsDir)) {
+        logging::Debug("[TTS] sherpa-onnx.dll が見つかりません。setup_tts.ps1 を実行してください。");
+        return;
+    }
+
     g_ttsRunning.store(true);
     g_ttsThread = std::thread(TtsWorker);
 }
 
-void tts::Speak(const char* textUtf8, const char* senderUtf8) {
+void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
         if (g_ttsQueue.size() >= MAX_TTS_QUEUE_SIZE) {
-            logging::Debug("[TTS] キュー満杯: 最古メッセージを破棄 (size=%zu)", g_ttsQueue.size());
+            logging::Debug("[TTS] キュー満杯: 最古を破棄");
             g_ttsQueue.pop();
         }
         TtsRequest req;
         req.text = textUtf8;
-        if (senderUtf8 && *senderUtf8) req.sender = senderUtf8;
         g_ttsQueue.push(std::move(req));
     }
     g_ttsCv.notify_one();
@@ -596,5 +500,25 @@ void tts::Shutdown() {
     g_ttsRunning.store(false);
     g_ttsCv.notify_one();
     if (g_ttsThread.joinable()) g_ttsThread.join();
-    logging::Debug("[TTS] Shutdown");
+
+    // モデル解放
+    {
+        std::lock_guard<std::mutex> lock(g_modelMutex);
+        for (auto& kv : g_models) {
+            if (kv.second.handle)
+                g_fnDestroy(kv.second.handle);
+        }
+        g_models.clear();
+    }
+
+    if (g_sherpaLib) {
+        FreeLibrary(g_sherpaLib);
+        g_sherpaLib  = nullptr;
+        g_fnCreate   = nullptr;
+        g_fnDestroy  = nullptr;
+        g_fnGenerate = nullptr;
+        g_fnFreeAudio = nullptr;
+    }
+
+    logging::Debug("[TTS] Shutdown 完了");
 }

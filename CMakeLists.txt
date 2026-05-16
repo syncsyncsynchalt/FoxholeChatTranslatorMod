@@ -106,7 +106,7 @@ add_library(chat_translator SHARED
 )
 
 target_include_directories(chat_translator PRIVATE src)
-target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm winhttp runtimeobject xaudio2 nlohmann_json::nlohmann_json)
+target_link_libraries(chat_translator PRIVATE imgui d3d11 dxgi winmm winhttp xaudio2 nlohmann_json::nlohmann_json)
 
 target_compile_definitions(chat_translator PRIVATE
     WIN32_LEAN_AND_MEAN
