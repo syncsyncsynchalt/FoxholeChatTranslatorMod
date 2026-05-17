@@ -109,8 +109,6 @@ TERM_DICT_PATH = WIN64_DIR / "term_protection.txt"
 
 # コンパイル済みパターンのリスト
 _TERM_PATTERNS: list[tuple[re.Pattern, bool]] = []
-_TERM_WORDS:    list[str] = []
-_SYSTEM_PROMPT: str = ""
 
 
 def _load_term_patterns(path: Path) -> None:
@@ -136,20 +134,11 @@ def _load_term_patterns(path: Path) -> None:
             flags = re.IGNORECASE if icase else 0
             try:
                 _TERM_PATTERNS.append((re.compile(pat, flags), icase))
-                _TERM_WORDS.append(line)
                 count += 1
             except re.error as e:
                 print(f"[WARN] 正規表現エラー '{line}': {e}", file=sys.stderr)
 
     print(f"[INFO] term_protection.txt: {count} 件読み込み ({path})")
-
-    global _SYSTEM_PROMPT
-    if _TERM_WORDS:
-        _SYSTEM_PROMPT = (
-            "You are a Foxhole game chat translator."
-            " NEVER translate these game-specific terms — keep them exactly as-is: "
-            + ", ".join(_TERM_WORDS) + "."
-        )
 
 
 _load_term_patterns(TERM_DICT_PATH)
@@ -214,7 +203,19 @@ def _is_single_placeholder(s: str) -> bool:
     return bool(_re.fullmatch(r"\{\{T\d+\}\}", stripped))
 
 
-def _raw_translate(text: str, model: str) -> str:
+def _build_system_prompt(replacements: list[tuple[str, str]]) -> str:
+    """マッチした語だけを列挙した system プロンプトを返す"""
+    if not replacements:
+        return ""
+    terms = ", ".join(orig for _, orig in replacements)
+    return (
+        "You are a Foxhole game chat translator."
+        " NEVER translate these game-specific terms — keep them exactly as-is: "
+        + terms + "."
+    )
+
+
+def _raw_translate(text: str, model: str, system_prompt: str = "") -> str:
     """text をそのまま Ollama に送り生の翻訳結果を返す (失敗時は空文字)"""
     prompt = (
         f"You are a translator. The user sends a chat message in any language."
@@ -230,8 +231,8 @@ def _raw_translate(text: str, model: str) -> str:
         "stream": False,
         "options": {"num_ctx": 256, "temperature": 0.1},
     }
-    if _SYSTEM_PROMPT:
-        payload["system"] = _SYSTEM_PROMPT
+    if system_prompt:
+        payload["system"] = system_prompt
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
         OLLAMA_ENDPOINT, data=body,
@@ -257,8 +258,11 @@ def translate(text: str, model: str) -> str:
     if replacements and _is_single_placeholder(protected):
         return replacements[0][1]
 
+    # このメッセージに出現した語だけで system プロンプトを組む
+    system_prompt = _build_system_prompt(replacements)
+
     # 1st try: プレースホルダー保護あり
-    raw = _raw_translate(protected, model)
+    raw = _raw_translate(protected, model, system_prompt)
     if not raw:
         return "[ERROR: Ollama not responding]"
 
@@ -269,7 +273,7 @@ def translate(text: str, model: str) -> str:
         found    = _count_found_terms(result, replacements)
         expected = len(replacements)
         if found * 2 < expected:
-            fallback = _raw_translate(text, model)
+            fallback = _raw_translate(text, model, system_prompt)
             if fallback:
                 result = fallback
 

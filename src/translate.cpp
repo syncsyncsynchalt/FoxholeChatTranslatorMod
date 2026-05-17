@@ -177,9 +177,7 @@ static std::string HttpPost(const std::string& body) {
 
 using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
 
-static std::vector<std::regex>  g_termRegexes;
-static std::vector<std::string> g_termWords;   // system prompt 構築用
-static std::string              g_systemPrompt;
+static std::vector<std::regex> g_termRegexes;
 
 static std::string GetDllBaseDir() {
     char dllPath[MAX_PATH];
@@ -227,7 +225,6 @@ static void InitTermRegexes(const std::string& baseDir) {
             auto flags = std::regex::ECMAScript;
             if (icase) flags |= std::regex::icase;
             g_termRegexes.emplace_back(fullPat, flags);
-            g_termWords.push_back(pat);
             count++;
         } catch (const std::regex_error& e) {
             logging::Debug("[Translate] 正規表現エラー '%s': %s", line, e.what());
@@ -235,17 +232,6 @@ static void InitTermRegexes(const std::string& baseDir) {
     }
     fclose(f);
     logging::Debug("[Translate] term_protection.txt: %d 件読み込み (%s)", count, path.c_str());
-
-    if (!g_termWords.empty()) {
-        g_systemPrompt =
-            "You are a Foxhole game chat translator."
-            " NEVER translate these game-specific terms — keep them exactly as-is: ";
-        for (size_t i = 0; i < g_termWords.size(); ++i) {
-            if (i > 0) g_systemPrompt += ", ";
-            g_systemPrompt += g_termWords[i];
-        }
-        g_systemPrompt += ".";
-    }
 }
 
 static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
@@ -327,7 +313,20 @@ static std::string RestoreTerms(std::string translated, const ReplacementMap& re
 // 翻訳コア
 // ============================================================
 
-static std::string BuildRequestBody(const std::string& text) {
+// マッチした語だけを列挙した system プロンプトを組み立てる
+static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
+    if (replacements.empty()) return "";
+    std::string s =
+        "You are a Foxhole game chat translator."
+        " NEVER translate these game-specific terms — keep them exactly as-is: ";
+    for (size_t i = 0; i < replacements.size(); ++i) {
+        if (i > 0) s += ", ";
+        s += replacements[i].second;  // 実際にマッチした原語
+    }
+    return s + ".";
+}
+
+static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt) {
     std::string prompt =
         "You are a translator. The user sends a chat message in any language."
         " Translate it to " + g_targetLang + "."
@@ -349,7 +348,7 @@ static std::string BuildRequestBody(const std::string& text) {
         {"stream",  false},
         {"options", opts}
     };
-    if (!g_systemPrompt.empty()) req["system"] = g_systemPrompt;
+    if (!systemPrompt.empty()) req["system"] = systemPrompt;
     return req.dump();
 }
 
@@ -366,8 +365,8 @@ static bool IsSinglePlaceholder(const std::string& s) {
 }
 
 // text を Ollama に送り、生の翻訳文字列を返す (エラー時は空文字列)
-static std::string RawTranslate(const std::string& text) {
-    std::string body     = BuildRequestBody(text);
+static std::string RawTranslate(const std::string& text, const std::string& systemPrompt = "") {
+    std::string body     = BuildRequestBody(text, systemPrompt);
     std::string response = HttpPost(body);
     if (response.empty()) {
         logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
@@ -409,8 +408,11 @@ static std::string DoTranslate(const std::string& text) {
         return replacements[0].second;
     }
 
+    // このメッセージに出現した語だけで system プロンプトを組む
+    std::string systemPrompt = BuildSystemPrompt(replacements);
+
     // 1st try: プレースホルダー保護あり
-    std::string raw = RawTranslate(protected_text);
+    std::string raw = RawTranslate(protected_text, systemPrompt);
     if (raw.empty())
         return u8"(接続失敗: Ollamaが起動していません)";
 
@@ -422,7 +424,7 @@ static std::string DoTranslate(const std::string& text) {
         int expected = static_cast<int>(replacements.size());
         if (found * 2 < expected) {
             logging::Debug("[Translate] 保護語失落 (%d/%d) - 保護なしで再翻訳", found, expected);
-            std::string fallback = RawTranslate(text);
+            std::string fallback = RawTranslate(text, systemPrompt);
             if (!fallback.empty()) result = fallback;
         }
     }
