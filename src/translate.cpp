@@ -177,7 +177,9 @@ static std::string HttpPost(const std::string& body) {
 
 using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
 
-static std::vector<std::regex> g_termRegexes;
+static std::vector<std::regex>  g_termRegexes;
+static std::vector<std::string> g_termWords;   // system prompt 構築用
+static std::string              g_systemPrompt;
 
 static std::string GetDllBaseDir() {
     char dllPath[MAX_PATH];
@@ -225,6 +227,7 @@ static void InitTermRegexes(const std::string& baseDir) {
             auto flags = std::regex::ECMAScript;
             if (icase) flags |= std::regex::icase;
             g_termRegexes.emplace_back(fullPat, flags);
+            g_termWords.push_back(pat);
             count++;
         } catch (const std::regex_error& e) {
             logging::Debug("[Translate] 正規表現エラー '%s': %s", line, e.what());
@@ -232,6 +235,17 @@ static void InitTermRegexes(const std::string& baseDir) {
     }
     fclose(f);
     logging::Debug("[Translate] term_protection.txt: %d 件読み込み (%s)", count, path.c_str());
+
+    if (!g_termWords.empty()) {
+        g_systemPrompt =
+            "You are a Foxhole game chat translator."
+            " NEVER translate these game-specific terms — keep them exactly as-is: ";
+        for (size_t i = 0; i < g_termWords.size(); ++i) {
+            if (i > 0) g_systemPrompt += ", ";
+            g_systemPrompt += g_termWords[i];
+        }
+        g_systemPrompt += ".";
+    }
 }
 
 static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
@@ -329,12 +343,14 @@ static std::string BuildRequestBody(const std::string& text) {
     if (g_numThread != 0)
         opts["num_thread"] = g_numThread;
 
-    return nlohmann::json{
+    nlohmann::json req{
         {"model",   g_model},
         {"prompt",  prompt},
         {"stream",  false},
         {"options", opts}
-    }.dump();
+    };
+    if (!g_systemPrompt.empty()) req["system"] = g_systemPrompt;
+    return req.dump();
 }
 
 // 空白を除いた文字列が単一プレースホルダー {{T0}} だけか判定する

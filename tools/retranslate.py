@@ -109,6 +109,8 @@ TERM_DICT_PATH = WIN64_DIR / "term_protection.txt"
 
 # コンパイル済みパターンのリスト
 _TERM_PATTERNS: list[tuple[re.Pattern, bool]] = []
+_TERM_WORDS:    list[str] = []
+_SYSTEM_PROMPT: str = ""
 
 
 def _load_term_patterns(path: Path) -> None:
@@ -134,11 +136,20 @@ def _load_term_patterns(path: Path) -> None:
             flags = re.IGNORECASE if icase else 0
             try:
                 _TERM_PATTERNS.append((re.compile(pat, flags), icase))
+                _TERM_WORDS.append(line)
                 count += 1
             except re.error as e:
                 print(f"[WARN] 正規表現エラー '{line}': {e}", file=sys.stderr)
 
     print(f"[INFO] term_protection.txt: {count} 件読み込み ({path})")
+
+    global _SYSTEM_PROMPT
+    if _TERM_WORDS:
+        _SYSTEM_PROMPT = (
+            "You are a Foxhole game chat translator."
+            " NEVER translate these game-specific terms — keep them exactly as-is: "
+            + ", ".join(_TERM_WORDS) + "."
+        )
 
 
 _load_term_patterns(TERM_DICT_PATH)
@@ -213,12 +224,15 @@ def _raw_translate(text: str, model: str) -> str:
         f" IMPORTANT: Keep all {{{{T0}}}}, {{{{T1}}}}, {{{{T2}}}} etc. tokens exactly as-is in your output."
         f"\n\n{text}"
     )
-    body = json.dumps({
+    payload: dict = {
         "model":  model,
         "prompt": prompt,
         "stream": False,
         "options": {"num_ctx": 256, "temperature": 0.1},
-    }).encode()
+    }
+    if _SYSTEM_PROMPT:
+        payload["system"] = _SYSTEM_PROMPT
+    body = json.dumps(payload).encode()
     req = urllib.request.Request(
         OLLAMA_ENDPOINT, data=body,
         headers={"Content-Type": "application/json"},
