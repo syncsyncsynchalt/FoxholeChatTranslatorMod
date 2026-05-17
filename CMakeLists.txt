@@ -159,6 +159,9 @@ add_custom_command(TARGET chat_translator POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/tools/ollama"
         "${GAME_BIN_DIR}/tools/ollama"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/term_protection.txt"
+        "${GAME_BIN_DIR}/term_protection.txt"
     COMMENT "Copying chat_translator.dll + assets + tools to ${GAME_BIN_DIR} (F9でリロード可能)"
 )
 

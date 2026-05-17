@@ -186,42 +186,52 @@ using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
 
 static std::vector<std::regex> g_termRegexes;
 
-static void InitTermRegexes() {
-    // 各パターンは単語境界 \b で囲む。
-    // icase=true のものは大文字小文字を区別しない。
-    struct Entry { const char* pat; bool icase; };
-    static const Entry entries[] = {
-        // ファクション名
-        { R"(\bWardens?\b)",          true  },
-        { R"(\bColonials?\b)",        true  },
-        { R"(\bCollies?\b)",          true  },
-        // ゲーム素材略語
-        { R"(\bbmat\b)",              true  },
-        { R"(\bcmat\b)",              true  },
-        { R"(\brmat\b)",              true  },
-        { R"(\bemat\b)",              true  },
-        { R"(\bsmat\b)",              true  },
-        // 軍事略語
-        { R"(\bQRF\b)",               false },
-        { R"(\bSPG\b)",               false },
-        { R"(\bGB\b)",                false },
-        { R"(\bAA\b)",                false },
-        { R"(\bBTs?\b)",              false },
-        // ゲーム内一般略語
-        { R"(\blogi\b)",              true  },
-        { R"(\binf\b)",               true  },
-        { R"(\bmsups?\b)",            true  },
-        { R"(\bbsups?\b)",            true  },
-        // 施設名
-        { R"(\bstockpile\b)",         true  },
-        { R"(\bseaport\b)",           true  },
-        { R"(\bgarrison\b)",          true  },
-    };
-    for (const auto& e : entries) {
-        auto flags = std::regex::ECMAScript;
-        if (e.icase) flags |= std::regex::icase;
-        g_termRegexes.emplace_back(e.pat, flags);
+// term_protection.txt を読み込んで正規表現リストを構築する。
+// 書式: "pattern [i]"  (#始まりと空行は無視)
+// \b は自動付与するが、パターン側に既に \b がある場合はそのまま使う。
+static void InitTermRegexes(const std::string& baseDir) {
+    std::string path = baseDir + "term_protection.txt";
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) {
+        logging::Debug("[Translate] term_protection.txt が見つかりません: %s", path.c_str());
+        return;
     }
+
+    char line[512];
+    int count = 0;
+    while (fgets(line, sizeof(line), f)) {
+        // 末尾の空白・改行を除去
+        int len = static_cast<int>(strlen(line));
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'
+                           || line[len-1] == ' ' || line[len-1] == '\t'))
+            line[--len] = '\0';
+
+        if (len == 0 || line[0] == '#') continue;
+
+        // 末尾に " i" があれば case-insensitive フラグ
+        bool icase = false;
+        if (len >= 2 && line[len-1] == 'i' && line[len-2] == ' ') {
+            line[len-2] = '\0';
+            icase = true;
+        }
+
+        // パターンに \b が含まれていなければ自動付与
+        std::string pat(line);
+        std::string fullPat = (pat.find("\\b") == std::string::npos)
+            ? ("\\b" + pat + "\\b")
+            : pat;
+
+        try {
+            auto flags = std::regex::ECMAScript;
+            if (icase) flags |= std::regex::icase;
+            g_termRegexes.emplace_back(fullPat, flags);
+            count++;
+        } catch (const std::regex_error& e) {
+            logging::Debug("[Translate] 正規表現エラー '%s': %s", line, e.what());
+        }
+    }
+    fclose(f);
+    logging::Debug("[Translate] term_protection.txt: %d 件読み込み (%s)", count, path.c_str());
 }
 
 // テキスト中の保護対象語をプレースホルダーに置き換えて返す。
@@ -597,7 +607,7 @@ static void ApplyPreset(const std::string& preset) {
 // ============================================================
 
 bool translate::Init(const TranslateConfig& cfg) {
-    InitTermRegexes();
+    InitTermRegexes(GetDllBaseDir());
     if (!ParseUrl(cfg.endpoint)) {
         logging::Debug("[Translate] URL パース失敗: %s", cfg.endpoint.c_str());
         return false;

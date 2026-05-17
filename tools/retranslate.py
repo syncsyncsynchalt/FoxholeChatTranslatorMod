@@ -105,42 +105,43 @@ def parse_chat_log(path: Path) -> list[dict]:
 # 固有名詞プレースホルダー保護 (translate.cpp と同一ロジック)
 # ============================================================
 
-# (pattern, flags) のリスト。icase=True で re.IGNORECASE を付ける。
+TERM_DICT_PATH = WIN64_DIR / "term_protection.txt"
+
+# コンパイル済みパターンのリスト
 _TERM_PATTERNS: list[tuple[re.Pattern, bool]] = []
 
-def _init_term_patterns() -> None:
-    entries = [
-        # ファクション名
-        (r"\bWardens?\b",          True),
-        (r"\bColonials?\b",        True),
-        (r"\bCollies?\b",          True),
-        # 素材略語
-        (r"\bbmat\b",              True),
-        (r"\bcmat\b",              True),
-        (r"\brmat\b",              True),
-        (r"\bemat\b",              True),
-        (r"\bsmat\b",              True),
-        # 軍事略語
-        (r"\bQRF\b",               False),
-        (r"\bSPG\b",               False),
-        (r"\bGB\b",                False),
-        (r"\bAA\b",                False),
-        (r"\bBTs?\b",              False),
-        # ゲーム内略語
-        (r"\blogi\b",              True),
-        (r"\binf\b",               True),
-        (r"\bmsups?\b",            True),
-        (r"\bbsups?\b",            True),
-        # 施設名
-        (r"\bstockpile\b",         True),
-        (r"\bseaport\b",           True),
-        (r"\bgarrison\b",          True),
-    ]
-    for pat, icase in entries:
-        flags = re.IGNORECASE if icase else 0
-        _TERM_PATTERNS.append((re.compile(pat, flags), icase))
 
-_init_term_patterns()
+def _load_term_patterns(path: Path) -> None:
+    """term_protection.txt を読み込んで _TERM_PATTERNS を構築する"""
+    if not path.exists():
+        print(f"[WARN] {path} が見つかりません。固有名詞保護は無効。", file=sys.stderr)
+        return
+
+    count = 0
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.rstrip("\r\n").rstrip()
+            if not line or line.startswith("#"):
+                continue
+
+            icase = False
+            if line.endswith(" i"):
+                line = line[:-2]
+                icase = True
+
+            # \b が含まれていなければ自動付与
+            pat = line if r"\b" in line else rf"\b{line}\b"
+            flags = re.IGNORECASE if icase else 0
+            try:
+                _TERM_PATTERNS.append((re.compile(pat, flags), icase))
+                count += 1
+            except re.error as e:
+                print(f"[WARN] 正規表現エラー '{line}': {e}", file=sys.stderr)
+
+    print(f"[INFO] term_protection.txt: {count} 件読み込み ({path})")
+
+
+_load_term_patterns(TERM_DICT_PATH)
 
 
 def protect_terms(text: str) -> tuple[str, list[tuple[str, str]]]:

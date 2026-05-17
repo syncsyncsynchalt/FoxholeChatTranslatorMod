@@ -1,0 +1,40 @@
+# Foxhole 固有名詞保護辞書
+# 翻訳前にこれらの用語をプレースホルダーに置き換え、翻訳後に原文を復元する。
+#
+# 書式: pattern [i]
+#   pattern : 正規表現 (\b は自動付与。\b が効かない場合は手動で記述)
+#   i       : 大文字小文字を区別しない (省略時は区別する)
+#
+# 例:
+#   Wardens? i   → warden / Warden / wardens / Wardens にマッチ
+#   QRF          → QRF のみにマッチ (大文字限定)
+
+# ファクション名
+Wardens? i
+Colonials? i
+Collies? i
+
+# 素材略語 (basic / construction / refined / explosive / salvage materials)
+bmat i
+cmat i
+rmat i
+emat i
+smat i
+
+# 軍事略語
+QRF
+SPG
+GBs?
+AA
+BTs?
+
+# ゲーム内略語
+logi i
+inf i
+msups? i
+bsups? i
+
+# 施設名
+stockpile i
+seaport i
+garrison i
