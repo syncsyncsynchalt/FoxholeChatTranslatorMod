@@ -215,14 +215,18 @@ def _build_system_prompt(replacements: list[tuple[str, str]]) -> str:
     )
 
 
-def _raw_translate(text: str, model: str, system_prompt: str = "") -> str:
+def _raw_translate(text: str, model: str, system_prompt: str = "", has_placeholders: bool = False) -> str:
     """text をそのまま Ollama に送り生の翻訳結果を返す (失敗時は空文字)"""
+    ph_instruction = (
+        " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output."
+        if has_placeholders else ""
+    )
     prompt = (
         f"You are a translator. The user sends a chat message in any language."
         f" Translate it to {TARGET_LANG}."
         f" Output ONLY the translated text, nothing else. No explanations."
         f" If the message is already in {TARGET_LANG}, output it unchanged."
-        f" IMPORTANT: Keep all {{{{T0}}}}, {{{{T1}}}}, {{{{T2}}}} etc. tokens exactly as-is in your output."
+        f"{ph_instruction}"
         f"\n\n{text}"
     )
     payload: dict = {
@@ -260,9 +264,10 @@ def translate(text: str, model: str) -> str:
 
     # このメッセージに出現した語だけで system プロンプトを組む
     system_prompt = _build_system_prompt(replacements)
+    has_ph = bool(replacements)
 
     # 1st try: プレースホルダー保護あり
-    raw = _raw_translate(protected, model, system_prompt)
+    raw = _raw_translate(protected, model, system_prompt, has_placeholders=has_ph)
     if not raw:
         return "[ERROR: Ollama not responding]"
 
@@ -273,7 +278,7 @@ def translate(text: str, model: str) -> str:
         found    = _count_found_terms(result, replacements)
         expected = len(replacements)
         if found * 2 < expected:
-            fallback = _raw_translate(text, model, system_prompt)
+            fallback = _raw_translate(text, model, system_prompt, has_placeholders=False)
             if fallback:
                 result = fallback
 

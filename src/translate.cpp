@@ -326,14 +326,16 @@ static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
     return s + ".";
 }
 
-static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt) {
+static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt,
+                                    bool hasPlaceholders) {
     std::string prompt =
         "You are a translator. The user sends a chat message in any language."
         " Translate it to " + g_targetLang + "."
         " Output ONLY the translated text, nothing else. No explanations."
-        " If the message is already in " + g_targetLang + ", output it unchanged."
-        " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output."
-        "\n\n" + text;
+        " If the message is already in " + g_targetLang + ", output it unchanged.";
+    if (hasPlaceholders)
+        prompt += " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output.";
+    prompt += "\n\n" + text;
 
     nlohmann::json opts;
     opts["num_ctx"]     = g_numCtx;
@@ -365,8 +367,9 @@ static bool IsSinglePlaceholder(const std::string& s) {
 }
 
 // text を Ollama に送り、生の翻訳文字列を返す (エラー時は空文字列)
-static std::string RawTranslate(const std::string& text, const std::string& systemPrompt = "") {
-    std::string body     = BuildRequestBody(text, systemPrompt);
+static std::string RawTranslate(const std::string& text, const std::string& systemPrompt = "",
+                                bool hasPlaceholders = false) {
+    std::string body     = BuildRequestBody(text, systemPrompt, hasPlaceholders);
     std::string response = HttpPost(body);
     if (response.empty()) {
         logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
@@ -410,9 +413,10 @@ static std::string DoTranslate(const std::string& text) {
 
     // このメッセージに出現した語だけで system プロンプトを組む
     std::string systemPrompt = BuildSystemPrompt(replacements);
+    bool hasPlaceholders = !replacements.empty();
 
     // 1st try: プレースホルダー保護あり
-    std::string raw = RawTranslate(protected_text, systemPrompt);
+    std::string raw = RawTranslate(protected_text, systemPrompt, hasPlaceholders);
     if (raw.empty())
         return u8"(接続失敗: Ollamaが起動していません)";
 
@@ -424,7 +428,7 @@ static std::string DoTranslate(const std::string& text) {
         int expected = static_cast<int>(replacements.size());
         if (found * 2 < expected) {
             logging::Debug("[Translate] 保護語失落 (%d/%d) - 保護なしで再翻訳", found, expected);
-            std::string fallback = RawTranslate(text, systemPrompt);
+            std::string fallback = RawTranslate(text, systemPrompt, false);
             if (!fallback.empty()) result = fallback;
         }
     }
