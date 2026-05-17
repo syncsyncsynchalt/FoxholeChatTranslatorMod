@@ -24,9 +24,10 @@ struct Config {
     // [TTS]
     // "auto" = テキスト内容から自動判定
     // "ja", "en", "ru", "zh", "ko" = 強制指定
-    std::string ttsLanguage    = "auto";
-    double      ttsSpeakingRate = 1.0;
-    bool        ttsRadioEffect = true;
+    std::string ttsLanguage      = "auto";
+    double      ttsSpeakingRate  = 1.0;
+    bool        ttsRadioEffect   = true;
+    uint32_t    ttsVoicevoxStyleId = 3; // 3=ずんだもんノーマル
 };
 
 namespace config {

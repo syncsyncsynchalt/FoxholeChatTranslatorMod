@@ -209,6 +209,202 @@ class TtsEngine:
 
 
 # ============================================================
+# VOICEVOX Core TTS エンジン (ctypes)
+# ============================================================
+
+class VoicevoxEngine:
+    """VOICEVOX Core DLL を ctypes でロードして日本語音声合成"""
+
+    def __init__(self, tts_dir: str, style_id: int = 3):
+        self.tts_dir  = tts_dir
+        self.style_id = style_id
+        self._lib     = None
+        self._synth   = None
+        self._jtalk   = None
+        self._TtsOpts = None
+        self._ready   = False
+        self._error   = ""
+        self._try_init()
+
+    def _vv_dir(self):
+        return os.path.join(self.tts_dir, "voicevox")
+
+    def installed(self) -> bool:
+        return os.path.exists(
+            os.path.join(self._vv_dir(), "c_api", "voicevox_core.dll"))
+
+    @property
+    def ready(self) -> bool:
+        return self._ready
+
+    @property
+    def error(self) -> str:
+        return self._error
+
+    def _try_init(self):
+        import ctypes
+        import glob as _glob
+        try:
+            vv = self._vv_dir()
+            dll_path = os.path.join(vv, "c_api", "voicevox_core.dll")
+            if not os.path.exists(dll_path):
+                self._error = "voicevox_core.dll なし (setup_tts.ps1 を実行してください)"
+                return
+
+            ort_dir  = os.path.join(vv, "onnxruntime")
+            ort_dlls = _glob.glob(os.path.join(ort_dir, "*.dll"))
+            if not ort_dlls:
+                self._error = "voicevox_onnxruntime.dll なし"
+                return
+            ort_path = ort_dlls[0]
+
+            os.add_dll_directory(os.path.abspath(ort_dir))
+            os.add_dll_directory(os.path.abspath(os.path.join(vv, "c_api")))
+
+            lib = ctypes.CDLL(dll_path)
+
+            class _LoadOrtOpts(ctypes.Structure):
+                _fields_ = [("filename", ctypes.c_char_p)]
+            class _InitOpts(ctypes.Structure):
+                _fields_ = [("acceleration_mode", ctypes.c_int32),
+                             ("cpu_num_threads",   ctypes.c_uint16)]
+            class _TtsOpts(ctypes.Structure):
+                _fields_ = [("enable_interrogative_upspeak", ctypes.c_bool)]
+
+            lib.voicevox_onnxruntime_load_once.argtypes = [
+                _LoadOrtOpts, ctypes.POINTER(ctypes.c_void_p)]
+            lib.voicevox_onnxruntime_load_once.restype  = ctypes.c_int32
+            lib.voicevox_open_jtalk_rc_new.argtypes = [
+                ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
+            lib.voicevox_open_jtalk_rc_new.restype  = ctypes.c_int32
+            lib.voicevox_make_default_initialize_options.argtypes = []
+            lib.voicevox_make_default_initialize_options.restype  = _InitOpts
+            lib.voicevox_synthesizer_new.argtypes = [
+                ctypes.c_void_p, ctypes.c_void_p, _InitOpts,
+                ctypes.POINTER(ctypes.c_void_p)]
+            lib.voicevox_synthesizer_new.restype  = ctypes.c_int32
+            lib.voicevox_voice_model_file_open.argtypes = [
+                ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
+            lib.voicevox_voice_model_file_open.restype  = ctypes.c_int32
+            lib.voicevox_synthesizer_load_voice_model.argtypes = [
+                ctypes.c_void_p, ctypes.c_void_p]
+            lib.voicevox_synthesizer_load_voice_model.restype  = ctypes.c_int32
+            lib.voicevox_voice_model_file_delete.argtypes = [ctypes.c_void_p]
+            lib.voicevox_voice_model_file_delete.restype  = None
+            lib.voicevox_make_default_tts_options.argtypes = []
+            lib.voicevox_make_default_tts_options.restype  = _TtsOpts
+            lib.voicevox_synthesizer_tts.argtypes = [
+                ctypes.c_void_p, ctypes.c_char_p, ctypes.c_uint32,
+                _TtsOpts,
+                ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_void_p)]
+            lib.voicevox_synthesizer_tts.restype  = ctypes.c_int32
+            lib.voicevox_wav_free.argtypes = [ctypes.c_void_p]
+            lib.voicevox_wav_free.restype  = None
+            lib.voicevox_synthesizer_delete.argtypes = [ctypes.c_void_p]
+            lib.voicevox_synthesizer_delete.restype  = None
+            lib.voicevox_open_jtalk_rc_delete.argtypes = [ctypes.c_void_p]
+            lib.voicevox_open_jtalk_rc_delete.restype  = None
+
+            ort_ptr = ctypes.c_void_p()
+            rc = lib.voicevox_onnxruntime_load_once(
+                _LoadOrtOpts(filename=ort_path.encode()), ctypes.byref(ort_ptr))
+            if rc != 0:
+                self._error = f"ONNX Runtime ロード失敗 rc={rc}"
+                return
+
+            dict_dir = os.path.join(vv, "dict")
+            if os.path.isdir(dict_dir):
+                for name in os.listdir(dict_dir):
+                    sub = os.path.join(dict_dir, name)
+                    if os.path.isdir(sub):
+                        dict_dir = sub
+                        break
+            jtalk_ptr = ctypes.c_void_p()
+            rc = lib.voicevox_open_jtalk_rc_new(
+                dict_dir.encode(), ctypes.byref(jtalk_ptr))
+            if rc != 0:
+                self._error = f"OpenJTalk 初期化失敗 rc={rc}"
+                return
+
+            init_opts = lib.voicevox_make_default_initialize_options()
+            init_opts.acceleration_mode = 1
+            init_opts.cpu_num_threads   = 2
+            synth_ptr = ctypes.c_void_p()
+            rc = lib.voicevox_synthesizer_new(
+                ort_ptr, jtalk_ptr, init_opts, ctypes.byref(synth_ptr))
+            if rc != 0:
+                lib.voicevox_open_jtalk_rc_delete(jtalk_ptr)
+                self._error = f"Synthesizer 作成失敗 rc={rc}"
+                return
+
+            vvms_dir = os.path.join(vv, "vvms")
+            loaded = 0
+            for vvm in _glob.glob(os.path.join(vvms_dir, "*.vvm")):
+                m_ptr = ctypes.c_void_p()
+                if lib.voicevox_voice_model_file_open(
+                        vvm.encode(), ctypes.byref(m_ptr)) == 0:
+                    lib.voicevox_synthesizer_load_voice_model(synth_ptr, m_ptr)
+                    lib.voicevox_voice_model_file_delete(m_ptr)
+                    loaded += 1
+            if loaded == 0:
+                lib.voicevox_synthesizer_delete(synth_ptr)
+                lib.voicevox_open_jtalk_rc_delete(jtalk_ptr)
+                self._error = f"VVM モデルなし: {vvms_dir}"
+                return
+
+            self._lib     = lib
+            self._synth   = synth_ptr
+            self._jtalk   = jtalk_ptr
+            self._TtsOpts = _TtsOpts
+            self._ready   = True
+        except Exception as e:
+            self._error = str(e)
+
+    def synthesize(self, text: str):
+        """(samples_float32_ndarray, sample_rate) または None を返す"""
+        if not self._ready:
+            return None
+        import ctypes
+        import numpy as np
+        opts = self._lib.voicevox_make_default_tts_options()
+        opts.enable_interrogative_upspeak = False
+        wav_len = ctypes.c_size_t(0)
+        wav_ptr = ctypes.c_void_p(0)
+        rc = self._lib.voicevox_synthesizer_tts(
+            self._synth, text.encode("utf-8"),
+            ctypes.c_uint32(self.style_id), opts,
+            ctypes.byref(wav_len), ctypes.byref(wav_ptr))
+        if rc != 0 or not wav_ptr:
+            return None
+        data = bytes(ctypes.string_at(wav_ptr.value, wav_len.value))
+        self._lib.voicevox_wav_free(wav_ptr)
+        pcm, sr = self._parse_wav(data)
+        if pcm is None:
+            return None
+        return pcm.astype(np.float32) / 32768.0, sr
+
+    @staticmethod
+    def _parse_wav(data: bytes):
+        import struct
+        import numpy as np
+        if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+            return None, None
+        pos, sr, bits, pcm = 12, None, None, None
+        while pos + 8 <= len(data):
+            tag  = data[pos:pos+4]
+            size = struct.unpack_from("<I", data, pos+4)[0]
+            if tag == b"fmt " and size >= 16:
+                sr   = struct.unpack_from("<I", data, pos+12)[0]
+                bits = struct.unpack_from("<H", data, pos+22)[0]
+            elif tag == b"data":
+                pcm  = data[pos+8:pos+8+size]
+            pos += 8 + size + (size % 2)
+        if pcm is None or sr is None or bits != 16:
+            return None, None
+        return np.frombuffer(pcm, dtype=np.int16).copy(), sr
+
+
+# ============================================================
 # config.ini 読み込み
 # ============================================================
 
@@ -234,9 +430,10 @@ def load_config(base_dir: str) -> dict:
     def gf(s, k, fb): return p.getfloat(s, k)   if p.has_option(s, k) else fb
 
     return {
-        "tts_language":       gs("TTS",         "Language",           "auto"),
-        "tts_speaking_rate":  gf("TTS",         "SpeakingRate",       1.0),
-        "tts_radio_effect":   gi("TTS",         "RadioEffect",        1) != 0,
+        "tts_language":          gs("TTS",         "Language",           "auto"),
+        "tts_speaking_rate":     gf("TTS",         "SpeakingRate",       1.0),
+        "tts_radio_effect":      gi("TTS",         "RadioEffect",        1) != 0,
+        "tts_voicevox_style_id": gi("TTS",         "VoicevoxStyleId",    3),
         "translation_enabled":gi("Translation", "Enabled",            1) != 0,
         "target_language":    gs("Translation", "TargetLanguage",     "Japanese"),
         "performance_preset": gs("Translation", "PerformancePreset",  "Medium"),
@@ -289,6 +486,8 @@ class App:
         self.tts_dir   = _find_tts_dir(base_dir)
         self.cfg       = load_config(base_dir)
         self.engine    = TtsEngine(self.tts_dir)
+        self.vv_engine = VoicevoxEngine(self.tts_dir,
+                                        self.cfg.get("tts_voicevox_style_id", 3))
         self.log_msgs: list = []
         self._play_thread: threading.Thread | None = None
         self._stop_flag = threading.Event()
@@ -488,7 +687,13 @@ class App:
     def _refresh_model_status(self):
         installed = []
         for lang, lbl in self._model_labels.items():
-            if self.engine.model_installed(lang):
+            if lang == "ja" and self.vv_engine.ready:
+                lbl.config(text="OK (VOICEVOX)", foreground="#007700")
+                installed.append(lang)
+            elif lang == "ja" and self.vv_engine.installed():
+                lbl.config(text="インストール済 (初期化中)", foreground="#888800")
+                installed.append(lang)
+            elif self.engine.model_installed(lang):
                 lbl.config(text="OK", foreground="#007700")
                 installed.append(lang)
             else:
@@ -527,8 +732,11 @@ class App:
         mode = self.lang_var.get()
         lang = detect_language(text) if mode == "auto" else mode
         name = LANG_NAMES.get(lang, lang)
-        ok   = self.engine.model_installed(lang)
-        icon = "✓" if ok else "✗ モデル未インストール"
+        if lang == "ja" and (self.vv_engine.ready or self.vv_engine.installed()):
+            ok = True
+        else:
+            ok = self.engine.model_installed(lang)
+        icon  = "✓" if ok else "✗ モデル未インストール"
         color = "#007700" if ok else "#cc0000"
         self.detected_lbl.config(text=f"{lang} ({name})  {icon}", foreground=color)
 
@@ -616,7 +824,53 @@ class App:
         lang  = detect_language(text) if mode == "auto" else mode
         speed = float(self.rate_var.get())
 
-        # C++ 同様: 対象言語モデルなし → EN フォールバック、EN もなければ中断
+        radio_on = self.cfg.get("tts_radio_effect", True)
+
+        # VOICEVOX (日本語) — C++ 同様に Sherpa より優先
+        if lang == "ja" and self.vv_engine.ready:
+            self._stop_flag.clear()
+            self.speak_btn.config(state=tk.DISABLED)
+            self.stop_btn.config(state=tk.NORMAL)
+            self.gen_lbl.config(text="合成中 (VOICEVOX)…")
+            self.status_var.set(
+                f"合成中 (VOICEVOX ずんだもん)  styleId={self.vv_engine.style_id}")
+
+            def run_vv():
+                try:
+                    import sounddevice as sd
+                    import numpy as np
+                    result = self.vv_engine.synthesize(text)
+                    if result is None:
+                        self.root.after(0, lambda: self._on_done("VOICEVOX 合成失敗"))
+                        return
+                    samples, sr = result
+                    self.root.after(0, lambda: self.gen_lbl.config(text="再生中 (VOICEVOX)…"))
+                    arr = np.array(samples, dtype=np.float32)
+                    if radio_on:
+                        arr = apply_radio_effect(arr, sr)
+                    sd.play(arr, sr, blocking=False)
+                    import time
+                    while True:
+                        if self._stop_flag.is_set():
+                            sd.stop()
+                            break
+                        try:
+                            if not sd.get_stream().active:
+                                break
+                        except Exception:
+                            break
+                        time.sleep(0.05)
+                    radio_tag = " [ラジオON]" if radio_on else ""
+                    msg = f"完了 (VOICEVOX)  {len(samples)/sr:.1f}秒  sr={sr}Hz{radio_tag}"
+                except Exception as e:
+                    msg = f"エラー: {e}"
+                self.root.after(0, lambda m=msg: self._on_done(m))
+
+            self._play_thread = threading.Thread(target=run_vv, daemon=True)
+            self._play_thread.start()
+            return
+
+        # Sherpa-ONNX パス (C++ 同様: モデルなし → EN フォールバック)
         if not self.engine.model_installed(lang):
             if lang != "en" and self.engine.model_installed("en"):
                 self.status_var.set(f"[{lang}] モデルなし → EN フォールバック")
@@ -631,7 +885,6 @@ class App:
         self.stop_btn.config(state=tk.NORMAL)
         self.gen_lbl.config(text="合成中…")
         self.status_var.set(f"合成中  lang={lang}  speed={speed:.2f}")
-        radio_on = self.cfg.get("tts_radio_effect", True)
 
         def run():
             try:

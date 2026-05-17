@@ -135,6 +135,41 @@ typedef const SherpaOnnxGeneratedAudio* (*PFN_Generate)(const SherpaOnnxOfflineT
 typedef void                            (*PFN_DestroyAudio)(const SherpaOnnxGeneratedAudio*);
 
 // ============================================================
+// VOICEVOX Core C API (v0.16.x) - 日本語ずんだもん TTS
+// ============================================================
+
+enum VoicevoxResultCode : int32_t { VOICEVOX_RESULT_OK = 0 };
+
+struct VoicevoxLoadOnnxruntimeOptions { const char* filename; };
+
+struct VoicevoxInitializeOptions {
+    int32_t  acceleration_mode; // 1 = CPU
+    uint16_t cpu_num_threads;
+};
+
+struct VoicevoxTtsOptions { bool enable_interrogative_upspeak; };
+
+typedef uint32_t VoicevoxStyleId;
+
+struct VoicevoxOnnxruntime;    // opaque
+struct OpenJtalkRc;            // opaque
+struct VoicevoxSynthesizer;    // opaque
+struct VoicevoxVoiceModelFile; // opaque
+
+typedef int32_t (*PFN_VvOnnxLoad) (VoicevoxLoadOnnxruntimeOptions, const VoicevoxOnnxruntime**);
+typedef int32_t (*PFN_VvJtalkNew) (const char*, OpenJtalkRc**);
+typedef VoicevoxInitializeOptions (*PFN_VvDefInitOpt)(void);
+typedef int32_t (*PFN_VvSynthNew) (const VoicevoxOnnxruntime*, const OpenJtalkRc*, VoicevoxInitializeOptions, VoicevoxSynthesizer**);
+typedef int32_t (*PFN_VvModelOpen)(const char*, VoicevoxVoiceModelFile**);
+typedef int32_t (*PFN_VvLoadModel)(const VoicevoxSynthesizer*, const VoicevoxVoiceModelFile*);
+typedef void    (*PFN_VvModelDel) (VoicevoxVoiceModelFile*);
+typedef VoicevoxTtsOptions (*PFN_VvDefTtsOpt)(void);
+typedef int32_t (*PFN_VvTts)      (const VoicevoxSynthesizer*, const char*, VoicevoxStyleId, VoicevoxTtsOptions, uintptr_t*, uint8_t**);
+typedef void    (*PFN_VvWavFree)  (uint8_t*);
+typedef void    (*PFN_VvSynthDel) (VoicevoxSynthesizer*);
+typedef void    (*PFN_VvJtalkDel) (OpenJtalkRc*);
+
+// ============================================================
 // 言語判定
 // ============================================================
 
@@ -273,6 +308,28 @@ static PFN_DestroyTts  g_fnDestroy  = nullptr;
 static PFN_Generate    g_fnGenerate = nullptr;
 static PFN_DestroyAudio g_fnFreeAudio = nullptr;
 
+// VOICEVOX グローバル
+static HMODULE               g_vvLib        = nullptr;
+static bool                  g_vvReady      = false;
+static uint32_t              g_vvStyleId    = 3;
+
+static PFN_VvOnnxLoad        g_vvOnnxLoad   = nullptr;
+static PFN_VvJtalkNew        g_vvJtalkNew   = nullptr;
+static PFN_VvDefInitOpt      g_vvDefInitOpt = nullptr;
+static PFN_VvSynthNew        g_vvSynthNew   = nullptr;
+static PFN_VvModelOpen       g_vvModelOpen  = nullptr;
+static PFN_VvLoadModel       g_vvLoadModel  = nullptr;
+static PFN_VvModelDel        g_vvModelDel   = nullptr;
+static PFN_VvDefTtsOpt       g_vvDefTtsOpt  = nullptr;
+static PFN_VvTts             g_vvTts        = nullptr;
+static PFN_VvWavFree         g_vvWavFree    = nullptr;
+static PFN_VvSynthDel        g_vvSynthDel   = nullptr;
+static PFN_VvJtalkDel        g_vvJtalkDel   = nullptr;
+
+static const VoicevoxOnnxruntime* g_vvOnnxruntime = nullptr;
+static OpenJtalkRc*               g_vvOpenJtalk   = nullptr;
+static VoicevoxSynthesizer*       g_vvSynthesizer = nullptr;
+
 static bool LoadSherpaLib(const std::string& ttsDir) {
     // パッケージによって sherpa-onnx.dll か sherpa-onnx-c-api.dll の場合がある
     const char* candidates[] = { "sherpa-onnx.dll", "sherpa-onnx-c-api.dll" };
@@ -303,6 +360,190 @@ static bool LoadSherpaLib(const std::string& ttsDir) {
 
     logging::Debug("[TTS] sherpa-onnx.dll ロード完了");
     return true;
+}
+
+// ============================================================
+// VOICEVOX Core 初期化・合成
+// ============================================================
+
+static bool InitVoicevox(const std::string& ttsDir) {
+    std::string vvDir  = ttsDir + "voicevox\\";
+    std::string dllPath = vvDir + "c_api\\voicevox_core.dll";
+
+    if (GetFileAttributesA(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        logging::Debug("[TTS-VV] セットアップ未完了 (setup_tts.ps1 を実行してください)");
+        return false;
+    }
+
+    g_vvLib = LoadLibraryExA(dllPath.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (!g_vvLib) {
+        logging::Debug("[TTS-VV] DLL ロード失敗 err=%lu", GetLastError());
+        return false;
+    }
+
+    auto gp = [&](const char* name) { return GetProcAddress(g_vvLib, name); };
+    g_vvOnnxLoad   = (PFN_VvOnnxLoad)  gp("voicevox_onnxruntime_load_once");
+    g_vvJtalkNew   = (PFN_VvJtalkNew)  gp("voicevox_open_jtalk_rc_new");
+    g_vvDefInitOpt = (PFN_VvDefInitOpt)gp("voicevox_make_default_initialize_options");
+    g_vvSynthNew   = (PFN_VvSynthNew)  gp("voicevox_synthesizer_new");
+    g_vvModelOpen  = (PFN_VvModelOpen) gp("voicevox_voice_model_file_open");
+    g_vvLoadModel  = (PFN_VvLoadModel) gp("voicevox_synthesizer_load_voice_model");
+    g_vvModelDel   = (PFN_VvModelDel)  gp("voicevox_voice_model_file_delete");
+    g_vvDefTtsOpt  = (PFN_VvDefTtsOpt) gp("voicevox_make_default_tts_options");
+    g_vvTts        = (PFN_VvTts)       gp("voicevox_synthesizer_tts");
+    g_vvWavFree    = (PFN_VvWavFree)   gp("voicevox_wav_free");
+    g_vvSynthDel   = (PFN_VvSynthDel)  gp("voicevox_synthesizer_delete");
+    g_vvJtalkDel   = (PFN_VvJtalkDel)  gp("voicevox_open_jtalk_rc_delete");
+
+    if (!g_vvOnnxLoad || !g_vvJtalkNew || !g_vvSynthNew || !g_vvModelOpen ||
+        !g_vvLoadModel || !g_vvModelDel || !g_vvTts || !g_vvWavFree ||
+        !g_vvSynthDel  || !g_vvJtalkDel) {
+        logging::Debug("[TTS-VV] 関数取得失敗");
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+
+    // ONNX Runtime: onnxruntime/ 内の最初の .dll を使う
+    std::string ortDir = vvDir + "onnxruntime\\";
+    std::string ortPath;
+    {
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA((ortDir + "*.dll").c_str(), &fd);
+        if (h != INVALID_HANDLE_VALUE) {
+            ortPath = ortDir + fd.cFileName;
+            FindClose(h);
+        }
+    }
+    if (ortPath.empty()) {
+        logging::Debug("[TTS-VV] voicevox_onnxruntime.dll が見つかりません: %s", ortDir.c_str());
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+    VoicevoxLoadOnnxruntimeOptions ortOpts = { ortPath.c_str() };
+    auto rc = g_vvOnnxLoad(ortOpts, &g_vvOnnxruntime);
+    if (rc != VOICEVOX_RESULT_OK) {
+        logging::Debug("[TTS-VV] ONNX Runtime ロード失敗 rc=%d", rc);
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+
+    // OpenJTalk: dict/ 内の最初のサブディレクトリを辞書パスとして使う
+    std::string dictParent = vvDir + "dict\\";
+    std::string dictDir;
+    {
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA((dictParent + "*").c_str(), &fd);
+        if (h != INVALID_HANDLE_VALUE) {
+            do {
+                if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && fd.cFileName[0] != '.') {
+                    dictDir = dictParent + fd.cFileName;
+                    break;
+                }
+            } while (FindNextFileA(h, &fd));
+            FindClose(h);
+        }
+    }
+    if (dictDir.empty()) dictDir = dictParent; // フォールバック
+
+    rc = g_vvJtalkNew(dictDir.c_str(), &g_vvOpenJtalk);
+    if (rc != VOICEVOX_RESULT_OK) {
+        logging::Debug("[TTS-VV] OpenJTalk 初期化失敗 rc=%d dir=%s", rc, dictDir.c_str());
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+
+    // Synthesizer 作成
+    VoicevoxInitializeOptions initOpts = g_vvDefInitOpt ? g_vvDefInitOpt()
+                                                        : VoicevoxInitializeOptions{1, 0};
+    initOpts.acceleration_mode = 1; // CPU
+    initOpts.cpu_num_threads   = 2;
+    rc = g_vvSynthNew(g_vvOnnxruntime, g_vvOpenJtalk, initOpts, &g_vvSynthesizer);
+    if (rc != VOICEVOX_RESULT_OK) {
+        logging::Debug("[TTS-VV] Synthesizer 作成失敗 rc=%d", rc);
+        g_vvJtalkDel(g_vvOpenJtalk); g_vvOpenJtalk = nullptr;
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+
+    // 全 VVM モデルをロード
+    std::string vvmsDir = vvDir + "vvms\\";
+    int loaded = 0;
+    {
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA((vvmsDir + "*.vvm").c_str(), &fd);
+        if (h != INVALID_HANDLE_VALUE) {
+            do {
+                std::string vvmPath = vvmsDir + fd.cFileName;
+                VoicevoxVoiceModelFile* model = nullptr;
+                if (g_vvModelOpen(vvmPath.c_str(), &model) == VOICEVOX_RESULT_OK) {
+                    g_vvLoadModel(g_vvSynthesizer, model);
+                    g_vvModelDel(model);
+                    loaded++;
+                }
+            } while (FindNextFileA(h, &fd));
+            FindClose(h);
+        }
+    }
+    if (loaded == 0) {
+        logging::Debug("[TTS-VV] VVM モデルが見つかりません: %s", vvmsDir.c_str());
+        g_vvSynthDel(g_vvSynthesizer); g_vvSynthesizer = nullptr;
+        g_vvJtalkDel(g_vvOpenJtalk);   g_vvOpenJtalk   = nullptr;
+        FreeLibrary(g_vvLib); g_vvLib = nullptr;
+        return false;
+    }
+
+    logging::Debug("[TTS-VV] 初期化完了: %d VVM, styleId=%u", loaded, g_vvStyleId);
+    g_vvReady = true;
+    return true;
+}
+
+struct PcmData { std::vector<int16_t> samples; int32_t sampleRate = 0; };
+
+static bool ParseWavPcm(const uint8_t* wav, uintptr_t size, PcmData& out) {
+    if (size < 12) return false;
+    if (memcmp(wav, "RIFF", 4) || memcmp(wav + 8, "WAVE", 4)) return false;
+
+    uint32_t sampleRate = 0, dataSize = 0;
+    uint16_t bitsPerSample = 0;
+    const uint8_t* dataPtr = nullptr;
+    size_t pos = 12;
+
+    while (pos + 8 <= static_cast<size_t>(size)) {
+        uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(&wav[pos + 4]);
+        if (!memcmp(&wav[pos], "fmt ", 4) && chunkSize >= 16) {
+            sampleRate    = *reinterpret_cast<const uint32_t*>(&wav[pos + 12]);
+            bitsPerSample = *reinterpret_cast<const uint16_t*>(&wav[pos + 22]);
+        } else if (!memcmp(&wav[pos], "data", 4)) {
+            dataPtr  = &wav[pos + 8];
+            dataSize = chunkSize;
+        }
+        pos += 8 + chunkSize;
+        if (chunkSize % 2) pos++;
+    }
+    if (!dataPtr || !sampleRate || bitsPerSample != 16) return false;
+
+    out.sampleRate = static_cast<int32_t>(sampleRate);
+    out.samples.assign(reinterpret_cast<const int16_t*>(dataPtr),
+                       reinterpret_cast<const int16_t*>(dataPtr) + dataSize / 2);
+    return true;
+}
+
+static bool SynthesizeVoicevox(const std::string& text, PcmData& out) {
+    VoicevoxTtsOptions opts = g_vvDefTtsOpt ? g_vvDefTtsOpt() : VoicevoxTtsOptions{false};
+    opts.enable_interrogative_upspeak = false;
+
+    uintptr_t wavLen = 0;
+    uint8_t*  wavBuf = nullptr;
+    auto rc = g_vvTts(g_vvSynthesizer, text.c_str(), g_vvStyleId, opts, &wavLen, &wavBuf);
+    if (rc != VOICEVOX_RESULT_OK || !wavBuf) {
+        logging::Debug("[TTS-VV] 合成失敗 rc=%d", rc);
+        return false;
+    }
+    bool ok = ParseWavPcm(wavBuf, wavLen, out);
+    g_vvWavFree(wavBuf);
+    if (!ok) logging::Debug("[TTS-VV] WAV 解析失敗");
+    return ok;
 }
 
 // ============================================================
@@ -485,6 +726,50 @@ static void TtsWorker() {
             lang = DetectLanguage(req.text.c_str());
         }
 
+        // VOICEVOX (日本語) — Sherpa-ONNX より優先
+        if (lang == Lang::JA && g_vvReady) {
+            PcmData vvPcm;
+            if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
+            if (g_ttsStop.load()) continue;
+
+            WAVEFORMATEX wfx = {};
+            wfx.wFormatTag      = WAVE_FORMAT_PCM;
+            wfx.nChannels       = 1;
+            wfx.nSamplesPerSec  = static_cast<DWORD>(vvPcm.sampleRate);
+            wfx.wBitsPerSample  = 16;
+            wfx.nBlockAlign     = 2;
+            wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * 2;
+
+            DWORD dataSize = static_cast<DWORD>(vvPcm.samples.size() * 2);
+            if (g_radioEffect)
+                ApplyRadioEffect(reinterpret_cast<BYTE*>(vvPcm.samples.data()), dataSize, wfx);
+
+            IXAudio2SourceVoice* sourceVoice = nullptr;
+            hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
+            if (FAILED(hr) || !sourceVoice) continue;
+
+            XAUDIO2_BUFFER buf = {};
+            buf.AudioBytes = dataSize;
+            buf.pAudioData = reinterpret_cast<const BYTE*>(vvPcm.samples.data());
+            buf.Flags      = XAUDIO2_END_OF_STREAM;
+
+            sourceVoice->SubmitSourceBuffer(&buf);
+            sourceVoice->Start(0);
+
+            for (;;) {
+                if (g_ttsStop.load() || !g_ttsRunning.load()) {
+                    sourceVoice->Stop(0);
+                    break;
+                }
+                XAUDIO2_VOICE_STATE state;
+                sourceVoice->GetState(&state);
+                if (state.BuffersQueued == 0) break;
+                Sleep(50);
+            }
+            sourceVoice->DestroyVoice();
+            continue;
+        }
+
         // モデル取得 (遅延初期化)
         SherpaOnnxOfflineTts* model = GetModel(lang);
         if (!model && lang != Lang::EN)
@@ -570,20 +855,27 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language, double speakingRate, bool radioEffect) {
+void tts::Init(const char* language, double speakingRate, bool radioEffect, uint32_t voicevoxStyleId) {
     if (g_ttsRunning.load()) return;
 
     g_ttsLanguage  = (language && *language) ? language : "auto";
     g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0)
                      ? static_cast<float>(speakingRate) : 1.0f;
     g_radioEffect  = radioEffect;
+    g_vvStyleId    = voicevoxStyleId;
 
     g_ttsDir = GetTtsToolDir();
-    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radio=%d, dir=%s)",
-                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect, g_ttsDir.c_str());
+    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radio=%d, vvStyleId=%u, dir=%s)",
+                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect, voicevoxStyleId, g_ttsDir.c_str());
 
-    if (!LoadSherpaLib(g_ttsDir)) {
+    bool sherpaOk = LoadSherpaLib(g_ttsDir);
+    if (!sherpaOk)
         logging::Debug("[TTS] sherpa-onnx.dll が見つかりません。setup_tts.ps1 を実行してください。");
+
+    InitVoicevox(g_ttsDir);
+
+    if (!sherpaOk && !g_vvReady) {
+        logging::Debug("[TTS] TTS エンジンが利用できません。");
         return;
     }
 
@@ -620,7 +912,7 @@ void tts::Shutdown() {
     {
         std::lock_guard<std::mutex> lock(g_modelMutex);
         for (auto& kv : g_models) {
-            if (kv.second.handle)
+            if (kv.second.handle && g_fnDestroy)
                 g_fnDestroy(kv.second.handle);
         }
         g_models.clear();
@@ -628,11 +920,19 @@ void tts::Shutdown() {
 
     if (g_sherpaLib) {
         FreeLibrary(g_sherpaLib);
-        g_sherpaLib  = nullptr;
-        g_fnCreate   = nullptr;
-        g_fnDestroy  = nullptr;
-        g_fnGenerate = nullptr;
+        g_sherpaLib   = nullptr;
+        g_fnCreate    = nullptr;
+        g_fnDestroy   = nullptr;
+        g_fnGenerate  = nullptr;
         g_fnFreeAudio = nullptr;
+    }
+
+    // VOICEVOX クリーンアップ
+    if (g_vvReady) {
+        g_vvReady = false;
+        if (g_vvSynthesizer) { g_vvSynthDel(g_vvSynthesizer); g_vvSynthesizer = nullptr; }
+        if (g_vvOpenJtalk)   { g_vvJtalkDel(g_vvOpenJtalk);   g_vvOpenJtalk   = nullptr; }
+        if (g_vvLib)         { FreeLibrary(g_vvLib);           g_vvLib         = nullptr; }
     }
 
     logging::Debug("[TTS] Shutdown 完了");

@@ -90,7 +90,7 @@ function Copy-IfExists {
 # ============================================================
 
 if (-not $SkipDll) {
-    Write-Host "=== [1/2] Sherpa-ONNX DLL ===" -ForegroundColor Cyan
+    Write-Host "=== [1/3] Sherpa-ONNX DLL ===" -ForegroundColor Cyan
 
     # GitHub Releases API で最新バージョンを取得
     Write-Host "  最新バージョンを確認中..." -ForegroundColor Gray
@@ -162,7 +162,7 @@ if (-not $SkipDll) {
         Remove-Item $dllExtractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 } else {
-    Write-Host "=== [1/2] DLL スキップ (-SkipDll) ===" -ForegroundColor Gray
+    Write-Host "=== [1/3] DLL スキップ (-SkipDll) ===" -ForegroundColor Gray
 }
 
 # ============================================================
@@ -170,7 +170,7 @@ if (-not $SkipDll) {
 # ============================================================
 
 Write-Host ""
-Write-Host "=== [2/2] 音声モデル ===" -ForegroundColor Cyan
+Write-Host "=== [2/3] 音声モデル ===" -ForegroundColor Cyan
 
 # lang -> (モデル名, Type: vits|supertonic)
 $AllModels = [ordered]@{
@@ -312,6 +312,47 @@ foreach ($kv in $AllModels.GetEnumerator()) {
 }
 
 # ============================================================
+# 3. VOICEVOX Core (日本語ずんだもん TTS)
+# ============================================================
+
+Write-Host ""
+Write-Host "=== [3/3] VOICEVOX Core (日本語ずんだもん) ===" -ForegroundColor Cyan
+
+$VvDir     = Join-Path $TtsDir "voicevox"
+$VvCoreDll = Join-Path $VvDir "c_api\voicevox_core.dll"
+
+if (Test-Path $VvCoreDll) {
+    Write-Host "  VOICEVOX Core - スキップ (既存)" -ForegroundColor Gray
+} else {
+    $VvVersion       = "0.16.0"
+    $VvDownloaderUrl = "https://github.com/VOICEVOX/voicevox_core/releases/download/$VvVersion/download-windows-x64.exe"
+    $VvDownloaderPath = Join-Path $TmpDir "voicevox_downloader.exe"
+
+    try {
+        Write-Host "  ダウンロードツール取得中 (VOICEVOX Core $VvVersion)..." -ForegroundColor Gray
+        Download-File $VvDownloaderUrl $VvDownloaderPath "voicevox_downloader.exe"
+
+        New-Item -ItemType Directory -Force -Path $VvDir | Out-Null
+        Write-Host "  モデル・DLL ダウンロード中 (数分かかります)..." -ForegroundColor Gray
+        & $VvDownloaderPath --devices cpu --output $VvDir 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+
+        if (Test-Path $VvCoreDll) {
+            Write-Host "  [完了] VOICEVOX Core" -ForegroundColor Green
+        } else {
+            Write-Host "  [警告] voicevox_core.dll が見つかりません" -ForegroundColor Yellow
+            Write-Host "         手動DL: https://github.com/VOICEVOX/voicevox_core/releases/tag/$VvVersion" -ForegroundColor Yellow
+            Write-Host "         実行:   download-windows-x64.exe --devices cpu --output $VvDir" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  エラー: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  手動手順:" -ForegroundColor Yellow
+        Write-Host "    1. https://github.com/VOICEVOX/voicevox_core/releases/tag/$VvVersion" -ForegroundColor Yellow
+        Write-Host "    2. download-windows-x64.exe をダウンロード" -ForegroundColor Yellow
+        Write-Host "    3. 実行: .\download-windows-x64.exe --devices cpu --output `"$VvDir`"" -ForegroundColor Yellow
+    }
+}
+
+# ============================================================
 # クリーンアップ
 # ============================================================
 
@@ -347,6 +388,13 @@ if (Test-Path $espeakPath) {
     Write-Host "  [OK] espeak-ng-data/" -ForegroundColor Green
 } else {
     Write-Host "  [警告] espeak-ng-data/ なし (日英露韓の発音が不安定になる可能性)" -ForegroundColor Yellow
+}
+
+# VOICEVOX
+if (Test-Path $VvCoreDll) {
+    Write-Host "  [OK] voicevox/c_api/voicevox_core.dll (ずんだもん)" -ForegroundColor Green
+} else {
+    Write-Host "  [--] voicevox/ なし (日本語は Sherpa-ONNX でフォールバック)" -ForegroundColor Gray
 }
 
 # モデル

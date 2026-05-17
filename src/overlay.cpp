@@ -462,7 +462,7 @@ bool overlay::Init() {
     }
 
     // TTS初期化
-    tts::Init(config::Get().ttsLanguage.c_str(), config::Get().ttsSpeakingRate, config::Get().ttsRadioEffect);
+    tts::Init(config::Get().ttsLanguage.c_str(), config::Get().ttsSpeakingRate, config::Get().ttsRadioEffect, config::Get().ttsVoicevoxStyleId);
 
     logging::Debug("[Overlay] Init (遅延初期化モード)");
     return true;
