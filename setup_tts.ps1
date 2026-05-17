@@ -324,29 +324,55 @@ $VvCoreDll = Join-Path $VvDir "c_api\voicevox_core.dll"
 if (Test-Path $VvCoreDll) {
     Write-Host "  VOICEVOX Core - スキップ (既存)" -ForegroundColor Gray
 } else {
-    $VvVersion       = "0.16.0"
-    $VvDownloaderUrl = "https://github.com/VOICEVOX/voicevox_core/releases/download/$VvVersion/download-windows-x64.exe"
-    $VvDownloaderPath = Join-Path $TmpDir "voicevox_downloader.exe"
-
     try {
-        Write-Host "  ダウンロードツール取得中 (VOICEVOX Core $VvVersion)..." -ForegroundColor Gray
-        Download-File $VvDownloaderUrl $VvDownloaderPath "voicevox_downloader.exe"
+        # GitHub API で最新バージョンを取得
+        Write-Host "  最新バージョンを確認中 (VOICEVOX Core)..." -ForegroundColor Gray
+        $vvHeaders  = @{ "User-Agent" = "FoxholeChatTranslator-TTS-Setup" }
+        $vvRelease  = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/VOICEVOX/voicevox_core/releases/latest" `
+            -Headers $vvHeaders
+        $VvVersion  = $vvRelease.tag_name
+        Write-Host "  VOICEVOX Core $VvVersion" -ForegroundColor Green
+
+        $vvAsset = $vvRelease.assets |
+            Where-Object { $_.name -eq "download-windows-x64.exe" } |
+            Select-Object -First 1
+        if (-not $vvAsset) { throw "download-windows-x64.exe アセットが見つかりません" }
+
+        $VvDownloaderPath = Join-Path $TmpDir "voicevox_downloader.exe"
+        Download-File $vvAsset.browser_download_url $VvDownloaderPath "voicevox_downloader.exe"
 
         New-Item -ItemType Directory -Force -Path $VvDir | Out-Null
-        Write-Host "  モデル・DLL ダウンロード中 (数分かかります)..." -ForegroundColor Gray
-        & $VvDownloaderPath --devices cpu --output $VvDir 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+
+        # UTF-8 に切り替えてダウンローダーを直接実行
+        # (パイプすると stdin が切断されライセンス同意プロンプトに応答できない)
+        # (CP932 のままだと Rust の pager が日本語でパニックする)
+        $prevCodePage = [Console]::OutputEncoding.CodePage
+        & chcp 65001 | Out-Null
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+
+        Write-Host ""
+        Write-Host "  ライセンス同意画面が表示されます。" -ForegroundColor Yellow
+        Write-Host "  [y,n,r] プロンプトが出たら  y  を入力して Enter を押してください。" -ForegroundColor Yellow
+        Write-Host ""
+
+        & $VvDownloaderPath --devices cpu --output $VvDir
+
+        & chcp $prevCodePage | Out-Null
+        [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding($prevCodePage)
 
         if (Test-Path $VvCoreDll) {
             Write-Host "  [完了] VOICEVOX Core" -ForegroundColor Green
         } else {
             Write-Host "  [警告] voicevox_core.dll が見つかりません" -ForegroundColor Yellow
-            Write-Host "         手動DL: https://github.com/VOICEVOX/voicevox_core/releases/tag/$VvVersion" -ForegroundColor Yellow
-            Write-Host "         実行:   download-windows-x64.exe --devices cpu --output $VvDir" -ForegroundColor Yellow
+            Write-Host "         ライセンスに同意しなかった場合はダウンロードされません。" -ForegroundColor Yellow
+            Write-Host "         再度このスクリプトを実行してください。" -ForegroundColor Yellow
         }
     } catch {
         Write-Host "  エラー: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "  手動手順:" -ForegroundColor Yellow
-        Write-Host "    1. https://github.com/VOICEVOX/voicevox_core/releases/tag/$VvVersion" -ForegroundColor Yellow
+        Write-Host "    1. https://github.com/VOICEVOX/voicevox_core/releases" -ForegroundColor Yellow
         Write-Host "    2. download-windows-x64.exe をダウンロード" -ForegroundColor Yellow
         Write-Host "    3. 実行: .\download-windows-x64.exe --devices cpu --output `"$VvDir`"" -ForegroundColor Yellow
     }
