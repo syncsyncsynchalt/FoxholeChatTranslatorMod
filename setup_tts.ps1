@@ -319,7 +319,7 @@ Write-Host ""
 Write-Host "=== [3/3] VOICEVOX Core (日本語ずんだもん) ===" -ForegroundColor Cyan
 
 $VvDir     = Join-Path $TtsDir "voicevox"
-$VvCoreDll = Join-Path $VvDir "c_api\voicevox_core.dll"
+$VvCoreDll = Join-Path $VvDir "c_api\lib\voicevox_core.dll"
 
 if (Test-Path $VvCoreDll) {
     Write-Host "  VOICEVOX Core - スキップ (既存)" -ForegroundColor Gray
@@ -418,7 +418,7 @@ if (Test-Path $espeakPath) {
 
 # VOICEVOX
 if (Test-Path $VvCoreDll) {
-    Write-Host "  [OK] voicevox/c_api/voicevox_core.dll (ずんだもん)" -ForegroundColor Green
+    Write-Host "  [OK] voicevox/c_api/lib/voicevox_core.dll (ずんだもん)" -ForegroundColor Green
 } else {
     Write-Host "  [--] voicevox/ なし (日本語は Sherpa-ONNX でフォールバック)" -ForegroundColor Gray
 }

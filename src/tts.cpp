@@ -368,7 +368,7 @@ static bool LoadSherpaLib(const std::string& ttsDir) {
 
 static bool InitVoicevox(const std::string& ttsDir) {
     std::string vvDir  = ttsDir + "voicevox\\";
-    std::string dllPath = vvDir + "c_api\\voicevox_core.dll";
+    std::string dllPath = vvDir + "c_api\\lib\\voicevox_core.dll";
 
     if (GetFileAttributesA(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
         logging::Debug("[TTS-VV] セットアップ未完了 (setup_tts.ps1 を実行してください)");
@@ -404,8 +404,8 @@ static bool InitVoicevox(const std::string& ttsDir) {
         return false;
     }
 
-    // ONNX Runtime: onnxruntime/ 内の最初の .dll を使う
-    std::string ortDir = vvDir + "onnxruntime\\";
+    // ONNX Runtime: onnxruntime/lib/ 内の最初の .dll を使う
+    std::string ortDir = vvDir + "onnxruntime\\lib\\";
     std::string ortPath;
     {
         WIN32_FIND_DATAA fd;
@@ -467,7 +467,7 @@ static bool InitVoicevox(const std::string& ttsDir) {
     }
 
     // 全 VVM モデルをロード
-    std::string vvmsDir = vvDir + "vvms\\";
+    std::string vvmsDir = vvDir + "models\\vvms\\";
     int loaded = 0;
     {
         WIN32_FIND_DATAA fd;

@@ -97,6 +97,77 @@ models/<lang>/model.onnx + tokens.txt が存在する      → VITS (Piper/mimic
 
 ---
 
+## VOICEVOX Core に関する重要な知見
+
+### インストール後のディレクトリ構造
+
+`download-windows-x64.exe --devices cpu --output <VvDir>` が展開するパスは以下の通り:
+
+```
+voicevox/
+  c_api/
+    lib/
+      voicevox_core.dll        ← DLL はここ (c_api/ 直下ではない)
+  onnxruntime/
+    lib/
+      voicevox_onnxruntime.dll ← ORT DLL はここ (onnxruntime/ 直下ではない)
+  models/
+    vvms/
+      *.vvm                    ← VVM モデルはここ (vvms/ 直下ではない)
+  dict/
+    open_jtalk_dic_utf_8-1.11/ ← 辞書はここ (正しい)
+```
+
+**よくある誤り**: `c_api/voicevox_core.dll`、`onnxruntime/*.dll`、`vvms/*.vvm` と仮定すると
+ファイルが見つからず初期化に失敗する。必ず `lib/` サブディレクトリを含むパスを使うこと。
+
+### VOICEVOX ダウンローダーの挙動
+
+- `download-windows-x64.exe` はライセンス同意プロンプト `[y,n,r]` を stdin から読む
+- パイプ経由で実行すると stdin が切断されプロンプトが無限ループする
+- CP932 (デフォルト) のコンソールでは Rust の pager が日本語 Unicode でパニックする:
+  `byte index 1 is not a char boundary`
+- **対処**: 直接実行し、実行前に `chcp 65001` + UTF-8 エンコーディング設定を行う
+
+```powershell
+& chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+& $VvDownloaderPath --devices cpu --output $VvDir   # パイプしない
+```
+
+### VOICEVOX C API 初期化シーケンス
+
+```
+voicevox_onnxruntime_load_once(ort_dll_path)   → OnnxruntimePtr
+voicevox_open_jtalk_rc_new(dict_dir)           → OpenJtalkPtr
+voicevox_synthesizer_new(ort, jtalk, opts)     → SynthesizerPtr
+voicevox_voice_model_file_open(vvm_path)       → ModelPtr  ×N
+voicevox_synthesizer_load_voice_model(synth, model)
+voicevox_synthesizer_tts(synth, text, styleId, opts) → WAV bytes
+```
+
+出力は RIFF/WAVE 形式 (uint8_t*)。16bit PCM を直接解析して XAudio2 に渡す。
+
+### Python (ctypes) での追加設定
+
+```python
+os.add_dll_directory(os.path.abspath(ort_dir))        # onnxruntime/lib/
+os.add_dll_directory(os.path.abspath(c_api_lib_dir))  # c_api/lib/
+lib = ctypes.CDLL(dll_path)
+```
+
+`os.add_dll_directory` で両ディレクトリを登録しないと依存 DLL が解決できずロード失敗する。
+
+### VOICEVOX と Sherpa-ONNX の共存
+
+- VOICEVOX が初期化成功 → 日本語テキストは VOICEVOX (ずんだもん) で発話
+- VOICEVOX が未インストールまたは初期化失敗 → Sherpa-ONNX (Supertonic) にフォールバック
+- 両方なければスレッドを起動しない
+- style_id=3 がずんだもんノーマル
+
+---
+
 ## セットアップスクリプト (setup_tts.ps1) の注意点
 
 - **文字コード**: PowerShell は UTF-8 BOM 必須。編集後は必ず BOM 付きで保存すること:

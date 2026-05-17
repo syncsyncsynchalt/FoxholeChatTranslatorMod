@@ -231,7 +231,7 @@ class VoicevoxEngine:
 
     def installed(self) -> bool:
         return os.path.exists(
-            os.path.join(self._vv_dir(), "c_api", "voicevox_core.dll"))
+            os.path.join(self._vv_dir(), "c_api", "lib", "voicevox_core.dll"))
 
     @property
     def ready(self) -> bool:
@@ -246,12 +246,12 @@ class VoicevoxEngine:
         import glob as _glob
         try:
             vv = self._vv_dir()
-            dll_path = os.path.join(vv, "c_api", "voicevox_core.dll")
+            dll_path = os.path.join(vv, "c_api", "lib", "voicevox_core.dll")
             if not os.path.exists(dll_path):
                 self._error = "voicevox_core.dll なし (setup_tts.ps1 を実行してください)"
                 return
 
-            ort_dir  = os.path.join(vv, "onnxruntime")
+            ort_dir  = os.path.join(vv, "onnxruntime", "lib")
             ort_dlls = _glob.glob(os.path.join(ort_dir, "*.dll"))
             if not ort_dlls:
                 self._error = "voicevox_onnxruntime.dll なし"
@@ -259,7 +259,7 @@ class VoicevoxEngine:
             ort_path = ort_dlls[0]
 
             os.add_dll_directory(os.path.abspath(ort_dir))
-            os.add_dll_directory(os.path.abspath(os.path.join(vv, "c_api")))
+            os.add_dll_directory(os.path.abspath(os.path.join(vv, "c_api", "lib")))
 
             lib = ctypes.CDLL(dll_path)
 
@@ -337,7 +337,7 @@ class VoicevoxEngine:
                 self._error = f"Synthesizer 作成失敗 rc={rc}"
                 return
 
-            vvms_dir = os.path.join(vv, "vvms")
+            vvms_dir = os.path.join(vv, "models", "vvms")
             loaded = 0
             for vvm in _glob.glob(os.path.join(vvms_dir, "*.vvm")):
                 m_ptr = ctypes.c_void_p()
