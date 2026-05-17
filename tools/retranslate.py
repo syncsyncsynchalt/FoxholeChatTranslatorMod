@@ -163,11 +163,11 @@ def protect_terms(text: str) -> tuple[str, list[tuple[str, str]]]:
             deduped.append((start, end, orig))
             last_end = end
 
-    # 後ろから置換
+    # 後ろから置換 ({{T0}} 形式: LLM がテンプレート変数として認識し除去しにくい)
     replacements: list[tuple[str, str]] = []
     result = text
     for start, end, orig in reversed(deduped):
-        ph = f"__T{len(replacements)}__"
+        ph = f"{{{{T{len(replacements)}}}}}"
         replacements.append((ph, orig))
         result = result[:start] + ph + result[end:]
 
@@ -175,9 +175,20 @@ def protect_terms(text: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 def restore_terms(translated: str, replacements: list[tuple[str, str]]) -> str:
-    """翻訳結果中のプレースホルダーを原文に戻す"""
-    for ph, orig in replacements:
-        translated = translated.replace(ph, orig)
+    """翻訳結果中のプレースホルダーを原文に戻す。
+    LLM が外側の {{ }} を除去して Tn だけ残した場合もフォールバックで復元する。"""
+    import re as _re
+    for i, (ph, orig) in enumerate(replacements):
+        # 1st pass: 完全一致 {{Tn}}
+        if ph in translated:
+            translated = translated.replace(ph, orig)
+            continue
+
+        # 2nd pass: Tn のみ残った場合 (単語境界チェック付き)
+        bare = f"T{i}"
+        translated = _re.sub(rf"(?<![A-Za-z0-9]){_re.escape(bare)}(?![A-Za-z0-9])",
+                             orig, translated)
+
     return translated
 
 
@@ -185,15 +196,22 @@ def restore_terms(translated: str, replacements: list[tuple[str, str]]) -> str:
 # Ollama 翻訳
 # ============================================================
 
-def translate(text: str, model: str) -> str:
-    """translate.cpp:DoTranslate と同一ロジックで翻訳する"""
-    protected, replacements = protect_terms(text)
+def _is_single_placeholder(s: str) -> bool:
+    """空白除去後が {{Tn}} 1個だけか判定する"""
+    stripped = s.strip()
+    import re as _re
+    return bool(_re.fullmatch(r"\{\{T\d+\}\}", stripped))
+
+
+def _raw_translate(text: str, model: str) -> str:
+    """text をそのまま Ollama に送り生の翻訳結果を返す (失敗時は空文字)"""
     prompt = (
         f"You are a translator. The user sends a chat message in any language."
         f" Translate it to {TARGET_LANG}."
         f" Output ONLY the translated text, nothing else. No explanations."
         f" If the message is already in {TARGET_LANG}, output it unchanged."
-        f"\n\n{protected}"
+        f" IMPORTANT: Keep all {{{{T0}}}}, {{{{T1}}}}, {{{{T2}}}} etc. tokens exactly as-is in your output."
+        f"\n\n{text}"
     )
     body = json.dumps({
         "model":  model,
@@ -201,19 +219,47 @@ def translate(text: str, model: str) -> str:
         "stream": False,
         "options": {"num_ctx": 256, "temperature": 0.1},
     }).encode()
-
     req = urllib.request.Request(
         OLLAMA_ENDPOINT, data=body,
         headers={"Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read()).get("response", "").strip()
-            return restore_terms(result, replacements)
-    except urllib.error.URLError as e:
-        return f"[ERROR: {e}]"
-    except Exception as e:
-        return f"[ERROR: {e}]"
+            return json.loads(resp.read()).get("response", "").strip()
+    except Exception:
+        return ""
+
+
+def _count_found_terms(result: str, replacements: list[tuple[str, str]]) -> int:
+    lower = result.lower()
+    return sum(1 for _, orig in replacements if orig.lower() in lower)
+
+
+def translate(text: str, model: str) -> str:
+    """translate.cpp:DoTranslate と同一ロジックで翻訳する"""
+    protected, replacements = protect_terms(text)
+
+    # メッセージ全体が1つの保護語だけなら翻訳不要
+    if replacements and _is_single_placeholder(protected):
+        return replacements[0][1]
+
+    # 1st try: プレースホルダー保護あり
+    raw = _raw_translate(protected, model)
+    if not raw:
+        return "[ERROR: Ollama not responding]"
+
+    result = restore_terms(raw, replacements)
+
+    # 保護語の半数以上が訳文から消えていたら保護なしで再翻訳
+    if replacements:
+        found    = _count_found_terms(result, replacements)
+        expected = len(replacements)
+        if found * 2 < expected:
+            fallback = _raw_translate(text, model)
+            if fallback:
+                result = fallback
+
+    return result
 
 
 def check_ollama() -> bool:

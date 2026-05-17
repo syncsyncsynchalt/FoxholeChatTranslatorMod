@@ -1,6 +1,6 @@
 // ============================================================
 // translate.cpp - Ollama 翻訳モジュール実装
-// WinHTTP で Ollama REST API (localhost) にリクエストを送信し、
+// WinHTTP で Ollama REST API にリクエストを送信し、
 // バックグラウンドスレッドで非同期翻訳を行う
 // ============================================================
 
@@ -30,18 +30,16 @@
 // 内部状態
 // ============================================================
 
-static HINTERNET    g_hSession   = nullptr;
-static std::wstring g_host;
+static HINTERNET     g_hSession  = nullptr;
+static std::wstring  g_host;
 static INTERNET_PORT g_port      = 11434;
-static std::wstring g_path;
-static std::string  g_model;
-static std::string  g_targetLang;
-static std::string  g_ollamaDir;       // 同梱 ollama.exe のディレクトリ
-static HANDLE       g_ollamaProcess = nullptr; // 自前起動した ollama serve プロセス
-static int          g_numCtx       = 256;
-static int          g_numThread    = 2;
-static float        g_temperature  = 0.1f;
-static int          g_numPredict   = 120;
+static std::wstring  g_path;
+static std::string   g_model;
+static std::string   g_targetLang;
+static int           g_numCtx    = 256;
+static int           g_numThread = 2;
+static float         g_temperature = 0.1f;
+static int           g_numPredict  = 120;
 
 // ワーカースレッド
 struct QueueItem {
@@ -50,15 +48,14 @@ struct QueueItem {
     std::string message;
 };
 
-static std::thread              g_thread;
-static std::mutex               g_mutex;
-static std::condition_variable  g_cv;
-static std::queue<QueueItem>    g_queue;
-static bool                     g_running = false;
+static std::thread             g_thread;
+static std::mutex              g_mutex;
+static std::condition_variable g_cv;
+static std::queue<QueueItem>   g_queue;
+static bool                    g_running = false;
 
 static constexpr size_t MAX_QUEUE_SIZE = 32;
 
-// 翻訳完了コールバック
 static translate::ResultCallback g_resultCallback;
 
 // ============================================================
@@ -90,8 +87,6 @@ static bool ParseUrl(const std::string& url) {
     return true;
 }
 
-
-// エラー文字列を日本語メッセージに変換
 static std::string ClassifyError(const std::string& errMsg) {
     if (errMsg.find("memory") != std::string::npos ||
         errMsg.find("Memory") != std::string::npos) {
@@ -104,7 +99,7 @@ static std::string ClassifyError(const std::string& errMsg) {
 }
 
 // ============================================================
-// HTTP POST (WinHTTP)
+// HTTP 共通処理 (WinHTTP)
 // ============================================================
 
 static const char* WinHttpErrorName(DWORD err) {
@@ -137,7 +132,6 @@ static std::string HttpPost(const std::string& body) {
         return "";
     }
 
-    // タイムアウト: resolve 3s, connect 3s, send 5s, receive 10s
     WinHttpSetTimeouts(hRequest, 3000, 3000, 5000, 10000);
 
     const wchar_t* headers = L"Content-Type: application/json";
@@ -147,7 +141,7 @@ static std::string HttpPost(const std::string& body) {
         DWORD err = GetLastError();
         WinHttpCloseHandle(hRequest);
         WinHttpCloseHandle(hConnect);
-        logging::Debug("[Translate] WinHttpSendRequest 失敗: %u (%s, Ollama未起動?)", err, WinHttpErrorName(err));
+        logging::Debug("[Translate] WinHttpSendRequest 失敗: %u (%s)", err, WinHttpErrorName(err));
         return "";
     }
 
@@ -181,14 +175,23 @@ static std::string HttpPost(const std::string& body) {
 // 固有名詞プレースホルダー保護
 // ============================================================
 
-// placeholder → 原文 のペアリスト
 using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
 
 static std::vector<std::regex> g_termRegexes;
 
-// term_protection.txt を読み込んで正規表現リストを構築する。
-// 書式: "pattern [i]"  (#始まりと空行は無視)
-// \b は自動付与するが、パターン側に既に \b がある場合はそのまま使う。
+static std::string GetDllBaseDir() {
+    char dllPath[MAX_PATH];
+    HMODULE hSelf;
+    GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        reinterpret_cast<LPCSTR>(&GetDllBaseDir), &hSelf);
+    GetModuleFileNameA(hSelf, dllPath, MAX_PATH);
+    std::string dir(dllPath);
+    size_t pos = dir.rfind('\\');
+    if (pos != std::string::npos) dir = dir.substr(0, pos + 1);
+    return dir;
+}
+
 static void InitTermRegexes(const std::string& baseDir) {
     std::string path = baseDir + "term_protection.txt";
     FILE* f = fopen(path.c_str(), "r");
@@ -200,7 +203,6 @@ static void InitTermRegexes(const std::string& baseDir) {
     char line[512];
     int count = 0;
     while (fgets(line, sizeof(line), f)) {
-        // 末尾の空白・改行を除去
         int len = static_cast<int>(strlen(line));
         while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'
                            || line[len-1] == ' ' || line[len-1] == '\t'))
@@ -208,14 +210,12 @@ static void InitTermRegexes(const std::string& baseDir) {
 
         if (len == 0 || line[0] == '#') continue;
 
-        // 末尾に " i" があれば case-insensitive フラグ
         bool icase = false;
         if (len >= 2 && line[len-1] == 'i' && line[len-2] == ' ') {
             line[len-2] = '\0';
             icase = true;
         }
 
-        // パターンに \b が含まれていなければ自動付与
         std::string pat(line);
         std::string fullPat = (pat.find("\\b") == std::string::npos)
             ? ("\\b" + pat + "\\b")
@@ -234,8 +234,6 @@ static void InitTermRegexes(const std::string& baseDir) {
     logging::Debug("[Translate] term_protection.txt: %d 件読み込み (%s)", count, path.c_str());
 }
 
-// テキスト中の保護対象語をプレースホルダーに置き換えて返す。
-// out にプレースホルダー→原文のマッピングを格納する。
 static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
     out.clear();
     if (g_termRegexes.empty()) return text;
@@ -256,7 +254,6 @@ static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
     }
     if (spans.empty()) return text;
 
-    // 開始位置でソートし、重複するスパンを除去 (先着優先)
     std::sort(spans.begin(), spans.end(),
         [](const MatchSpan& a, const MatchSpan& b) { return a.start < b.start; });
     std::vector<MatchSpan> deduped;
@@ -268,26 +265,45 @@ static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
         }
     }
 
-    // 後ろから置換するとインデックスがずれない
     std::reverse(deduped.begin(), deduped.end());
     std::string result = text;
     for (const auto& s : deduped) {
-        std::string ph = "__T" + std::to_string(out.size()) + "__";
+        // {{T0}} 形式: LLM がテンプレート変数として認識し除去しにくい
+        std::string ph = "{{T" + std::to_string(out.size()) + "}}";
         out.emplace_back(ph, s.original);
         result.replace(s.start, s.end - s.start, ph);
     }
     return result;
 }
 
-// 翻訳結果中のプレースホルダーを原文に戻す。
 static std::string RestoreTerms(std::string translated, const ReplacementMap& replacements) {
-    for (const auto& kv : replacements) {
-        const std::string& ph  = kv.first;
-        const std::string& orig = kv.second;
+    for (size_t i = 0; i < replacements.size(); ++i) {
+        const std::string& ph   = replacements[i].first;   // {{Tn}}
+        const std::string& orig = replacements[i].second;
+
+        // 1st pass: 完全一致
         size_t pos = 0;
+        bool found = false;
         while ((pos = translated.find(ph, pos)) != std::string::npos) {
             translated.replace(pos, ph.size(), orig);
             pos += orig.size();
+            found = true;
+        }
+        if (found) continue;
+
+        // 2nd pass: LLM が外側の {{ }} を除去して Tn だけ残した場合のフォールバック
+        std::string bare = "T" + std::to_string(i);
+        pos = 0;
+        while ((pos = translated.find(bare, pos)) != std::string::npos) {
+            // 単語境界チェック: 前後が英数字でなければ置換
+            bool prevOk = (pos == 0)                       || !isalnum((unsigned char)translated[pos - 1]);
+            bool nextOk = (pos + bare.size() >= translated.size()) || !isalnum((unsigned char)translated[pos + bare.size()]);
+            if (prevOk && nextOk) {
+                translated.replace(pos, bare.size(), orig);
+                pos += orig.size();
+            } else {
+                pos++;
+            }
         }
     }
     return translated;
@@ -303,6 +319,7 @@ static std::string BuildRequestBody(const std::string& text) {
         " Translate it to " + g_targetLang + "."
         " Output ONLY the translated text, nothing else. No explanations."
         " If the message is already in " + g_targetLang + ", output it unchanged."
+        " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output."
         "\n\n" + text;
 
     nlohmann::json opts;
@@ -320,40 +337,86 @@ static std::string BuildRequestBody(const std::string& text) {
     }.dump();
 }
 
-static std::string DoTranslate(const std::string& text) {
-    ReplacementMap replacements;
-    std::string protected_text = ProtectTerms(text, replacements);
-    std::string body = BuildRequestBody(protected_text);
+// 空白を除いた文字列が単一プレースホルダー {{T0}} だけか判定する
+static bool IsSinglePlaceholder(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size() && s[i] == ' ') i++;
+    if (i + 6 > s.size() || s.substr(i, 2) != "{{") return false;
+    size_t end = s.find("}}", i + 2);
+    if (end == std::string::npos) return false;
+    end += 2;
+    while (end < s.size() && s[end] == ' ') end++;
+    return end == s.size();
+}
+
+// text を Ollama に送り、生の翻訳文字列を返す (エラー時は空文字列)
+static std::string RawTranslate(const std::string& text) {
+    std::string body     = BuildRequestBody(text);
     std::string response = HttpPost(body);
     if (response.empty()) {
         logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
-        return u8"(接続失敗: Ollamaが起動していません)";
+        return "";
     }
-
     logging::Debug("[Translate] レスポンス (先頭200): %s", response.substr(0, 200).c_str());
-
-    auto j = nlohmann::json::parse(response, nullptr, /*allow_exceptions=*/false);
+    auto j = nlohmann::json::parse(response, nullptr, false);
     if (j.is_discarded()) {
         logging::Debug("[Translate] レスポンス解析失敗 (JSONパースエラー)");
-        return u8"(解析失敗)";
+        return "";
     }
-
-    if (j.contains("response") && j["response"].is_string()) {
-        std::string result = j["response"].get<std::string>();
-        return RestoreTerms(result, replacements);
-    }
-
+    if (j.contains("response") && j["response"].is_string())
+        return j["response"].get<std::string>();
     if (j.contains("error") && j["error"].is_string()) {
-        std::string errMsg = j["error"].get<std::string>();
-        logging::Debug("[Translate] Ollamaエラー: %s", errMsg.c_str());
-        return ClassifyError(errMsg);
+        logging::Debug("[Translate] Ollamaエラー: %s", j["error"].get<std::string>().c_str());
     }
-
-    logging::Debug("[Translate] レスポンス解析失敗 (未知のフォーマット)");
-    return u8"(解析失敗)";
+    return "";
 }
 
-// 末尾の空白・改行を除去
+// result に replacements の原語が何件含まれているかを返す (大文字小文字無視)
+static int CountFoundTerms(const std::string& result, const ReplacementMap& replacements) {
+    std::string lower = result;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    int found = 0;
+    for (const auto& kv : replacements) {
+        std::string origLower = kv.second;
+        std::transform(origLower.begin(), origLower.end(), origLower.begin(), ::tolower);
+        if (lower.find(origLower) != std::string::npos) found++;
+    }
+    return found;
+}
+
+static std::string DoTranslate(const std::string& text) {
+    ReplacementMap replacements;
+    std::string protected_text = ProtectTerms(text, replacements);
+
+    // メッセージ全体が1つの保護語だけなら翻訳不要 (LLM が無意味な訳を返すのを防ぐ)
+    if (!replacements.empty() && IsSinglePlaceholder(protected_text)) {
+        return replacements[0].second;
+    }
+
+    // 1st try: プレースホルダー保護あり
+    std::string raw = RawTranslate(protected_text);
+    if (raw.empty())
+        return u8"(接続失敗: Ollamaが起動していません)";
+
+    std::string result = RestoreTerms(raw, replacements);
+
+    // 保護語の半数以上が訳文から消えていたら保護なしで再翻訳
+    if (!replacements.empty()) {
+        int found    = CountFoundTerms(result, replacements);
+        int expected = static_cast<int>(replacements.size());
+        if (found * 2 < expected) {
+            logging::Debug("[Translate] 保護語失落 (%d/%d) - 保護なしで再翻訳", found, expected);
+            std::string fallback = RawTranslate(text);
+            if (!fallback.empty()) result = fallback;
+        }
+    }
+
+    if (result.empty()) {
+        return u8"(解析失敗)";
+    }
+    return result;
+}
+
 static void TrimTrailing(std::string& s) {
     while (!s.empty()) {
         char c = s.back();
@@ -402,107 +465,11 @@ static void WorkerThread() {
 }
 
 // ============================================================
-// Ollama プロセス管理
+// モデル管理 (ollama.cpp から呼ばれる)
 // ============================================================
 
-// DLL のベースディレクトリを取得
-static std::string GetDllBaseDir() {
-    char dllPath[MAX_PATH];
-    HMODULE hSelf;
-    GetModuleHandleExA(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        reinterpret_cast<LPCSTR>(&GetDllBaseDir), &hSelf);
-    GetModuleFileNameA(hSelf, dllPath, MAX_PATH);
-    std::string dir(dllPath);
-    size_t pos = dir.rfind('\\');
-    if (pos != std::string::npos) dir = dir.substr(0, pos + 1);
-    return dir;
-}
-
-// Ollama API に疎通確認 (GET /api/version)
-static bool IsOllamaReachable() {
-    if (!g_hSession) return false;
-    HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
-    if (!hConnect) return false;
-    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", L"/api/version",
-        nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
-    if (!hRequest) { WinHttpCloseHandle(hConnect); return false; }
-    WinHttpSetTimeouts(hRequest, 3000, 3000, 3000, 3000);
-    BOOL ok = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
-    if (ok) ok = WinHttpReceiveResponse(hRequest, nullptr);
-    WinHttpCloseHandle(hRequest);
-    WinHttpCloseHandle(hConnect);
-    return ok != FALSE;
-}
-
-// 同梱 ollama.exe のパスを探す
-static std::string FindBundledOllama() {
-    if (!g_ollamaDir.empty()) {
-        std::string exe = g_ollamaDir + "\\ollama.exe";
-        if (GetFileAttributesA(exe.c_str()) != INVALID_FILE_ATTRIBUTES) return exe;
-    }
-    // DLL ディレクトリからの相対パスで探す
-    std::string baseDir = GetDllBaseDir();
-    // カレントディレクトリ
-    char cwd[MAX_PATH];
-    GetCurrentDirectoryA(MAX_PATH, cwd);
-    std::string cwdStr = cwd;
-    if (!cwdStr.empty() && cwdStr.back() != '\\') cwdStr += '\\';
-
-    std::string candidates[] = {
-        baseDir + "tools\\ollama\\ollama.exe",
-        baseDir + "..\\..\\Mods\\ChatTranslator\\tools\\ollama\\ollama.exe",
-        cwdStr + "tools\\ollama\\ollama.exe",
-    };
-    for (auto& path : candidates) {
-        if (GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES) return path;
-    }
-    return "";
-}
-
-// ollama serve をバックグラウンドで起動
-static bool StartOllamaServe(const std::string& exePath) {
-    // OLLAMA_MODELS を同梱ディレクトリ内の models/ に設定
-    std::string dir = exePath;
-    size_t pos = dir.rfind('\\');
-    if (pos != std::string::npos) dir = dir.substr(0, pos);
-    std::string modelsDir = dir + "\\models";
-    CreateDirectoryA(modelsDir.c_str(), nullptr);
-    SetEnvironmentVariableA("OLLAMA_MODELS", modelsDir.c_str());
-
-    STARTUPINFOA si = {};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-
-    PROCESS_INFORMATION pi = {};
-    std::string cmdLine = "\"" + exePath + "\" serve";
-
-    if (!CreateProcessA(nullptr, &cmdLine[0], nullptr, nullptr, FALSE,
-            CREATE_NO_WINDOW, nullptr, dir.c_str(), &si, &pi)) {
-        logging::Debug("[Translate] ollama serve 起動失敗: %u", GetLastError());
-        return false;
-    }
-
-    CloseHandle(pi.hThread);
-    g_ollamaProcess = pi.hProcess;
-    logging::Debug("[Translate] ollama serve 起動 (PID=%u, exe=%s)", pi.dwProcessId, exePath.c_str());
-    logging::Debug("[Translate] OLLAMA_MODELS=%s", modelsDir.c_str());
-
-    // サーバー起動を待機 (最大30秒)
-    for (int i = 0; i < 60; i++) {
-        Sleep(500);
-        if (IsOllamaReachable()) {
-            logging::Debug("[Translate] ollama serve 応答確認 (%d ms)", (i + 1) * 500);
-            return true;
-        }
-    }
-    logging::Debug("[Translate] ollama serve 応答タイムアウト (30秒)");
-    return false;
-}
-
-// モデルが利用可能か確認 (POST /api/show)
 static bool IsModelAvailable() {
+    if (!g_hSession) return false;
     std::string body = nlohmann::json{{"name", g_model}}.dump();
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) return false;
@@ -523,9 +490,9 @@ static bool IsModelAvailable() {
     return statusCode == 200;
 }
 
-// モデルを pull (POST /api/pull, stream=false)
 static bool PullModel() {
     logging::Debug("[Translate] モデル '%s' をダウンロード中...", g_model.c_str());
+    if (!g_hSession) return false;
     std::string body = nlohmann::json{{"name", g_model}, {"stream", false}}.dump();
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) return false;
@@ -542,7 +509,6 @@ static bool PullModel() {
     DWORD size = sizeof(statusCode);
     if (ok) WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
         WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &size, WINHTTP_NO_HEADER_INDEX);
-    // レスポンスボディを読み捨て (コネクション解放のため)
     if (ok) {
         DWORD avail = 0, read = 0;
         do {
@@ -559,22 +525,6 @@ static bool PullModel() {
     }
     logging::Debug("[Translate] モデル pull 失敗 (HTTP %u)", statusCode);
     return false;
-}
-
-// Ollama の確保: 疎通確認 → 未起動なら同梱版を起動 → モデル確認 → 未DLなら pull
-static bool EnsureOllama() {
-    if (!IsOllamaReachable()) {
-        std::string exe = FindBundledOllama();
-        if (exe.empty()) {
-            logging::Debug("[Translate] Ollama 未起動かつ同梱バイナリ未検出");
-            return false;
-        }
-        if (!StartOllamaServe(exe)) return false;
-    }
-    if (!IsModelAvailable()) {
-        if (!PullModel()) return false;
-    }
-    return true;
 }
 
 // ============================================================
@@ -613,7 +563,6 @@ bool translate::Init(const TranslateConfig& cfg) {
         return false;
     }
     g_targetLang = cfg.targetLang;
-    g_ollamaDir  = cfg.ollamaDir;
 
     ApplyPreset(cfg.performancePreset);
 
@@ -623,12 +572,6 @@ bool translate::Init(const TranslateConfig& cfg) {
     if (!g_hSession) {
         logging::Debug("[Translate] WinHttpOpen 失敗: %u", GetLastError());
         return false;
-    }
-
-    // Ollama 自動起動 + モデル確認/DL
-    if (!EnsureOllama()) {
-        logging::Debug("[Translate] Ollama 準備失敗 - 翻訳は利用不可");
-        // セッションは維持 (後でリトライ可能)
     }
 
     g_running = true;
@@ -650,15 +593,6 @@ void translate::Shutdown() {
     if (g_hSession) {
         WinHttpCloseHandle(g_hSession);
         g_hSession = nullptr;
-    }
-
-    // 自前起動した ollama プロセスを終了
-    if (g_ollamaProcess) {
-        TerminateProcess(g_ollamaProcess, 0);
-        WaitForSingleObject(g_ollamaProcess, 5000);
-        CloseHandle(g_ollamaProcess);
-        g_ollamaProcess = nullptr;
-        logging::Debug("[Translate] ollama プロセス終了");
     }
 
     logging::Debug("[Translate] シャットダウン完了");
@@ -685,27 +619,26 @@ void translate::Queue(const std::string& channel, const std::string& sender, con
 }
 
 bool translate::IsHealthy() {
-    return IsOllamaReachable();
+    if (!g_hSession) return false;
+    HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
+    if (!hConnect) return false;
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", L"/api/version",
+        nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
+    if (!hRequest) { WinHttpCloseHandle(hConnect); return false; }
+    WinHttpSetTimeouts(hRequest, 3000, 3000, 3000, 3000);
+    BOOL ok = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+        WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
+    if (ok) ok = WinHttpReceiveResponse(hRequest, nullptr);
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    return ok != FALSE;
 }
 
-bool translate::Restart() {
-    logging::Debug("[Translate] Ollama 再起動試行...");
-    return EnsureOllama();
+bool translate::EnsureModel() {
+    if (IsModelAvailable()) return true;
+    return PullModel();
 }
 
 void translate::DetachThread() {
-    // DLL_PROCESS_DETACH (プロセス終了) 専用: ~std::thread が std::terminate を呼ばないよう detach する
     if (g_thread.joinable()) g_thread.detach();
-}
-
-void translate::KillOllama() {
-    // ミューテックス・ログ不使用: DLL_PROCESS_DETACH (プロセス終了) 専用
-    // スレッドが std::mutex を保持したままkillされている可能性があるため
-    HANDLE h = g_ollamaProcess;
-    if (h) {
-        TerminateProcess(h, 0);
-        WaitForSingleObject(h, 1000);
-        CloseHandle(h);
-        g_ollamaProcess = nullptr;
-    }
 }
