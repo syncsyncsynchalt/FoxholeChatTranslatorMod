@@ -22,7 +22,7 @@
 #include <vector>
 
 // ============================================================
-// Sherpa-ONNX C API 構造体 (v1.10.x ABI 互換)
+// Sherpa-ONNX C API 構造体 (v1.13.x ABI)
 // ============================================================
 
 struct SherpaOnnxOfflineTtsVitsModelConfig {
@@ -36,11 +36,81 @@ struct SherpaOnnxOfflineTtsVitsModelConfig {
     const char* dict_dir;
 };
 
+struct SherpaOnnxOfflineTtsMatchaModelConfig {
+    const char* acoustic_model;
+    const char* vocoder;
+    const char* lexicon;
+    const char* tokens;
+    const char* data_dir;
+    float       noise_scale;
+    float       length_scale;
+    const char* dict_dir;
+};
+
+struct SherpaOnnxOfflineTtsKokoroModelConfig {
+    const char* model;
+    const char* voices;
+    const char* tokens;
+    const char* data_dir;
+    float       length_scale;
+    const char* dict_dir;
+    const char* lexicon;
+    const char* lang;
+};
+
+struct SherpaOnnxOfflineTtsKittenModelConfig {
+    const char* model;
+    const char* voices;
+    const char* tokens;
+    const char* data_dir;
+    float       length_scale;
+};
+
+struct SherpaOnnxOfflineTtsZipvoiceModelConfig {
+    const char* tokens;
+    const char* encoder;
+    const char* decoder;
+    const char* vocoder;
+    const char* data_dir;
+    const char* lexicon;
+    float       feat_scale;
+    float       t_shift;
+    float       target_rms;
+    float       guidance_scale;
+};
+
+struct SherpaOnnxOfflineTtsPocketModelConfig {
+    const char* lm_flow;
+    const char* lm_main;
+    const char* encoder;
+    const char* decoder;
+    const char* text_conditioner;
+    const char* vocab_json;
+    const char* token_scores_json;
+    int32_t     voice_embedding_cache_capacity;
+};
+
+struct SherpaOnnxOfflineTtsSupertonicModelConfig {
+    const char* duration_predictor;
+    const char* text_encoder;
+    const char* vector_estimator;
+    const char* vocoder;
+    const char* tts_json;
+    const char* unicode_indexer;
+    const char* voice_style;
+};
+
 struct SherpaOnnxOfflineTtsModelConfig {
-    SherpaOnnxOfflineTtsVitsModelConfig vits;
-    int32_t     num_threads;
-    int32_t     debug;
-    const char* provider;
+    SherpaOnnxOfflineTtsVitsModelConfig       vits;
+    int32_t                                   num_threads;
+    int32_t                                   debug;
+    const char*                               provider;
+    SherpaOnnxOfflineTtsMatchaModelConfig     matcha;
+    SherpaOnnxOfflineTtsKokoroModelConfig     kokoro;
+    SherpaOnnxOfflineTtsKittenModelConfig     kitten;
+    SherpaOnnxOfflineTtsZipvoiceModelConfig   zipvoice;
+    SherpaOnnxOfflineTtsPocketModelConfig     pocket;
+    SherpaOnnxOfflineTtsSupertonicModelConfig supertonic;
 };
 
 struct SherpaOnnxOfflineTtsConfig {
@@ -48,11 +118,12 @@ struct SherpaOnnxOfflineTtsConfig {
     const char* rule_fsts;
     int32_t     max_num_sentences;
     const char* rule_fars;
+    float       silence_scale;
 };
 
 struct SherpaOnnxGeneratedAudio {
     const float* samples;
-    int32_t      num_samples;
+    int32_t      n;           // v1.13.x では 'n' (旧 num_samples)
     int32_t      sample_rate;
 };
 
@@ -203,13 +274,18 @@ static PFN_Generate    g_fnGenerate = nullptr;
 static PFN_DestroyAudio g_fnFreeAudio = nullptr;
 
 static bool LoadSherpaLib(const std::string& ttsDir) {
-    std::string dllPath = ttsDir + "sherpa-onnx.dll";
-
-    // DLL とその依存 (onnxruntime.dll 等) を同じディレクトリから探す
-    g_sherpaLib = LoadLibraryExA(dllPath.c_str(), nullptr,
-        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    // パッケージによって sherpa-onnx.dll か sherpa-onnx-c-api.dll の場合がある
+    const char* candidates[] = { "sherpa-onnx.dll", "sherpa-onnx-c-api.dll" };
+    std::string dllPath;
+    for (auto* name : candidates) {
+        dllPath = ttsDir + name;
+        g_sherpaLib = LoadLibraryExA(dllPath.c_str(), nullptr,
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        if (g_sherpaLib) break;
+        logging::Debug("[TTS] %s ロード失敗 (err=%lu)", name, GetLastError());
+    }
     if (!g_sherpaLib) {
-        logging::Debug("[TTS] sherpa-onnx.dll ロード失敗: %s (err=%lu)", dllPath.c_str(), GetLastError());
+        logging::Debug("[TTS] sherpa-onnx DLL が見つかりません: %s", ttsDir.c_str());
         return false;
     }
 
@@ -253,22 +329,61 @@ static const char* LangSubdir(Lang lang) {
     return "en";
 }
 
+static SherpaOnnxOfflineTts* CreateSupertonicModel(const std::string& modelDir) {
+    std::string dp  = modelDir + "duration_predictor.int8.onnx";
+    std::string te  = modelDir + "text_encoder.int8.onnx";
+    std::string ve  = modelDir + "vector_estimator.int8.onnx";
+    std::string voc = modelDir + "vocoder.int8.onnx";
+    std::string jsn = modelDir + "tts.json";
+    std::string ui  = modelDir + "unicode_indexer.bin";
+    std::string vs  = modelDir + "voice.bin";
+
+    SherpaOnnxOfflineTtsConfig cfg = {};
+    cfg.model.supertonic.duration_predictor = dp.c_str();
+    cfg.model.supertonic.text_encoder       = te.c_str();
+    cfg.model.supertonic.vector_estimator   = ve.c_str();
+    cfg.model.supertonic.vocoder            = voc.c_str();
+    cfg.model.supertonic.tts_json           = jsn.c_str();
+    cfg.model.supertonic.unicode_indexer    = ui.c_str();
+    cfg.model.supertonic.voice_style        = vs.c_str();
+    cfg.model.num_threads   = 2;
+    cfg.model.debug         = 0;
+    cfg.model.provider      = "cpu";
+    cfg.max_num_sentences   = 1;
+
+    SherpaOnnxOfflineTts* handle = g_fnCreate(&cfg);
+    if (!handle)
+        logging::Debug("[TTS] Supertonic モデル作成失敗: %s", modelDir.c_str());
+    else
+        logging::Debug("[TTS] Supertonic モデル作成完了: %s", modelDir.c_str());
+    return handle;
+}
+
 static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     std::string modelDir  = g_ttsDir + "models\\" + LangSubdir(lang) + "\\";
-    std::string modelPath = modelDir + "model.onnx";
+
+    // Supertonic モデルを優先確認 (duration_predictor.int8.onnx の有無で判定)
+    std::string dpPath = modelDir + "duration_predictor.int8.onnx";
+    if (GetFileAttributesA(dpPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        return CreateSupertonicModel(modelDir);
+
+    // VITS (Piper / mimic3) モデル
+    std::string modelPath  = modelDir + "model.onnx";
     std::string tokensPath = modelDir + "tokens.txt";
-    std::string espeakDir = g_ttsDir + "espeak-ng-data";
+    std::string espeakDir  = g_ttsDir + "espeak-ng-data";
 
     if (GetFileAttributesA(modelPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
         logging::Debug("[TTS] モデルなし: %s", modelPath.c_str());
         return nullptr;
     }
 
-    // 文字列をローカル変数で保持 (CreateOfflineTts が内部でコピーする)
     std::string lexiconPath;
     std::string dictDir;
 
-    // Chinese: jieba 辞書があれば指定
+    std::string lexiconFile = modelDir + "lexicon.txt";
+    if (GetFileAttributesA(lexiconFile.c_str()) != INVALID_FILE_ATTRIBUTES)
+        lexiconPath = lexiconFile;
+
     if (lang == Lang::ZH) {
         std::string jiebaDir = modelDir + "dict";
         if (GetFileAttributesA(jiebaDir.c_str()) != INVALID_FILE_ATTRIBUTES)
@@ -383,7 +498,7 @@ static void TtsWorker() {
 
         // 音声合成: speed=1.0 は標準速度
         const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, req.text.c_str(), 0, g_speakingRate);
-        if (!audio || audio->num_samples <= 0) {
+        if (!audio || audio->n <= 0) {
             if (audio) g_fnFreeAudio(audio);
             logging::Debug("[TTS] 合成失敗またはサンプルなし");
             continue;
@@ -396,7 +511,7 @@ static void TtsWorker() {
 
         // float32 PCM [-1,1] → int16
         int sampleRate  = audio->sample_rate;
-        int numSamples  = audio->num_samples;
+        int numSamples  = audio->n;
         std::vector<int16_t> pcm16(numSamples);
         for (int i = 0; i < numSamples; i++) {
             float v = audio->samples[i];

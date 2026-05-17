@@ -830,6 +830,19 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
 
     case DLL_PROCESS_DETACH:
         if (g_loaderLogFile) { fclose(g_loaderLogFile); g_loaderLogFile = nullptr; }
+        if (lpReserved != nullptr) {
+            // プロセス終了: 全スレッドは既に強制終了済み
+            // std::mutex (SRWLOCK) が放棄状態になっている可能性があるため
+            // ミューテックスを取得するコード (UnloadWorker/ログ等) は呼べない
+            // Ollama だけはプロセス終了後も生き残るので直接終了させる
+            if (g_hWorker) {
+                typedef void (*PFN_KillChildren)();
+                auto killFn = reinterpret_cast<PFN_KillChildren>(
+                    GetProcAddress(g_hWorker, "WorkerKillChildProcesses"));
+                if (killFn) killFn();
+            }
+            break;
+        }
         UnloadWorker();
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();

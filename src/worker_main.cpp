@@ -45,6 +45,11 @@ __declspec(dllexport) void WorkerShutdown() {
     hooks::Shutdown();
 }
 
+__declspec(dllexport) void WorkerKillChildProcesses() {
+    // DLL_PROCESS_DETACH (プロセス終了) 専用: ミューテックス・ログ不使用
+    translate::KillOllama();
+}
+
 __declspec(dllexport) void WorkerSetPEAddress(uintptr_t addr) {
     hooks::SetHookedPEAddress(addr);
 }

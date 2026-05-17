@@ -46,4 +46,7 @@ bool IsHealthy();
 // Ollama 再起動 (EnsureOllama 再実行)
 bool Restart();
 
+// Ollama プロセスを即時終了 (DLL_PROCESS_DETACH 緊急用 - ミューテックス/ログ不使用)
+void KillOllama();
+
 } // namespace translate

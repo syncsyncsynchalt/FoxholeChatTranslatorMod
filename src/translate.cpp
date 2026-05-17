@@ -568,3 +568,15 @@ bool translate::Restart() {
     logging::Debug("[Translate] Ollama 再起動試行...");
     return EnsureOllama();
 }
+
+void translate::KillOllama() {
+    // ミューテックス・ログ不使用: DLL_PROCESS_DETACH (プロセス終了) 専用
+    // スレッドが std::mutex を保持したままkillされている可能性があるため
+    HANDLE h = g_ollamaProcess;
+    if (h) {
+        TerminateProcess(h, 0);
+        WaitForSingleObject(h, 1000);
+        CloseHandle(h);
+        g_ollamaProcess = nullptr;
+    }
+}
