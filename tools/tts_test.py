@@ -690,12 +690,14 @@ class App:
             if lang == "ja" and self.vv_engine.ready:
                 lbl.config(text="OK (VOICEVOX)", foreground="#007700")
                 installed.append(lang)
-            elif lang == "ja" and self.vv_engine.installed():
-                lbl.config(text="インストール済 (初期化中)", foreground="#888800")
-                installed.append(lang)
             elif self.engine.model_installed(lang):
-                lbl.config(text="OK", foreground="#007700")
+                if lang == "ja" and self.vv_engine.installed():
+                    lbl.config(text="OK (Sherpa) ※VV初期化失敗", foreground="#888800")
+                else:
+                    lbl.config(text="OK", foreground="#007700")
                 installed.append(lang)
+            elif lang == "ja" and self.vv_engine.installed():
+                lbl.config(text="初期化失敗", foreground="#cc0000")
             else:
                 lbl.config(text="未インストール", foreground="#999999")
 
@@ -808,13 +810,6 @@ class App:
     # ----------------------------------------------------------
 
     def _speak(self):
-        if not self.engine.available:
-            import sys
-            self.status_var.set(
-                f"sherpa-onnx 未インストール — "
-                f'"{sys.executable}" -m pip install sherpa-onnx')
-            return
-
         text = self.text_box.get("1.0", tk.END).strip()
         if not text:
             self.status_var.set("テキストを入力してください")
@@ -827,6 +822,7 @@ class App:
         radio_on = self.cfg.get("tts_radio_effect", True)
 
         # VOICEVOX (日本語) — C++ 同様に Sherpa より優先
+        # sherpa-onnx 未インストールでも VOICEVOX があれば動作する
         if lang == "ja" and self.vv_engine.ready:
             self._stop_flag.clear()
             self.speak_btn.config(state=tk.DISABLED)
@@ -871,6 +867,13 @@ class App:
             return
 
         # Sherpa-ONNX パス (C++ 同様: モデルなし → EN フォールバック)
+        if not self.engine.available:
+            import sys
+            self.status_var.set(
+                f"sherpa-onnx 未インストール — "
+                f'"{sys.executable}" -m pip install sherpa-onnx')
+            return
+
         if not self.engine.model_installed(lang):
             if lang != "en" and self.engine.model_installed("en"):
                 self.status_var.set(f"[{lang}] モデルなし → EN フォールバック")
