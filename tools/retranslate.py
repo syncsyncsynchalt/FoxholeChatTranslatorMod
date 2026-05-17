@@ -102,17 +102,97 @@ def parse_chat_log(path: Path) -> list[dict]:
     return entries
 
 # ============================================================
+# 固有名詞プレースホルダー保護 (translate.cpp と同一ロジック)
+# ============================================================
+
+# (pattern, flags) のリスト。icase=True で re.IGNORECASE を付ける。
+_TERM_PATTERNS: list[tuple[re.Pattern, bool]] = []
+
+def _init_term_patterns() -> None:
+    entries = [
+        # ファクション名
+        (r"\bWardens?\b",          True),
+        (r"\bColonials?\b",        True),
+        (r"\bCollies?\b",          True),
+        # 素材略語
+        (r"\bbmat\b",              True),
+        (r"\bcmat\b",              True),
+        (r"\brmat\b",              True),
+        (r"\bemat\b",              True),
+        (r"\bsmat\b",              True),
+        # 軍事略語
+        (r"\bQRF\b",               False),
+        (r"\bSPG\b",               False),
+        (r"\bGB\b",                False),
+        (r"\bAA\b",                False),
+        (r"\bBTs?\b",              False),
+        # ゲーム内略語
+        (r"\blogi\b",              True),
+        (r"\binf\b",               True),
+        (r"\bmsups?\b",            True),
+        (r"\bbsups?\b",            True),
+        # 施設名
+        (r"\bstockpile\b",         True),
+        (r"\bseaport\b",           True),
+        (r"\bgarrison\b",          True),
+    ]
+    for pat, icase in entries:
+        flags = re.IGNORECASE if icase else 0
+        _TERM_PATTERNS.append((re.compile(pat, flags), icase))
+
+_init_term_patterns()
+
+
+def protect_terms(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """保護対象語をプレースホルダーに置き換えて (変換後テキスト, マッピング) を返す"""
+    spans: list[tuple[int, int, str]] = []  # (start, end, original)
+    for pat, _ in _TERM_PATTERNS:
+        for m in pat.finditer(text):
+            spans.append((m.start(), m.end(), m.group()))
+
+    if not spans:
+        return text, []
+
+    # 開始位置でソートし重複を除去 (先着優先)
+    spans.sort(key=lambda s: s[0])
+    deduped: list[tuple[int, int, str]] = []
+    last_end = 0
+    for start, end, orig in spans:
+        if start >= last_end:
+            deduped.append((start, end, orig))
+            last_end = end
+
+    # 後ろから置換
+    replacements: list[tuple[str, str]] = []
+    result = text
+    for start, end, orig in reversed(deduped):
+        ph = f"__T{len(replacements)}__"
+        replacements.append((ph, orig))
+        result = result[:start] + ph + result[end:]
+
+    return result, replacements
+
+
+def restore_terms(translated: str, replacements: list[tuple[str, str]]) -> str:
+    """翻訳結果中のプレースホルダーを原文に戻す"""
+    for ph, orig in replacements:
+        translated = translated.replace(ph, orig)
+    return translated
+
+
+# ============================================================
 # Ollama 翻訳
 # ============================================================
 
 def translate(text: str, model: str) -> str:
-    """translate.cpp:BuildRequestBody と同一プロンプトで翻訳する"""
+    """translate.cpp:DoTranslate と同一ロジックで翻訳する"""
+    protected, replacements = protect_terms(text)
     prompt = (
         f"You are a translator. The user sends a chat message in any language."
         f" Translate it to {TARGET_LANG}."
         f" Output ONLY the translated text, nothing else. No explanations."
         f" If the message is already in {TARGET_LANG}, output it unchanged."
-        f"\n\n{text}"
+        f"\n\n{protected}"
     )
     body = json.dumps({
         "model":  model,
@@ -127,8 +207,8 @@ def translate(text: str, model: str) -> str:
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read())
-            return data.get("response", "").strip()
+            result = json.loads(resp.read()).get("response", "").strip()
+            return restore_terms(result, replacements)
     except urllib.error.URLError as e:
         return f"[ERROR: {e}]"
     except Exception as e:

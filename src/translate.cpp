@@ -14,10 +14,13 @@
 #include <windows.h>
 #include <winhttp.h>
 #include <string>
+#include <vector>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <regex>
+#include <utility>
 
 #include "translate.h"
 #include "log.h"
@@ -175,6 +178,112 @@ static std::string HttpPost(const std::string& body) {
 }
 
 // ============================================================
+// 固有名詞プレースホルダー保護
+// ============================================================
+
+// placeholder → 原文 のペアリスト
+using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
+
+static std::vector<std::regex> g_termRegexes;
+
+static void InitTermRegexes() {
+    // 各パターンは単語境界 \b で囲む。
+    // icase=true のものは大文字小文字を区別しない。
+    struct Entry { const char* pat; bool icase; };
+    static const Entry entries[] = {
+        // ファクション名
+        { R"(\bWardens?\b)",          true  },
+        { R"(\bColonials?\b)",        true  },
+        { R"(\bCollies?\b)",          true  },
+        // ゲーム素材略語
+        { R"(\bbmat\b)",              true  },
+        { R"(\bcmat\b)",              true  },
+        { R"(\brmat\b)",              true  },
+        { R"(\bemat\b)",              true  },
+        { R"(\bsmat\b)",              true  },
+        // 軍事略語
+        { R"(\bQRF\b)",               false },
+        { R"(\bSPG\b)",               false },
+        { R"(\bGB\b)",                false },
+        { R"(\bAA\b)",                false },
+        { R"(\bBTs?\b)",              false },
+        // ゲーム内一般略語
+        { R"(\blogi\b)",              true  },
+        { R"(\binf\b)",               true  },
+        { R"(\bmsups?\b)",            true  },
+        { R"(\bbsups?\b)",            true  },
+        // 施設名
+        { R"(\bstockpile\b)",         true  },
+        { R"(\bseaport\b)",           true  },
+        { R"(\bgarrison\b)",          true  },
+    };
+    for (const auto& e : entries) {
+        auto flags = std::regex::ECMAScript;
+        if (e.icase) flags |= std::regex::icase;
+        g_termRegexes.emplace_back(e.pat, flags);
+    }
+}
+
+// テキスト中の保護対象語をプレースホルダーに置き換えて返す。
+// out にプレースホルダー→原文のマッピングを格納する。
+static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
+    out.clear();
+    if (g_termRegexes.empty()) return text;
+
+    struct MatchSpan { size_t start, end; std::string original; };
+    std::vector<MatchSpan> spans;
+
+    for (const auto& re : g_termRegexes) {
+        auto it  = std::sregex_iterator(text.begin(), text.end(), re);
+        auto end = std::sregex_iterator();
+        for (; it != end; ++it) {
+            spans.push_back({
+                static_cast<size_t>(it->position()),
+                static_cast<size_t>(it->position() + it->length()),
+                it->str()
+            });
+        }
+    }
+    if (spans.empty()) return text;
+
+    // 開始位置でソートし、重複するスパンを除去 (先着優先)
+    std::sort(spans.begin(), spans.end(),
+        [](const MatchSpan& a, const MatchSpan& b) { return a.start < b.start; });
+    std::vector<MatchSpan> deduped;
+    size_t lastEnd = 0;
+    for (const auto& s : spans) {
+        if (s.start >= lastEnd) {
+            deduped.push_back(s);
+            lastEnd = s.end;
+        }
+    }
+
+    // 後ろから置換するとインデックスがずれない
+    std::reverse(deduped.begin(), deduped.end());
+    std::string result = text;
+    for (const auto& s : deduped) {
+        std::string ph = "__T" + std::to_string(out.size()) + "__";
+        out.emplace_back(ph, s.original);
+        result.replace(s.start, s.end - s.start, ph);
+    }
+    return result;
+}
+
+// 翻訳結果中のプレースホルダーを原文に戻す。
+static std::string RestoreTerms(std::string translated, const ReplacementMap& replacements) {
+    for (const auto& kv : replacements) {
+        const std::string& ph  = kv.first;
+        const std::string& orig = kv.second;
+        size_t pos = 0;
+        while ((pos = translated.find(ph, pos)) != std::string::npos) {
+            translated.replace(pos, ph.size(), orig);
+            pos += orig.size();
+        }
+    }
+    return translated;
+}
+
+// ============================================================
 // 翻訳コア
 // ============================================================
 
@@ -202,7 +311,9 @@ static std::string BuildRequestBody(const std::string& text) {
 }
 
 static std::string DoTranslate(const std::string& text) {
-    std::string body = BuildRequestBody(text);
+    ReplacementMap replacements;
+    std::string protected_text = ProtectTerms(text, replacements);
+    std::string body = BuildRequestBody(protected_text);
     std::string response = HttpPost(body);
     if (response.empty()) {
         logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
@@ -217,8 +328,10 @@ static std::string DoTranslate(const std::string& text) {
         return u8"(解析失敗)";
     }
 
-    if (j.contains("response") && j["response"].is_string())
-        return j["response"].get<std::string>();
+    if (j.contains("response") && j["response"].is_string()) {
+        std::string result = j["response"].get<std::string>();
+        return RestoreTerms(result, replacements);
+    }
 
     if (j.contains("error") && j["error"].is_string()) {
         std::string errMsg = j["error"].get<std::string>();
@@ -484,6 +597,7 @@ static void ApplyPreset(const std::string& preset) {
 // ============================================================
 
 bool translate::Init(const TranslateConfig& cfg) {
+    InitTermRegexes();
     if (!ParseUrl(cfg.endpoint)) {
         logging::Debug("[Translate] URL パース失敗: %s", cfg.endpoint.c_str());
         return false;
@@ -567,6 +681,11 @@ bool translate::IsHealthy() {
 bool translate::Restart() {
     logging::Debug("[Translate] Ollama 再起動試行...");
     return EnsureOllama();
+}
+
+void translate::DetachThread() {
+    // DLL_PROCESS_DETACH (プロセス終了) 専用: ~std::thread が std::terminate を呼ばないよう detach する
+    if (g_thread.joinable()) g_thread.detach();
 }
 
 void translate::KillOllama() {
