@@ -222,10 +222,9 @@ def _raw_translate(text: str, model: str, system_prompt: str = "", has_placehold
         if has_placeholders else ""
     )
     prompt = (
-        f"You are a translator. The user sends a chat message in any language."
-        f" Translate it to {TARGET_LANG}."
-        f" Output ONLY the translated text, nothing else. No explanations."
-        f" If the message is already in {TARGET_LANG}, output it unchanged."
+        f"Translate the following war game chat message to {TARGET_LANG} accurately."
+        f" Keep the original meaning. End sentences with 〜のだ or 〜なのだ (Zundamon style)."
+        f" Output ONLY the translated text. No explanations, no extra sentences."
         f"{ph_instruction}"
         f"\n\n{text}"
     )

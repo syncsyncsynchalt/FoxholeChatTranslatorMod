@@ -329,10 +329,9 @@ static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
 static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt,
                                     bool hasPlaceholders) {
     std::string prompt =
-        "You are a translator. The user sends a chat message in any language."
-        " Translate it to " + g_targetLang + "."
-        " Output ONLY the translated text, nothing else. No explanations."
-        " If the message is already in " + g_targetLang + ", output it unchanged.";
+        "Translate the following war game chat message to " + g_targetLang + " accurately."
+        " Keep the original meaning. End sentences with 〜のだ or 〜なのだ (Zundamon style)."
+        " Output ONLY the translated text. No explanations, no extra sentences.";
     if (hasPlaceholders)
         prompt += " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output.";
     prompt += "\n\n" + text;
