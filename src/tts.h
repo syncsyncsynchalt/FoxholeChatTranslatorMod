@@ -3,6 +3,8 @@
 // tts.h - 多言語TTS読み上げ (Windows OneCore / WinRT)
 // ============================================================
 
+#include <cstdint>
+
 namespace tts {
 
 // 初期化 (ワーカースレッド起動)

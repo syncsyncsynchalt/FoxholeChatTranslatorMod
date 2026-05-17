@@ -449,6 +449,8 @@ bool overlay::Init() {
             g_translatedText = r.translated;
         }
         g_textChanged.store(true);
+        logging::Translation(r.channel.c_str(), r.sender.c_str(),
+                             r.original.c_str(), r.translated.c_str());
         tts::Speak(r.original.c_str(), r.sender.empty() ? nullptr : r.sender.c_str());
     });
 

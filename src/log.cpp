@@ -11,8 +11,9 @@
 #include <string>
 
 static std::mutex g_logMutex;
-static FILE*      g_debugLogFile = nullptr;
-static FILE*      g_chatLogFile  = nullptr;
+static FILE*      g_debugLogFile       = nullptr;
+static FILE*      g_chatLogFile        = nullptr;
+static FILE*      g_translationLogFile = nullptr;
 static bool       g_enableConsole = true;
 static std::string g_baseDir;
 static std::string g_chatLogPath;
@@ -31,8 +32,9 @@ void logging::Init(const char* baseDir, bool enableConsole) {
 
 void logging::Shutdown() {
     std::lock_guard<std::mutex> lock(g_logMutex);
-    if (g_chatLogFile)  { fclose(g_chatLogFile);  g_chatLogFile  = nullptr; }
-    if (g_debugLogFile) { fclose(g_debugLogFile); g_debugLogFile = nullptr; }
+    if (g_translationLogFile) { fclose(g_translationLogFile); g_translationLogFile = nullptr; }
+    if (g_chatLogFile)        { fclose(g_chatLogFile);        g_chatLogFile        = nullptr; }
+    if (g_debugLogFile)       { fclose(g_debugLogFile);       g_debugLogFile       = nullptr; }
 }
 
 void logging::SetChatLogPath(const char* path) {
@@ -77,4 +79,45 @@ void logging::Chat(const char* channel, const char* sender, const char* message)
 
     fprintf(g_chatLogFile, "[%s] [%s] %s: %s\n", timestamp, channel, sender, message);
     fflush(g_chatLogFile);
+}
+
+// CSV フィールドをダブルクォートで囲み、内部の " を "" にエスケープする
+static std::string CsvField(const char* s) {
+    std::string out = "\"";
+    for (; *s; ++s) {
+        if (*s == '"') out += "\"\"";
+        else           out += *s;
+    }
+    out += '"';
+    return out;
+}
+
+void logging::Translation(const char* channel, const char* sender,
+                          const char* original, const char* translated) {
+    std::lock_guard<std::mutex> lock(g_logMutex);
+
+    if (!g_translationLogFile) {
+        std::string path = g_baseDir + "translation_log.csv";
+        g_translationLogFile = fopen(path.c_str(), "a");
+        if (!g_translationLogFile) return;
+        // ファイルが空のときだけヘッダを書く
+        fseek(g_translationLogFile, 0, SEEK_END);
+        if (ftell(g_translationLogFile) == 0) {
+            fprintf(g_translationLogFile, "timestamp,channel,sender,original,translated\n");
+        }
+    }
+
+    time_t now = time(nullptr);
+    struct tm local;
+    localtime_s(&local, &now);
+    char timestamp[64];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &local);
+
+    fprintf(g_translationLogFile, "%s,%s,%s,%s,%s\n",
+        CsvField(timestamp).c_str(),
+        CsvField(channel).c_str(),
+        CsvField(sender).c_str(),
+        CsvField(original).c_str(),
+        CsvField(translated).c_str());
+    fflush(g_translationLogFile);
 }

@@ -25,4 +25,8 @@ void Chat(const char* channel, const char* sender, const char* message);
 // チャットログの出力先パスを設定
 void SetChatLogPath(const char* path);
 
+// 翻訳ペアログ出力 (translation_log.csv)
+void Translation(const char* channel, const char* sender,
+                 const char* original, const char* translated);
+
 } // namespace logging
