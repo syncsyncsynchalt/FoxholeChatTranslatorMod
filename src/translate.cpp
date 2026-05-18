@@ -41,6 +41,8 @@ static int           g_numThread = 2;
 static float         g_temperature = 0.1f;
 static int           g_numPredict  = 120;
 
+static translate::SyncStats g_lastSyncStats;
+
 // ワーカースレッド
 struct QueueItem {
     std::string channel;
@@ -380,8 +382,16 @@ static std::string RawTranslate(const std::string& text, const std::string& syst
         logging::Debug("[Translate] レスポンス解析失敗 (JSONパースエラー)");
         return "";
     }
-    if (j.contains("response") && j["response"].is_string())
+    if (j.contains("response") && j["response"].is_string()) {
+        g_lastSyncStats = {};
+        if (j.contains("eval_count") && j["eval_count"].is_number())
+            g_lastSyncStats.evalCount = j["eval_count"].get<int>();
+        if (j.contains("eval_duration") && j["eval_duration"].is_number()) {
+            double sec = j["eval_duration"].get<long long>() / 1e9;
+            if (sec > 0) g_lastSyncStats.tokPerSec = g_lastSyncStats.evalCount / sec;
+        }
         return j["response"].get<std::string>();
+    }
     if (j.contains("error") && j["error"].is_string()) {
         logging::Debug("[Translate] Ollamaエラー: %s", j["error"].get<std::string>().c_str());
     }
@@ -627,6 +637,10 @@ std::string translate::Sync(const std::string& text) {
     std::string result = DoTranslate(text);
     TrimTrailing(result);
     return result;
+}
+
+translate::SyncStats translate::GetLastSyncStats() {
+    return g_lastSyncStats;
 }
 
 void translate::Queue(const std::string& channel, const std::string& sender, const std::string& message) {

@@ -15,6 +15,12 @@ struct TranslateConfig {
     std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"
 };
 
+// 直近の Sync() 呼び出しの Ollama 内部統計 (Sync() 直後に呼ぶこと)
+struct SyncStats {
+    double tokPerSec = 0.0;
+    int    evalCount = 0;
+};
+
 struct TranslateResult {
     std::string channel;
     std::string sender;
@@ -38,6 +44,9 @@ void Queue(const std::string& channel, const std::string& sender, const std::str
 
 // 同期翻訳 (ブロッキング) - テスト・診断ツール用
 std::string Sync(const std::string& text);
+
+// 直近の Sync() の Ollama 内部統計を返す
+SyncStats GetLastSyncStats();
 
 // Ollama 死活確認 (GET /api/version)
 bool IsHealthy();

@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # benchmark_presets.ps1 - Preset Comparison Benchmark
 # 3 presets x 9 sentences x 5 runs = 135 requests
 # Focus: speed / quality / cold-start across Low / Medium / High
@@ -16,9 +16,9 @@ $ErrorActionPreference = "Stop"
 # ============================================================
 
 $Presets = @(
-    @{ Name = "Low";    Model = "gemma3:1b"; NumCtx = 256; NumThread = 8 },
-    @{ Name = "Medium"; Model = "gemma3:4b"; NumCtx = 256; NumThread = 4 },
-    @{ Name = "High";   Model = "gemma3:4b"; NumCtx = 256; NumThread = 0 }
+    @{ Name = "Low";    Model = "gemma3:1b"; NumCtx = 128; NumThread = 2 },
+    @{ Name = "Medium"; Model = "gemma3:4b"; NumCtx = 256; NumThread = 0 },
+    @{ Name = "High";   Model = "gemma3:4b"; NumCtx = 512; NumThread = 0 }
 )
 
 # ============================================================
@@ -46,7 +46,7 @@ $RunsPerPreset = 5   # run1=cold, run2-5=warm
 
 $TargetLang = "Japanese"
 function Build-Prompt([string]$text) {
-    return "You are a translator. The user sends a chat message in any language. Translate it to $TargetLang. Output ONLY the translated text, nothing else. No explanations. If the message is already in $TargetLang, output it unchanged.`n`n$text"
+    return "Translate the following war game chat message to $TargetLang accurately. Keep the original meaning. End sentences with 〜のだ or 〜なのだ (Zundamon style). Output ONLY the translated text. No explanations, no extra sentences.`n`n$text"
 }
 
 # ============================================================
@@ -102,11 +102,13 @@ function Test-ModelAvailable([string]$modelName) {
 # ============================================================
 
 function Invoke-Translation([string]$model, [int]$numCtx, [int]$numThread, [string]$text) {
+    $options = @{ num_ctx = $numCtx; num_predict = 120; temperature = 0.1 }
+    if ($numThread -ne 0) { $options["num_thread"] = $numThread }
     $body = @{
         model   = $model
         prompt  = Build-Prompt $text
         stream  = $false
-        options = @{ num_ctx = $numCtx; num_thread = $numThread }
+        options = $options
     } | ConvertTo-Json -Depth 3
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -144,7 +146,9 @@ if (-not (Test-OllamaRunning)) { Start-BundledOllama }
 
 $cpu      = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
 $ram      = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
-$gpu      = (Get-CimInstance Win32_VideoController | Select-Object -First 1).Name
+$allGpus  = Get-CimInstance Win32_VideoController
+$gpu      = ($allGpus | Where-Object { $_.Name -match "NVIDIA" } | Select-Object -First 1).Name
+if (-not $gpu) { $gpu = ($allGpus | Sort-Object AdapterRAM -Descending | Select-Object -First 1).Name }
 $ollamaV  = try { (Invoke-RestMethod -Uri "$OllamaUrl/api/version" -TimeoutSec 5).version } catch { "unknown" }
 Write-Host "[Env] CPU=$cpu  RAM=${ram}GB  GPU=$gpu  Ollama=$ollamaV"
 
@@ -226,12 +230,11 @@ foreach ($lang in $langs) {
     Write-Host ("  {0,-10} {1,10} {2,10} {3,10} {4,10}" -f ("-"*10), ("-"*10), ("-"*10), ("-"*10), ("-"*10))
 
     foreach ($preset in $Presets) {
-        $shortMs = ($warmData[$preset.Name]["Short-$lang"] | Measure-Object -Property ElapsedMs -Average).Average
-        $medMs   = ($warmData[$preset.Name]["Medium-$lang"] | Measure-Object -Property ElapsedMs -Average).Average
-        $longMs  = ($warmData[$preset.Name]["Long-$lang"]  | Measure-Object -Property ElapsedMs -Average).Average
-        $tps     = (($warmData[$preset.Name].Values | ForEach-Object { $_ }) | Where-Object { $_ -ne $null } |
-                    ForEach-Object { $_ } | Where-Object { $_.TokPerSec -gt 0 } |
-                    Measure-Object -Property TokPerSec -Average).Average
+        $shortMs = ($warmData[$preset.Name]["Short-$lang"]  | ForEach-Object { $_['ElapsedMs'] }  | Measure-Object -Average).Average
+        $medMs   = ($warmData[$preset.Name]["Medium-$lang"] | ForEach-Object { $_['ElapsedMs'] }  | Measure-Object -Average).Average
+        $longMs  = ($warmData[$preset.Name]["Long-$lang"]   | ForEach-Object { $_['ElapsedMs'] }  | Measure-Object -Average).Average
+        $tpsVals = $warmData[$preset.Name].Values | ForEach-Object { $_ } | Where-Object { $_ -ne $null -and $_['TokPerSec'] -gt 0 } | ForEach-Object { $_['TokPerSec'] }
+        $tps     = ($tpsVals | Measure-Object -Average).Average
         Write-Host ("  {0,-10} {1,10:N0} {2,10:N0} {3,10:N0} {4,10:N1}" -f $preset.Name, $shortMs, $medMs, $longMs, $tps)
     }
 }
