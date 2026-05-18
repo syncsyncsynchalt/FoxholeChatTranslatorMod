@@ -1,5 +1,8 @@
 {
   "cmake.sourceDirectory": "${workspaceFolder}",
   "cmake.buildDirectory": "${workspaceFolder}/build",
-  "C_Cpp.default.compilerPath": "cl.exe"
+  "C_Cpp.default.compilerPath": "cl.exe",
+  "github.copilot.chat.codeGeneration.instructions": [
+    { "file": "CLAUDE.md" }
+  ]
 }

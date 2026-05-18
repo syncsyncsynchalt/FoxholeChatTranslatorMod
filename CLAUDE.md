@@ -1,203 +1,245 @@
-# ChatTranslator — Claude 向け開発ガイド
+# ChatTranslator — AI Dev Guide
 
-## プロジェクト概要
-
-Foxhole ゲームのチャットを自動翻訳し、音声合成(TTS)で読み上げる DLL Mod。
-- **翻訳エンジン**: Ollama ローカル LLM
-- **TTS エンジン**: Sherpa-ONNX (C API を DLL 経由で動的ロード)
-- **再生**: XAudio2
+Foxhole (UE4 4.24.3) チャット傍受 → Ollama 翻訳 → Sherpa-ONNX / VOICEVOX TTS の C++ DLL Mod。
+日本語で応答すること。
 
 ---
 
-## ビルド
+## ルール (絶対禁止)
+
+- ゲームメモリへの**書き込みコードを生成するな** (読み取り専用)
+- `DllMain` 内で `LoadLibrary` を呼ぶな (ローダーロック)
+- `WIN32_LEAN_AND_MEAN` / `NOMINMAX` をソースで定義するな (CMake 定義済み)
+- C++ 例外を使うな → `bool` 返却 + `logging::Debug()` で報告
+- iostream を使うな → `fopen`/`fprintf`/`fflush`
+- コミット・プッシュ・PR を勝手に行うな
+
+## ルール (必須)
+
+- UE4 メモリ読み取りは `__try/__except` (SEH) でガード
+- スレッドフラグは `std::atomic<bool>`、ロックは `std::mutex` + `std::lock_guard`
+- UE4 `FString` は即座に `FStringToUtf8()` で変換
+- HTTP は WinHTTP のみ。JSON は手書き (`JsonEscape()` / `ExtractResponse()`)
+- INI 読込は `GetPrivateProfileStringA` のみ
+- MinHook フックは `MH_EnableHook` / `MH_DisableHook` でペア管理
+- ProcessEvent コールバック内は最小処理のみ。重い処理は別スレッドへ
+- 翻訳処理は描画スレッドをブロックするな
+
+---
+
+## ファイル構成
+
+| ファイル | namespace / 役割 |
+|---|---|
+| `src/dllmain.cpp` | — / version.dll エントリ、vtable スキャン、ProcessEvent フック、Present フック、ワーカー DLL ロード |
+| `src/worker_main.cpp` | — / chat_translator.dll エントリ、`WorkerInit()` |
+| `src/hooks.h/cpp` | `hooks` / ProcessEvent コールバック、チャット判定、重複排除 |
+| `src/gnames.h/cpp` | `gnames` / FNamePool 検出、`FindFNameIndex()` |
+| `src/overlay.h/cpp` | `overlay` / DX11 ImGui オーバーレイ、マーキー、`OnChatMessage()` |
+| `src/translate.h/cpp` | `translate` / Ollama WinHTTP 翻訳、保護語、`Sync()` / `AsyncTranslate()` |
+| `src/tts.h/cpp` | `tts` / Sherpa-ONNX + VOICEVOX + XAudio2、`Speak()` |
+| `src/ollama.h/cpp` | `ollama` / プロセス管理、ヘルス監視 |
+| `src/config.h/cpp` | `config` / config.ini → `Config` 構造体、`Load()` |
+| `src/scanner.h/cpp` | `scanner` / .text/.rdata セクションスキャン |
+| `src/log.h/cpp` | `logging` / スレッドセーフログ |
+| `src/ue4.h` | — / UE4 内部型定義 (Dumper-7 SDK 準拠) |
+| `src/chat_message.h` | — / `ChatMessage` 構造体 |
+| `src/radio_icon.h` | — / 埋め込み RGBA (32×32px) |
+
+---
+
+## config.ini キー一覧
+
+| セクション | キー | デフォルト | 説明 |
+|-----------|------|-----------|------|
+| General | EnableConsole | true | デバッグコンソール |
+| General | LogFilePath | "chat_log.txt" | ログ出力先 (DLL 同階層) |
+| General | InitDelayMs | 10000 | UE4 初期化待機 (ms) |
+| Discovery | DumpAllEvents | false | 全 ProcessEvent 出力 |
+| Discovery | FunctionNameFilter | "" | 関数名フィルタ (カンマ区切り) |
+| Stage2 | Prefix | "★" | チャット接頭辞 |
+| Translation | Enabled | true | 翻訳機能 |
+| Translation | OllamaEndpoint | "http://localhost:11434/api/generate" | Ollama API |
+| Translation | TargetLanguage | "Japanese" | 翻訳先言語 |
+| Translation | PerformancePreset | "Medium" | Low / Medium / High |
+| Overlay | DemoMode | true | false = 実チャット駆動 |
+| TTS | Language | "auto" | auto = テキストから自動判定 |
+| TTS | SpeakingRate | 1.0 | 読み上げ速度 (0.5〜2.0) |
+| TTS | RadioEffect | true | ラジオ DSP エフェクト |
+| TTS | VoicevoxStyleId | 3 | VOICEVOX スタイル ID (3 = ずんだもんノーマル) |
+| TTS | SpeakTranslated | true | true = 翻訳後を読み上げ / false = 原文 |
+| Addresses | ProcessEventVtableIndex | 66 | ProcessEvent vtable インデックス |
+
+---
+
+## アーキテクチャ
+
+### 2-DLL 構成
+
+```
+version.dll (永続)
+  ├─ system version.dll へ 17 関数フォワード
+  ├─ ProcessEvent フック: vtable[66]、最大 64 枠 (MinHook)
+  ├─ DX11 Present フック: vtable[8]
+  └─ chat_translator.dll ロード/ホットリロード (F9 or ファイル変更)
+        └─ WorkerInit() → hooks / overlay / translate / tts / ollama
+```
+
+ワーカー DLL だけを再ロード可能。フックアドレスは version.dll 側に維持。
+
+### 翻訳・TTS パイプライン
+
+```
+ProcessEvent → hooks::OnProcessEvent
+  → ChatMessage 構築 → 重複排除 (sender+message+channel, 500ms 窓)
+  → overlay::OnChatMessage
+    → [ラジオ ON] AsyncTranslate スレッド
+      → 保護語マスク ({{T0}}…{{Tn}})
+      → translate::Sync() [WinHTTP → Ollama]
+      → 保護語復元 (2パス: 完全一致 → \bTn\b フォールバック)
+      → tts::Speak(text, sender)
+```
+
+翻訳キュー MAX 32。TTS キュー MAX 8。
+
+### パフォーマンスプリセット (`translate::ApplyPreset`)
+
+| Preset | model | num_ctx | num_thread | temperature | num_predict |
+|--------|-------|--------:|-----------:|------------:|------------:|
+| Low | gemma3:1b | 128 | 2 | 0.1 | 120 |
+| Medium | gemma3:4b | 256 | 0 | 0.1 | 120 |
+| High | gemma3:4b | 512 | 0 | 0.1 | 120 |
+
+`num_thread=0` = 全 CPU コア使用。
+
+### ラジオアイコン状態
+
+| 状態 | 動作 | クリック |
+|---|---|---|
+| ON | 翻訳 + TTS + 表示 | → OFF |
+| OFF | 停止・非表示 | → ON |
+| FAULT | 原文 + TTS のみ | Ollama 再起動試行 |
+| RESTARTING | 再起動中 | — |
+
+---
+
+## TTS エンジン
+
+### エンジン選択 (tts.cpp)
+
+1. VOICEVOX Core — 言語=JA かつ初期化済み
+2. Sherpa-ONNX — その他言語 / JA フォールバック
+3. 英語モデルフォールバック — 対象モデル未インストール時
+
+### Sherpa-ONNX モデル検出 (`War/Binaries/Win64/tools/tts/models/<lang>/`)
+
+- `duration_predictor.int8.onnx` 存在 → Supertonic エンジン
+- `model.onnx` + `tokens.txt` 存在 → VITS (Piper/mimic3) エンジン
+
+日本語・韓国語は Piper 系モデルが存在しない:
+- JA → Supertonic 3 (`sherpa-onnx-supertonic-3-tts-int8-2026-05-11`)
+- KO → `vits-mimic3-ko_KO-kss_low`
+
+### VOICEVOX パス (`War/Binaries/Win64/voicevox/`)
+
+```
+c_api/lib/voicevox_core.dll              ← lib/ サブディレクトリ (c_api/ 直下ではない)
+onnxruntime/lib/voicevox_onnxruntime.dll ← lib/ サブディレクトリ
+models/vvms/*.vvm                        ← vvms/ サブディレクトリ
+dict/open_jtalk_dic_utf_8-1.11/
+```
+
+### TTS 初期化ルール
+
+- VOICEVOX 初期化成功 + 言語=JA → VOICEVOX (style_id=3 = ずんだもんノーマル)
+- VOICEVOX 失敗または非 JA → Sherpa-ONNX にフォールバック
+- 両方とも使用不可 → TTS スレッドを起動しない (スキップ)
+
+### ラジオエフェクト (`ApplyRadioEffect`)
+
+増幅 1.4× → HPF 300Hz → LPF 3400Hz → クリッピング ±0.85 (Biquad Q=√2/2)
+
+---
+
+## 保護語システム (term_protection.txt)
+
+- 1行1正規表現。行末 ` i` で icase。`\b` 未指定なら自動補完
+- 翻訳前: マッチ語 → `{{T0}}`, `{{T1}}` … に置換
+- 翻訳後: 2パス復元 — `{{Tn}}` 完全一致 → `\bTn\b` フォールバック
+- マッチ語のみシステムプロンプトに列挙 ("keep exactly as-is")
+
+---
+
+## 落とし穴
+
+### Sherpa-ONNX v1.13.x ABI 変更
+
+`SherpaOnnxOfflineTtsModelConfig` に以下の新フィールドが追加 (全部定義しないとクラッシュ):
+`Matcha` / `Kokoro` / `Kitten` / `Zipvoice` / `Pocket` / `Supertonic` の各 ModelConfig。
+`SherpaOnnxGeneratedAudio.num_samples` → `.n` に改名。
+
+DLL 名: `sherpa-onnx-c-api.dll` (新) / `sherpa-onnx.dll` (旧)。両方を順番に試す実装。
+パッケージ選択条件: `win-x64-shared` + `MD-Release`、`-lib.` / `no-tts` を含まない。
+
+### VOICEVOX ダウンローダー
+
+- パイプ経由で実行するな → stdin 切断でライセンス同意プロンプトが無限ループ
+- CP932 環境で Rust pager が Unicode パニック → 実行前に `chcp 65001` + UTF-8 設定
+
+### チャットキャプチャ対象関数
+
+`ClientChatMessage` / `ClientChatMessageWithTag` / `ClientWorldChatMessage` のみ。
+ServerChat 系は除外。判定: FName ComparisonIndex 一致 + `FUNC_Net (0x40)` フラグ。
+
+### GNames 検出
+
+FNameBlockOffsetBits = 16 ハードコード。`TryDetectShift()` で自動補正。
+
+### EAC
+
+EasyAntiCheat により BAN の可能性あり (自己責任)。ゲームアップデートでオフセット変更の可能性あり。
+
+---
+
+## コーディング規約
+
+| 対象 | 規則 |
+|---|---|
+| 関数 | `PascalCase` |
+| ローカル変数 | `camelCase` |
+| グローバル/static 変数 | `g_` + `camelCase` |
+| namespace | `snake_case` |
+| 構造体/enum | `PascalCase` |
+| 定数/マクロ | `ALL_CAPS` |
+| UE4 定数 | UE4 原名のまま (`FUNC_Net`, `EObjectFlags` 等) |
+
+- C++17 / `#pragma once` / インクルード順: windows → C 標準 → C++ 標準 → 外部 → プロジェクト内
+- モジュール構成: namespace + free function + static 内部状態 (クラスベースではない)
+- 内部関数/変数は `static` (無名 namespace 未使用)
+- コメント・ログ文字列は日本語
+
+---
+
+## ビルド・セットアップ
 
 ```powershell
+# ビルド
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release --parallel
-```
+cmake --build build --config Release --target chat_translator  # ワーカーのみ (F9 ホットリロード用)
 
-VSCode タスク: `Ctrl+Shift+B` → "Build & Deploy (Release)"
-
----
-
-## TTS セットアップ
-
-```powershell
+# TTS セットアップ (Sherpa-ONNX DLL + モデル → War/Binaries/Win64/tools/tts/)
 powershell -ExecutionPolicy Bypass -File .\setup_tts.ps1
-```
 
-インストール先: `../../War/Binaries/Win64/tools/tts/`
-
----
-
-## TTS テストツール
-
-```powershell
+# TTS テスト GUI
 powershell -ExecutionPolicy Bypass -File .\tools\tts_test.ps1
 ```
 
-または VSCode タスク: "Run TTS Test Tool"
-
-`tts_test.ps1` は Python 3.12 の自動選択と不足パッケージの自動インストールを行う。
+setup_tts.ps1 編集時: PowerShell は UTF-8 BOM 必須。`tar` は `$env:SystemRoot\System32\tar.exe` を使うこと (Git tar はドライブレターを解釈できない)。
 
 ---
 
-## Sherpa-ONNX に関する重要な知見
+## 参照
 
-### バージョン v1.13.x の ABI 変更 (v1.10.x との非互換)
-
-v1.13.x では `SherpaOnnxOfflineTtsModelConfig` に多数の新モデル用フィールドが追加された。
-C++ 側で古い定義を使うとメモリレイアウトがずれてクラッシュする。
-
-**必ず全構造体を定義すること** (src/tts.cpp 参照):
-- `SherpaOnnxOfflineTtsMatchaModelConfig`
-- `SherpaOnnxOfflineTtsKokoroModelConfig`
-- `SherpaOnnxOfflineTtsKittenModelConfig`
-- `SherpaOnnxOfflineTtsZipvoiceModelConfig`
-- `SherpaOnnxOfflineTtsPocketModelConfig`
-- `SherpaOnnxOfflineTtsSupertonicModelConfig`
-
-また `SherpaOnnxGeneratedAudio` のサンプル数フィールドが `num_samples` → `n` に改名された。
-
-### DLL 名の変化
-
-リリースパッケージによって DLL 名が異なる:
-- `sherpa-onnx.dll` (旧パッケージ)
-- `sherpa-onnx-c-api.dll` (新パッケージ)
-
-`tts.cpp` では両方を順番に試す実装にしている。`setup_tts.ps1` では `sherpa-onnx-c-api.dll` が存在する場合に `sherpa-onnx.dll` としてコピーもする。
-
-### DLL パッケージの選択
-
-GitHub Release から正しいパッケージを選ぶ条件:
-- `win-x64-shared` を含む
-- `MD-Release` を含む
-- `-lib.` を含まない (lib パッケージは DLL なし)
-- `no-tts` を含まない
-
-### 日本語 TTS
-
-Piper 系モデルに日本語版は存在しない。**Supertonic 3** を使う:
-- モデル名: `sherpa-onnx-supertonic-3-tts-int8-2026-05-11`
-- 31言語対応、約123MB
-- 判別方法: モデルディレクトリに `duration_predictor.int8.onnx` が存在するか否か
-
-韓国語は `vits-mimic3-ko_KO-kss_low` を使う (Piper 系の韓国語モデルは存在しない)。
-
-### C++/Python 共通: モデル自動判別ロジック
-
-```
-models/<lang>/duration_predictor.int8.onnx が存在する → Supertonic
-models/<lang>/model.onnx + tokens.txt が存在する      → VITS (Piper/mimic3)
-```
-
-### 英語フォールバック
-
-対象言語のモデルが未インストールの場合、英語モデルで代替する (C++/Python 両方で実装)。
-
----
-
-## VOICEVOX Core に関する重要な知見
-
-### インストール後のディレクトリ構造
-
-`download-windows-x64.exe --devices cpu --output <VvDir>` が展開するパスは以下の通り:
-
-```
-voicevox/
-  c_api/
-    lib/
-      voicevox_core.dll        ← DLL はここ (c_api/ 直下ではない)
-  onnxruntime/
-    lib/
-      voicevox_onnxruntime.dll ← ORT DLL はここ (onnxruntime/ 直下ではない)
-  models/
-    vvms/
-      *.vvm                    ← VVM モデルはここ (vvms/ 直下ではない)
-  dict/
-    open_jtalk_dic_utf_8-1.11/ ← 辞書はここ (正しい)
-```
-
-**よくある誤り**: `c_api/voicevox_core.dll`、`onnxruntime/*.dll`、`vvms/*.vvm` と仮定すると
-ファイルが見つからず初期化に失敗する。必ず `lib/` サブディレクトリを含むパスを使うこと。
-
-### VOICEVOX ダウンローダーの挙動
-
-- `download-windows-x64.exe` はライセンス同意プロンプト `[y,n,r]` を stdin から読む
-- パイプ経由で実行すると stdin が切断されプロンプトが無限ループする
-- CP932 (デフォルト) のコンソールでは Rust の pager が日本語 Unicode でパニックする:
-  `byte index 1 is not a char boundary`
-- **対処**: 直接実行し、実行前に `chcp 65001` + UTF-8 エンコーディング設定を行う
-
-```powershell
-& chcp 65001 | Out-Null
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
-& $VvDownloaderPath --devices cpu --output $VvDir   # パイプしない
-```
-
-### VOICEVOX C API 初期化シーケンス
-
-```
-voicevox_onnxruntime_load_once(ort_dll_path)   → OnnxruntimePtr
-voicevox_open_jtalk_rc_new(dict_dir)           → OpenJtalkPtr
-voicevox_synthesizer_new(ort, jtalk, opts)     → SynthesizerPtr
-voicevox_voice_model_file_open(vvm_path)       → ModelPtr  ×N
-voicevox_synthesizer_load_voice_model(synth, model)
-voicevox_synthesizer_tts(synth, text, styleId, opts) → WAV bytes
-```
-
-出力は RIFF/WAVE 形式 (uint8_t*)。16bit PCM を直接解析して XAudio2 に渡す。
-
-### Python (ctypes) での追加設定
-
-```python
-os.add_dll_directory(os.path.abspath(ort_dir))        # onnxruntime/lib/
-os.add_dll_directory(os.path.abspath(c_api_lib_dir))  # c_api/lib/
-lib = ctypes.CDLL(dll_path)
-```
-
-`os.add_dll_directory` で両ディレクトリを登録しないと依存 DLL が解決できずロード失敗する。
-
-### VOICEVOX と Sherpa-ONNX の共存
-
-- VOICEVOX が初期化成功 → 日本語テキストは VOICEVOX (ずんだもん) で発話
-- VOICEVOX が未インストールまたは初期化失敗 → Sherpa-ONNX (Supertonic) にフォールバック
-- 両方なければスレッドを起動しない
-- style_id=3 がずんだもんノーマル
-
----
-
-## セットアップスクリプト (setup_tts.ps1) の注意点
-
-- **文字コード**: PowerShell は UTF-8 BOM 必須。編集後は必ず BOM 付きで保存すること:
-  ```powershell
-  [System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($true))
-  ```
-- **tar コマンド**: Git の `/usr/bin/tar` は Windows ドライブレターを解釈できない。
-  必ず `$env:SystemRoot\System32\tar.exe` を使うこと:
-  ```powershell
-  & "$env:SystemRoot\System32\tar.exe" -xf $Archive -C $DestDir
-  ```
-
----
-
-## Python テストツール (tools/tts_test.py) の注意点
-
-- 使用 Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`
-- 必須パッケージ: `sherpa-onnx`, `sounddevice`, `numpy`
-- `tts_test.ps1` ランチャーが自動インストールを行う
-- テストツールのラジオエフェクトは `tts.cpp` の `ApplyRadioEffect` と同一ロジック (HPF 300Hz / LPF 3400Hz / クリッピング 0.85)
-- VSCode タスクの Python パスが別 venv を向いていると動作しない → タスクは `tts_test.ps1` 経由で起動すること
-
----
-
-## ファイル構成 (TTS 関連)
-
-```
-src/tts.cpp              C++ TTS 実装 (Sherpa-ONNX 動的ロード + XAudio2)
-src/tts.h                公開 API (Init / Speak / Stop / Shutdown)
-setup_tts.ps1            DLL + モデルのダウンロード・配置
-tools/tts_test.py        GUI テストツール (Python / tkinter)
-tools/tts_test.ps1       テストツール ランチャー (Python 選択 + 依存インストール)
-```
+- UE4 オフセット・構造体レイアウト・parms 解析: `docs/ue4-reversing-foxhole.md`
+- UE4 構造体フィールドオフセット: Dumper-7 SDK (`C:\Dumper-7\4.24.3-0+++UE4+Release-4.24-War\CppSDK\`)
