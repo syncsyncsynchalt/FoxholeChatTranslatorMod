@@ -72,8 +72,8 @@
     {
       "label": "Run TTS Test Tool",
       "type": "shell",
-      "command": "powershell",
-      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\tools\\tts_test.ps1"],
+      "command": "python",
+      "args": ["${workspaceFolder}\\tools\\tts_test.py"],
       "options": {
         "cwd": "${workspaceFolder}"
       },

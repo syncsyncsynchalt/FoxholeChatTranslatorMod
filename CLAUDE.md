@@ -232,7 +232,7 @@ cmake --build build --config Release --target chat_translator  # ワーカーの
 powershell -ExecutionPolicy Bypass -File .\setup_tts.ps1
 
 # TTS テスト GUI
-powershell -ExecutionPolicy Bypass -File .\tools\tts_test.ps1
+python tools\tts_test.py
 ```
 
 setup_tts.ps1 編集時: PowerShell は UTF-8 BOM 必須。`tar` は `$env:SystemRoot\System32\tar.exe` を使うこと (Git tar はドライブレターを解釈できない)。

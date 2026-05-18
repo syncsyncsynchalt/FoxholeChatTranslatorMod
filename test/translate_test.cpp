@@ -5,6 +5,7 @@
 // 使用方法:
 //   translate_test.exe                     対話モード
 //   translate_test.exe "Hello world"       単文翻訳
+//   translate_test.exe --raw "Hello world" 翻訳結果のみ stdout に出力 (GUI 連携用)
 //   translate_test.exe --file chat_log.txt ログファイル一括翻訳
 //   translate_test.exe --benchmark         プリセット比較ベンチマーク
 //
@@ -12,6 +13,7 @@
 //   --endpoint URL    Ollama API (既定: http://localhost:11434/api/generate)
 //   --preset PRESET   プリセット  (既定: Medium, Low/Medium/High)
 //   --lang LANG       翻訳先言語  (既定: Japanese)
+//   --raw             翻訳結果のみ stdout に出力、ログ非表示 (GUI 連携用)
 //   --output FILE     ベンチマーク CSV 出力先 (既定: benchmark_presets.csv)
 //   --runs N          ウォームラン数 (既定: 5)
 // ============================================================
@@ -281,6 +283,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
     std::string outputCsv = "benchmark_presets.csv";
     bool presetSpecified = false;
     bool benchmarkMode   = false;
+    bool rawMode         = false;
     int  warmRuns        = 5;
 
     // 引数パース
@@ -301,6 +304,8 @@ int main(int /*argc*/, char* /*argv*/[]) {
             if (warmRuns < 1) warmRuns = 1;
         } else if (args[i] == "--benchmark") {
             benchmarkMode = true;
+        } else if (args[i] == "--raw") {
+            rawMode = true;
         } else if (args[i][0] != '-') {
             inputText = args[i];
         }
@@ -315,7 +320,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
     }
 
     // ログ初期化 (コンソール出力のみ)
-    logging::Init(".\\", true);
+    logging::Init(".\\", !rawMode);
     SetConsoleOutputCP(CP_UTF8);
 
     // ベンチマークモード
@@ -365,9 +370,18 @@ int main(int /*argc*/, char* /*argv*/[]) {
 
     } else if (!inputText.empty()) {
         // 単文モード
-        printf("[原文]  %s\n", inputText.c_str());
+        if (!rawMode) printf("[原文]  %s\n", inputText.c_str());
         std::string translated = translate::Sync(inputText);
-        printf("[翻訳]  %s\n", translated.empty() ? "(エラー)" : translated.c_str());
+        if (rawMode) {
+            if (!translated.empty()) printf("%s\n", translated.c_str());
+            if (translated.empty()) {
+                translate::Shutdown();
+                logging::Shutdown();
+                return 1;
+            }
+        } else {
+            printf("[翻訳]  %s\n", translated.empty() ? "(エラー)" : translated.c_str());
+        }
 
     } else {
         // 対話モード

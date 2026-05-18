@@ -3,9 +3,24 @@
 TTS テストツール - Sherpa-ONNX Piper VITS 版
 setup_tts.ps1 でインストールした models/ をゲーム起動なしでテストする。
 
-依存パッケージ (初回のみ):
-  pip install sherpa-onnx sounddevice
+使い方:
+  python tools/tts_test.py
 """
+
+import importlib
+import importlib.util
+import subprocess
+import sys
+
+def _ensure_deps():
+    pkgs = [("sherpa-onnx", "sherpa_onnx"), ("sounddevice", "sounddevice"), ("numpy", "numpy")]
+    missing = [pkg for pkg, mod in pkgs if importlib.util.find_spec(mod) is None]
+    if missing:
+        print(f"依存パッケージをインストール中: {', '.join(missing)} ...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", *missing, "--quiet"])
+        print("インストール完了\n")
+
+_ensure_deps()
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext

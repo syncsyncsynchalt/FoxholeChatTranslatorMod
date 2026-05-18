@@ -15,7 +15,6 @@ import re as _re
 import json
 import time
 import urllib.request
-import urllib.error
 import subprocess
 import ctypes
 import ctypes.wintypes as _wt
@@ -24,12 +23,6 @@ import collections
 # ============================================================
 # 定数
 # ============================================================
-
-PRESETS = {
-    "High":   {"model": "gemma3:4b", "num_ctx": 512, "num_thread": 0, "temperature": 0.1},
-    "Medium": {"model": "gemma3:1b", "num_ctx": 256, "num_thread": 0, "temperature": 0.1},
-    "Low":    {"model": "gemma3:1b",   "num_ctx": 128, "num_thread": 2, "temperature": 0.1},
-}
 
 _NUM_CPUS = os.cpu_count() or 1
 
@@ -105,47 +98,31 @@ def ollama_version(endpoint: str, timeout: float = 3.0):
         return None
 
 
-def do_translate(endpoint: str, model: str, target_lang: str,
-                 num_ctx: int, num_thread: int, text: str,
-                 num_predict: int = 120, temperature: float = 0.1) -> tuple:
-    prompt = (
-        "You are a translator. The user sends a chat message in any language."
-        f" Translate it to {target_lang}."
-        " Output ONLY the translated text, nothing else. No explanations."
-        f" If the message is already in {target_lang}, output it unchanged."
-        f"\n\n{text}"
-    )
-    options = {"num_ctx": num_ctx, "num_predict": num_predict,
-               "temperature": temperature}
-    if num_thread != 0:
-        options["num_thread"] = num_thread
+def _find_translate_exe(base_dir: str) -> str | None:
+    for cfg in ("Release", "Debug"):
+        path = os.path.join(base_dir, "build", cfg, "translate_test.exe")
+        if os.path.isfile(path):
+            return path
+    return None
 
-    body = json.dumps({
-        "model": model, "prompt": prompt, "stream": False, "options": options,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        endpoint, data=body,
-        headers={"Content-Type": "application/json"}, method="POST"
-    )
+
+def _call_translate_exe(exe: str, preset: str, endpoint: str,
+                        lang: str, text: str) -> tuple[str, int]:
+    cmd = [exe, "--raw", "--preset", preset, "--lang", lang, "--endpoint", endpoint, text]
     t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.loads(r.read())
-    except urllib.error.URLError as e:
-        return f"(接続失敗: {e.reason})", int((time.time() - t0) * 1000), 0
+        r = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", timeout=120,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        elapsed = int((time.time() - t0) * 1000)
+        if r.returncode != 0 or not r.stdout.strip():
+            return "(エラー: 翻訳失敗)", elapsed
+        return r.stdout.strip(), elapsed
+    except subprocess.TimeoutExpired:
+        return "(タイムアウト)", int((time.time() - t0) * 1000)
     except Exception as e:
-        return f"(エラー: {e})", int((time.time() - t0) * 1000), 0
-
-    elapsed = int((time.time() - t0) * 1000)
-    if "error" in data:
-        err = data["error"]
-        if "memory" in err.lower():
-            return "(メモリ不足: PerformancePreset を Low に変更してください)", elapsed, 0
-        if "not found" in err.lower():
-            return f"(モデル未インストール: ollama pull {model})", elapsed, 0
-        return f"(Ollamaエラー: {err})", elapsed, 0
-
-    return data.get("response", "").rstrip(), elapsed, data.get("eval_count", 0)
+        return f"(エラー: {e})", int((time.time() - t0) * 1000)
 
 # ============================================================
 # Windows プロセス情報 (ctypes)
@@ -637,52 +614,14 @@ class App:
         r1.pack(fill=tk.X, pady=3)
         ttk.Label(r1, text="プリセット:").grid(row=0, column=0, sticky=tk.E, padx=(0, 4))
         self.preset_var = tk.StringVar(value=self.cfg["performance_preset"])
-        pcb = ttk.Combobox(r1, textvariable=self.preset_var,
-                           values=list(PRESETS.keys()), width=8, state="readonly")
-        pcb.grid(row=0, column=1, sticky=tk.W)
-        pcb.bind("<<ComboboxSelected>>", lambda _: self._on_preset_change())
+        ttk.Combobox(r1, textvariable=self.preset_var,
+                     values=["Low", "Medium", "High"], width=8, state="readonly"
+                     ).grid(row=0, column=1, sticky=tk.W)
 
-        ttk.Label(r1, text="モデル:").grid(row=0, column=2, sticky=tk.E, padx=(16, 4))
-        self.model_var = tk.StringVar()
-        ttk.Entry(r1, textvariable=self.model_var, width=16).grid(
-            row=0, column=3, sticky=tk.W)
-
-        ttk.Label(r1, text="翻訳先:").grid(row=0, column=4, sticky=tk.E, padx=(16, 4))
+        ttk.Label(r1, text="翻訳先:").grid(row=0, column=2, sticky=tk.E, padx=(16, 4))
         self.target_var = tk.StringVar(value=self.cfg["target_language"])
         ttk.Entry(r1, textvariable=self.target_var, width=12).grid(
-            row=0, column=5, sticky=tk.W)
-
-        r2 = ttk.Frame(pf)
-        r2.pack(fill=tk.X, pady=3)
-        ttk.Label(r2, text="num_ctx:").grid(row=0, column=0, sticky=tk.E, padx=(0, 4))
-        self.ctx_var = tk.IntVar()
-        ttk.Spinbox(r2, textvariable=self.ctx_var,
-                    from_=64, to=2048, increment=64, width=6).grid(
-            row=0, column=1, sticky=tk.W)
-
-        ttk.Label(r2, text="num_thread:").grid(row=0, column=2, sticky=tk.E, padx=(16, 4))
-        self.thread_var = tk.IntVar()
-        ttk.Spinbox(r2, textvariable=self.thread_var,
-                    from_=0, to=32, increment=1, width=5).grid(
             row=0, column=3, sticky=tk.W)
-        ttk.Label(r2, text="(0=自動)", foreground="#888",
-                  font=("", 7)).grid(row=0, column=4, padx=(4, 0))
-
-        ttk.Label(r2, text="num_predict:").grid(row=0, column=5, sticky=tk.E, padx=(16, 4))
-        self.predict_var = tk.IntVar(value=120)
-        ttk.Spinbox(r2, textvariable=self.predict_var,
-                    from_=20, to=512, increment=10, width=5).grid(
-            row=0, column=6, sticky=tk.W)
-
-        ttk.Label(r2, text="temperature:").grid(row=0, column=7, sticky=tk.E, padx=(16, 4))
-        self.temp_var = tk.DoubleVar(value=0.1)
-        ttk.Spinbox(r2, textvariable=self.temp_var,
-                    from_=0.0, to=2.0, increment=0.05, width=5,
-                    format="%.2f").grid(row=0, column=8, sticky=tk.W)
-        ttk.Label(r2, text="(低=精度重視)", foreground="#888",
-                  font=("", 7)).grid(row=0, column=9, padx=(4, 0))
-
-        self._on_preset_change()
 
         # 入力テキスト
         tf = ttk.LabelFrame(parent, text=" 入力テキスト ", padding=8)
@@ -899,19 +838,20 @@ class App:
     # ----------------------------------------------------------
 
     def _start_warmup(self):
-        preset = PRESETS.get(self.preset_var.get(), PRESETS["Medium"])
-        model  = self.model_var.get().strip() or preset["model"]
-        self.status_var.set(f"モデル ({model}) をウォームアップ中...")
+        exe = _find_translate_exe(self.base_dir)
+        if not exe:
+            self.status_var.set(
+                "translate_test.exe が見つかりません — cmake --build build --config Release")
+            return
+        preset = self.preset_var.get()
+        self.status_var.set(f"モデル ({preset}) をウォームアップ中...")
         self.translate_btn.config(state=tk.DISABLED)
 
-        endpoint   = self.cfg["ollama_endpoint"]
-        num_ctx    = preset["num_ctx"]
-        num_thread = preset["num_thread"]
+        endpoint = self.cfg["ollama_endpoint"]
+        lang     = self.target_var.get().strip() or "Japanese"
 
         def run():
-            do_translate(endpoint, model, "Japanese",
-                         num_ctx, num_thread, "hello",
-                         num_predict=1, temperature=0.1)
+            _call_translate_exe(exe, preset, endpoint, lang, "hello")
             self.root.after(0, self._on_warmup_done)
 
         threading.Thread(target=run, daemon=True).start()
@@ -978,13 +918,6 @@ class App:
     # プリセット変更
     # ----------------------------------------------------------
 
-    def _on_preset_change(self):
-        p = PRESETS.get(self.preset_var.get(), PRESETS["Medium"])
-        self.model_var.set(p["model"])
-        self.ctx_var.set(p["num_ctx"])
-        self.thread_var.set(p["num_thread"])
-        self.temp_var.set(p["temperature"])
-
     # ----------------------------------------------------------
     # 翻訳
     # ----------------------------------------------------------
@@ -994,35 +927,34 @@ class App:
         if not text:
             self.status_var.set("テキストを入力してください")
             return
+
+        exe = _find_translate_exe(self.base_dir)
+        if not exe:
+            self.status_var.set(
+                "translate_test.exe が見つかりません — cmake --build build --config Release")
+            return
+
         self.translate_btn.config(state=tk.DISABLED)
         self._set_result("翻訳中...")
         self.perf_lbl.config(text="")
 
-        endpoint    = self.cfg["ollama_endpoint"]
-        model       = self.model_var.get().strip() or "gemma3:1b"
-        target_lang = self.target_var.get().strip() or "Japanese"
-        num_ctx     = self.ctx_var.get()
-        num_thread  = self.thread_var.get()
-        num_predict = self.predict_var.get()
-        temperature = self.temp_var.get()
+        preset   = self.preset_var.get()
+        endpoint = self.cfg["ollama_endpoint"]
+        lang     = self.target_var.get().strip() or "Japanese"
 
         def run():
-            result, elapsed, cnt = do_translate(
-                endpoint, model, target_lang, num_ctx, num_thread, text, num_predict,
-                temperature)
-            self.root.after(0, lambda r=result, e=elapsed, c=cnt:
-                            self._on_done(r, e, c, text, model))
+            result, elapsed = _call_translate_exe(exe, preset, endpoint, lang, text)
+            self.root.after(0, lambda r=result, e=elapsed:
+                            self._on_done(r, e, text, preset))
 
         threading.Thread(target=run, daemon=True).start()
 
-    def _on_done(self, result, elapsed, cnt, src, model):
+    def _on_done(self, result: str, elapsed: int, src: str, preset: str):
         self.translate_btn.config(state=tk.NORMAL)
         self._set_result(result)
-        speed = f"  {cnt / (elapsed / 1000):.1f} tok/s" if cnt and elapsed else ""
-        perf  = f"{elapsed} ms  |  {cnt} tokens{speed}"
-        self.perf_lbl.config(text=perf)
-        self.status_var.set(f"完了 — {perf}  [{model}]")
-        self._append_history(src, result, model, elapsed)
+        self.perf_lbl.config(text=f"{elapsed} ms")
+        self.status_var.set(f"完了 — {elapsed} ms  [{preset}]")
+        self._append_history(src, result, preset, elapsed)
 
     # ----------------------------------------------------------
     # 結果 / 履歴
