@@ -28,6 +28,7 @@ struct Config {
     double      ttsSpeakingRate  = 1.0;
     bool        ttsRadioEffect   = true;
     uint32_t    ttsVoicevoxStyleId = 3; // 3=ずんだもんノーマル
+    bool        ttsSpeakTranslated = true; // true=翻訳後, false=原文
 };
 
 namespace config {
