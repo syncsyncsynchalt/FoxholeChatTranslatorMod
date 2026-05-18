@@ -102,6 +102,7 @@ add_library(chat_translator SHARED
     src/config.cpp
     src/overlay.cpp
     src/translate.cpp
+    src/ollama.cpp
     src/tts.cpp
 )
 

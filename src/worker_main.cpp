@@ -13,41 +13,50 @@
 #include "hooks.h"
 #include "overlay.h"
 #include "translate.h"
+#include "ollama.h"
+#include "tts.h"
 #include "config.h"
 
 extern "C" {
 
-// version.dll から呼ばれる。初期化成功時はコールバック関数ポインタを返す。
 __declspec(dllexport) void* WorkerInit() {
     if (!hooks::Init()) {
         return nullptr;
     }
-    overlay::Init();
 
-    // 翻訳モジュール初期化
     const Config& cfg = config::Get();
+
     if (cfg.translationEnabled) {
+        // 1. translate: WinHTTP セッション + ワーカースレッド起動
         translate::TranslateConfig tcfg;
-        tcfg.endpoint          = cfg.ollamaEndpoint;
-        tcfg.targetLang        = cfg.targetLanguage;
+        tcfg.endpoint         = cfg.ollamaEndpoint;
+        tcfg.targetLang       = cfg.targetLanguage;
         tcfg.performancePreset = cfg.performancePreset;
         translate::Init(tcfg);
+
+        // 2. ollama: プロセス管理 + ヘルスワーカー起動
+        // (translate::Init 後に呼ぶ: EnsureModel が g_model を参照するため)
+        ollama::Init("", cfg.ollamaEndpoint);
     }
+
+    // 3. TTS: 音声合成ワーカー起動
+    tts::Init(cfg.ttsLanguage.c_str(), cfg.ttsSpeakingRate,
+              cfg.ttsRadioEffect, cfg.ttsVoicevoxStyleId);
+
+    // 4. overlay: ImGui 遅延初期化登録 + 翻訳コールバック設定
+    overlay::Init();
 
     return reinterpret_cast<void*>(&hooks::OnProcessEvent);
 }
 
 __declspec(dllexport) void WorkerShutdown() {
-    // overlay を先に止める: HealthWorker が translate::IsHealthy() (→ g_hSession 使用) を
-    // 呼んでいる可能性があるため、translate::Shutdown() で g_hSession を閉じる前に join する
+    // overlay を先に止める: HealthWorker が translate::IsHealthy() を呼んでいる可能性があるため
+    // ollama::Shutdown() より前に描画ループを止める
     overlay::Shutdown();
+    ollama::Shutdown();   // Job Object 閉鎖 → Ollama プロセス終了
+    tts::Shutdown();
     translate::Shutdown();
     hooks::Shutdown();
-}
-
-__declspec(dllexport) void WorkerKillChildProcesses() {
-    // DLL_PROCESS_DETACH (プロセス終了) 専用: ミューテックス・ログ不使用
-    translate::KillOllama();
 }
 
 __declspec(dllexport) void WorkerSetPEAddress(uintptr_t addr) {
@@ -70,6 +79,15 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
         DisableThreadLibraryCalls(hModule);
         break;
     case DLL_PROCESS_DETACH:
+        if (lpReserved != nullptr) {
+            // プロセス終了: 全スレッドは既に強制終了済み。
+            // static デストラクタが走る前に std::thread を detach して
+            // ~std::thread() による std::terminate() を防ぐ。
+            // ollama::DetachThread() は Job Object も閉じて Ollama を終了させる。
+            ollama::DetachThread();
+            translate::DetachThread();
+            tts::DetachThread();
+        }
         break;
     }
     return TRUE;

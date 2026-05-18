@@ -10,9 +10,8 @@
 namespace translate {
 
 struct TranslateConfig {
-    std::string endpoint   = "http://localhost:11434/api/generate";
-    std::string targetLang = "Japanese";
-    std::string ollamaDir;          // 同梱 ollama.exe のディレクトリ (空=自動検出)
+    std::string endpoint         = "http://localhost:11434/api/generate";
+    std::string targetLang       = "Japanese";
     std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"
 };
 
@@ -43,10 +42,10 @@ std::string Sync(const std::string& text);
 // Ollama 死活確認 (GET /api/version)
 bool IsHealthy();
 
-// Ollama 再起動 (EnsureOllama 再実行)
-bool Restart();
+// モデルの確認・DL (ollama.cpp から呼ばれる)
+bool EnsureModel();
 
-// Ollama プロセスを即時終了 (DLL_PROCESS_DETACH 緊急用 - ミューテックス/ログ不使用)
-void KillOllama();
+// ワーカースレッドを detach (DLL_PROCESS_DETACH 緊急用)
+void DetachThread();
 
 } // namespace translate
