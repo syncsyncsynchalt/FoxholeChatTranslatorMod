@@ -24,4 +24,7 @@ void Stop();
 // シャットダウン (スレッド終了)
 void Shutdown();
 
+// ワーカースレッドを detach (DLL_PROCESS_DETACH 緊急用 - ~std::thread が std::terminate を呼ばないよう)
+void DetachThread();
+
 } // namespace tts

@@ -902,6 +902,11 @@ void tts::Stop() {
     g_ttsStop.store(true);
 }
 
+void tts::DetachThread() {
+    // DLL_PROCESS_DETACH (プロセス終了) 専用: ~std::thread が std::terminate を呼ばないよう detach する
+    if (g_ttsThread.joinable()) g_ttsThread.detach();
+}
+
 void tts::Shutdown() {
     if (!g_ttsRunning.load()) return;
     g_ttsRunning.store(false);
