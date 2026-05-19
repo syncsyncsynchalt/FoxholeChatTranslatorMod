@@ -246,7 +246,9 @@ void ollama::Shutdown() {
     }
 
     if (g_ollamaProcess) {
-        WaitForSingleObject(g_ollamaProcess, 3000);
+        if (WaitForSingleObject(g_ollamaProcess, 3000) == WAIT_TIMEOUT) {
+            TerminateProcess(g_ollamaProcess, 1);
+        }
         CloseHandle(g_ollamaProcess);
         g_ollamaProcess = nullptr;
     }
