@@ -581,7 +581,9 @@ static DWORD WINAPI InitThread(LPVOID param) {
             uintptr_t obj = *reinterpret_cast<uintptr_t*>(resolved);
             if (obj == 0) continue;
 
-            void** vt = *reinterpret_cast<void***>(obj);
+            void** vt = nullptr;
+            __try { vt = *reinterpret_cast<void***>(obj); }
+            __except (EXCEPTION_EXECUTE_HANDLER) { continue; }
             uintptr_t vtAddr = reinterpret_cast<uintptr_t>(vt);
             if (vtAddr >= moduleBase && vtAddr < moduleBase + moduleSize) {
                 vtable = vt;
