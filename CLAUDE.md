@@ -140,7 +140,7 @@ ProcessEvent → hooks::OnProcessEvent
 - JA → Supertonic 3 (`sherpa-onnx-supertonic-3-tts-int8-2026-05-11`)
 - KO → `vits-mimic3-ko_KO-kss_low`
 
-### VOICEVOX パス (`War/Binaries/Win64/voicevox/`)
+### VOICEVOX パス (`War/Binaries/Win64/tools/tts/voicevox/`)
 
 ```
 c_api/lib/voicevox_core.dll              ← lib/ サブディレクトリ (c_api/ 直下ではない)
