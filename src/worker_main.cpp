@@ -38,7 +38,7 @@ __declspec(dllexport) void* WorkerInit() {
     ollama::Init("", cfg.ollamaEndpoint);
 
     // 3. TTS: 音声合成ワーカー起動
-    tts::Init(cfg.ttsLanguage.c_str(), cfg.ttsSpeakingRate, cfg.ttsVoicevoxStyleId);
+    tts::Init(cfg.ttsLanguage.c_str(), cfg.ttsVoicevoxStyleId);
 
     // 4. overlay: ImGui 遅延初期化登録 + 翻訳コールバック設定
     overlay::Init();

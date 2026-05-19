@@ -1,9 +1,9 @@
 // ============================================================
-// tts.cpp - ニューラルTTS (Sherpa-ONNX Piper VITS)
+// tts.cpp - 多言語TTS (Sherpa-ONNX / VOICEVOX Core)
 //
-// sherpa-onnx.dll を tools/tts/ から動的ロード
-// Piper VITS モデルで自然な発音を実現
-// 再生: XAudio2, エフェクト: バンドパスDSP (変更なし)
+// sherpa-onnx.dll / voicevox_core.dll を tools/tts/ から動的ロード
+// 日本語: VOICEVOX (ずんだもん), その他: Sherpa-ONNX Piper/Supertonic
+// 再生: XAudio2
 // ============================================================
 
 #include "tts.h"
@@ -608,7 +608,6 @@ static SherpaOnnxOfflineTts* GetModel(Lang lang) {
 
 struct TtsRequest {
     std::string text;
-    std::string sender;
 };
 
 static constexpr size_t MAX_TTS_QUEUE_SIZE = 8;
@@ -620,7 +619,6 @@ static std::queue<TtsRequest>  g_ttsQueue;
 static std::atomic<bool>       g_ttsRunning{false};
 static std::atomic<bool>       g_ttsStop{false};
 static std::string             g_ttsLanguage = "auto";
-static float                   g_speakingRate = 1.0f;
 
 static void TtsWorker() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -716,8 +714,7 @@ static void TtsWorker() {
 
         if (g_ttsStop.load()) continue;
 
-        // 音声合成: speed=1.0 は標準速度
-        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, req.text.c_str(), 0, g_speakingRate);
+        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, req.text.c_str(), 0, 1.0f);
         if (!audio || audio->n <= 0) {
             if (audio) g_fnFreeAudio(audio);
             logging::Debug("[TTS] 合成失敗またはサンプルなし");
@@ -741,7 +738,6 @@ static void TtsWorker() {
         }
         g_fnFreeAudio(audio);
 
-        // 無線ラジオ風エフェクト
         WAVEFORMATEX wfx = {};
         wfx.wFormatTag      = WAVE_FORMAT_PCM;
         wfx.nChannels       = 1;
@@ -788,17 +784,15 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language, double speakingRate, uint32_t voicevoxStyleId) {
+void tts::Init(const char* language, uint32_t voicevoxStyleId) {
     if (g_ttsRunning.load()) return;
 
-    g_ttsLanguage  = (language && *language) ? language : "auto";
-    g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0)
-                     ? static_cast<float>(speakingRate) : 1.0f;
-    g_vvStyleId    = voicevoxStyleId;
+    g_ttsLanguage = (language && *language) ? language : "auto";
+    g_vvStyleId   = voicevoxStyleId;
 
     g_ttsDir = GetTtsToolDir();
-    logging::Debug("[TTS] Init (language=%s, rate=%.2f, vvStyleId=%u, dir=%s)",
-                   g_ttsLanguage.c_str(), g_speakingRate, voicevoxStyleId, g_ttsDir.c_str());
+    logging::Debug("[TTS] Init (language=%s, vvStyleId=%u, dir=%s)",
+                   g_ttsLanguage.c_str(), voicevoxStyleId, g_ttsDir.c_str());
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
     if (!sherpaOk)
@@ -823,9 +817,7 @@ void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
             logging::Debug("[TTS] キュー満杯: 最古を破棄");
             g_ttsQueue.pop();
         }
-        TtsRequest req;
-        req.text = textUtf8;
-        g_ttsQueue.push(std::move(req));
+        g_ttsQueue.push({textUtf8});
     }
     g_ttsCv.notify_one();
 }

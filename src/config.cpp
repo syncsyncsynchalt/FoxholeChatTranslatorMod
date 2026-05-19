@@ -29,14 +29,6 @@ void config::Load(const char* baseDir) {
 
     g_config.ttsLanguage = ReadIniStr(configPath.c_str(), "TTS", "Language", "auto");
 
-    std::string rateStr = ReadIniStr(configPath.c_str(), "TTS", "SpeakingRate", "1.0");
-    try {
-        double r = std::stod(rateStr);
-        g_config.ttsSpeakingRate = (r >= 0.5 && r <= 2.0) ? r : 1.0;
-    } catch (...) {
-        g_config.ttsSpeakingRate = 1.0;
-    }
-
     g_config.ttsVoicevoxStyleId  = static_cast<uint32_t>(
         GetPrivateProfileIntA("TTS", "VoicevoxStyleId", 3, configPath.c_str()));
     g_config.ttsSpeakTranslated  = GetPrivateProfileIntA("TTS", "SpeakTranslated",   1, configPath.c_str()) != 0;
