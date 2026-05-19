@@ -214,74 +214,6 @@ static Lang DetectLanguage(const char* textUtf8) {
 }
 
 // ============================================================
-// 無線ラジオ風オーディオエフェクト (バンドパス + クリッピング)
-// ============================================================
-
-struct BiquadCoeffs { double b0, b1, b2, a1, a2; };
-struct BiquadState  { double x1=0, x2=0, y1=0, y2=0; };
-
-static BiquadCoeffs DesignHPF(double fc, double fs) {
-    const double pi = 3.14159265358979323846;
-    double w0    = 2.0 * pi * fc / fs;
-    double alpha = sin(w0) / (2.0 * 0.7071067811865476);
-    double cosw0 = cos(w0);
-    double a0    = 1.0 + alpha;
-    return { (1+cosw0)/2/a0, -(1+cosw0)/a0, (1+cosw0)/2/a0,
-             -2*cosw0/a0, (1-alpha)/a0 };
-}
-
-static BiquadCoeffs DesignLPF(double fc, double fs) {
-    const double pi = 3.14159265358979323846;
-    double w0    = 2.0 * pi * fc / fs;
-    double alpha = sin(w0) / (2.0 * 0.7071067811865476);
-    double cosw0 = cos(w0);
-    double a0    = 1.0 + alpha;
-    return { (1-cosw0)/2/a0, (1-cosw0)/a0, (1-cosw0)/2/a0,
-             -2*cosw0/a0, (1-alpha)/a0 };
-}
-
-static void ApplyRadioEffect(BYTE* dataChunk, DWORD dataSize, const WAVEFORMATEX& wfx) {
-    if (wfx.wFormatTag != WAVE_FORMAT_PCM || wfx.wBitsPerSample != 16 || !wfx.nSamplesPerSec) return;
-
-    int16_t* s16    = reinterpret_cast<int16_t*>(dataChunk);
-    size_t   n      = dataSize / 2;
-    int      ch     = wfx.nChannels;
-    size_t   frames = n / ch;
-    double   fs     = static_cast<double>(wfx.nSamplesPerSec);
-
-    std::vector<float> buf(n);
-    for (size_t i = 0; i < n; i++) buf[i] = s16[i] / 32768.0f;
-
-    BiquadCoeffs hpf = DesignHPF(300.0,  fs);
-    BiquadCoeffs lpf = DesignLPF(3400.0, fs);
-
-    for (int c = 0; c < ch; c++) {
-        BiquadState hs, ls;
-        for (size_t f = 0; f < frames; f++) {
-            float* p = &buf[f * ch + c];
-            double y = hpf.b0 * *p + hpf.b1*hs.x1 + hpf.b2*hs.x2 - hpf.a1*hs.y1 - hpf.a2*hs.y2;
-            hs.x2=hs.x1; hs.x1=*p;  hs.y2=hs.y1; hs.y1=y;
-            double z = lpf.b0 * y   + lpf.b1*ls.x1 + lpf.b2*ls.x2 - lpf.a1*ls.y1 - lpf.a2*ls.y2;
-            ls.x2=ls.x1; ls.x1=y;   ls.y2=ls.y1; ls.y1=z;
-            *p = static_cast<float>(z);
-        }
-    }
-
-    const float kClip = 0.85f;
-    for (size_t i = 0; i < n; i++) {
-        float v = buf[i] * 1.4f;
-        v = v > kClip ? kClip : (v < -kClip ? -kClip : v);
-        buf[i] = v / kClip;
-    }
-    for (size_t i = 0; i < n; i++) {
-        float v = buf[i];
-        if (v >  1.0f) v =  1.0f;
-        if (v < -1.0f) v = -1.0f;
-        s16[i] = static_cast<int16_t>(v * 32767.0f);
-    }
-}
-
-// ============================================================
 // DLL ベースディレクトリ取得
 // ============================================================
 
@@ -689,7 +621,6 @@ static std::atomic<bool>       g_ttsRunning{false};
 static std::atomic<bool>       g_ttsStop{false};
 static std::string             g_ttsLanguage = "auto";
 static float                   g_speakingRate = 1.0f;
-static bool                    g_radioEffect  = true;
 
 static void TtsWorker() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -747,8 +678,6 @@ static void TtsWorker() {
             wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * 2;
 
             DWORD dataSize = static_cast<DWORD>(vvPcm.samples.size() * 2);
-            if (g_radioEffect)
-                ApplyRadioEffect(reinterpret_cast<BYTE*>(vvPcm.samples.data()), dataSize, wfx);
 
             IXAudio2SourceVoice* sourceVoice = nullptr;
             hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
@@ -822,8 +751,6 @@ static void TtsWorker() {
         wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
 
         DWORD dataSize = static_cast<DWORD>(pcm16.size() * 2);
-        if (g_radioEffect)
-            ApplyRadioEffect(reinterpret_cast<BYTE*>(pcm16.data()), dataSize, wfx);
 
         // XAudio2 再生
         IXAudio2SourceVoice* sourceVoice = nullptr;
@@ -861,18 +788,17 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language, double speakingRate, bool radioEffect, uint32_t voicevoxStyleId) {
+void tts::Init(const char* language, double speakingRate, uint32_t voicevoxStyleId) {
     if (g_ttsRunning.load()) return;
 
     g_ttsLanguage  = (language && *language) ? language : "auto";
     g_speakingRate = (speakingRate >= 0.5 && speakingRate <= 2.0)
                      ? static_cast<float>(speakingRate) : 1.0f;
-    g_radioEffect  = radioEffect;
     g_vvStyleId    = voicevoxStyleId;
 
     g_ttsDir = GetTtsToolDir();
-    logging::Debug("[TTS] Init (language=%s, rate=%.2f, radio=%d, vvStyleId=%u, dir=%s)",
-                   g_ttsLanguage.c_str(), g_speakingRate, (int)radioEffect, voicevoxStyleId, g_ttsDir.c_str());
+    logging::Debug("[TTS] Init (language=%s, rate=%.2f, vvStyleId=%u, dir=%s)",
+                   g_ttsLanguage.c_str(), g_speakingRate, voicevoxStyleId, g_ttsDir.c_str());
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
     if (!sherpaOk)

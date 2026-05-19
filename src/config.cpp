@@ -42,7 +42,6 @@ void config::Load(const char* baseDir) {
         g_config.ttsSpeakingRate = 1.0;
     }
 
-    g_config.ttsRadioEffect      = GetPrivateProfileIntA("TTS", "RadioEffect",        1, configPath.c_str()) != 0;
     g_config.ttsVoicevoxStyleId  = static_cast<uint32_t>(
         GetPrivateProfileIntA("TTS", "VoicevoxStyleId", 3, configPath.c_str()));
     g_config.ttsSpeakTranslated  = GetPrivateProfileIntA("TTS", "SpeakTranslated",   1, configPath.c_str()) != 0;
