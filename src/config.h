@@ -13,7 +13,6 @@ struct Config {
     int         initDelayMs = 10000;
 
     // [Translation]
-    bool        translationEnabled = true;
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
     std::string targetLanguage = "Japanese";
     std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"

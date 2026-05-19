@@ -26,18 +26,16 @@ __declspec(dllexport) void* WorkerInit() {
 
     const Config& cfg = config::Get();
 
-    if (cfg.translationEnabled) {
-        // 1. translate: WinHTTP セッション + ワーカースレッド起動
-        translate::TranslateConfig tcfg;
-        tcfg.endpoint         = cfg.ollamaEndpoint;
-        tcfg.targetLang       = cfg.targetLanguage;
-        tcfg.performancePreset = cfg.performancePreset;
-        translate::Init(tcfg);
+    // 1. translate: WinHTTP セッション + ワーカースレッド起動
+    translate::TranslateConfig tcfg;
+    tcfg.endpoint         = cfg.ollamaEndpoint;
+    tcfg.targetLang       = cfg.targetLanguage;
+    tcfg.performancePreset = cfg.performancePreset;
+    translate::Init(tcfg);
 
-        // 2. ollama: プロセス管理 + ヘルスワーカー起動
-        // (translate::Init 後に呼ぶ: EnsureModel が g_model を参照するため)
-        ollama::Init("", cfg.ollamaEndpoint);
-    }
+    // 2. ollama: プロセス管理 + ヘルスワーカー起動
+    // (translate::Init 後に呼ぶ: EnsureModel が g_model を参照するため)
+    ollama::Init("", cfg.ollamaEndpoint);
 
     // 3. TTS: 音声合成ワーカー起動
     tts::Init(cfg.ttsLanguage.c_str(), cfg.ttsSpeakingRate, cfg.ttsVoicevoxStyleId);
