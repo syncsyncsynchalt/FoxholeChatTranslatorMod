@@ -62,14 +62,14 @@ New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
 # ヘルパー関数
 # ============================================================
 
-function Download-File {
+function Invoke-FileDownload {
     param([string]$Url, [string]$Dest, [string]$Label = "")
     $name = if ($Label) { $Label } else { Split-Path $Url -Leaf }
     Write-Host "  ダウンロード中: $name" -ForegroundColor Gray
     Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
 }
 
-function Extract-Tar {
+function Expand-TarArchive {
     param([string]$Archive, [string]$DestDir)
     New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
     & "$env:SystemRoot\System32\tar.exe" -xf $Archive -C $DestDir 2>&1 | Out-Null
@@ -125,10 +125,10 @@ if (-not $SkipDll) {
         Write-Host "  sherpa-onnx.dll と onnxruntime.dll を $TtsDir に配置してください。"
     } else {
         $archivePath = Join-Path $TmpDir $dllAsset.name
-        Download-File $dllAsset.browser_download_url $archivePath $dllAsset.name
+        Invoke-FileDownload $dllAsset.browser_download_url $archivePath $dllAsset.name
 
         $dllExtractDir = Join-Path $TmpDir "dll_extract"
-        Extract-Tar $archivePath $dllExtractDir
+        Expand-TarArchive $archivePath $dllExtractDir
 
         # DLL ファイルをコピー
         $dlls = Get-ChildItem -Recurse $dllExtractDir -Filter "*.dll"
@@ -149,14 +149,6 @@ if (-not $SkipDll) {
             if (Test-Path $espeakDest) { Remove-Item $espeakDest -Recurse -Force }
             Copy-Item $espeakInPkg.FullName $espeakDest -Recurse -Force
             Write-Host "  espeak-ng-data/ をコピー (DLL パッケージ)" -ForegroundColor Green
-        }
-
-        # sherpa-onnx.dll がない場合は sherpa-onnx-c-api.dll を代替として使用
-        $mainDll = Join-Path $TtsDir "sherpa-onnx.dll"
-        $cApiDll = Join-Path $TtsDir "sherpa-onnx-c-api.dll"
-        if (-not (Test-Path $mainDll) -and (Test-Path $cApiDll)) {
-            Copy-Item $cApiDll $mainDll -Force
-            Write-Host "  sherpa-onnx-c-api.dll → sherpa-onnx.dll としてコピー" -ForegroundColor Yellow
         }
 
         Remove-Item $dllExtractDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -208,8 +200,8 @@ foreach ($kv in $AllModels.GetEnumerator()) {
         $archivePath = Join-Path $TmpDir $archiveName
         $extractDir  = Join-Path $TmpDir "${lang}_extract"
         try {
-            Download-File "$ModelBaseUrl/$archiveName" $archivePath $archiveName
-            Extract-Tar $archivePath $extractDir
+            Invoke-FileDownload "$ModelBaseUrl/$archiveName" $archivePath $archiveName
+            Expand-TarArchive $archivePath $extractDir
 
             $suFiles = @("duration_predictor.int8.onnx","text_encoder.int8.onnx",
                          "vector_estimator.int8.onnx","vocoder.int8.onnx",
@@ -249,8 +241,8 @@ foreach ($kv in $AllModels.GetEnumerator()) {
     $extractDir  = Join-Path $TmpDir "${lang}_extract"
 
     try {
-        Download-File "$ModelBaseUrl/$archiveName" $archivePath $archiveName
-        Extract-Tar $archivePath $extractDir
+        Invoke-FileDownload "$ModelBaseUrl/$archiveName" $archivePath $archiveName
+        Expand-TarArchive $archivePath $extractDir
 
         # model.onnx
         $onnxFile = Get-ChildItem -Recurse $extractDir -Filter "*.onnx" | Select-Object -First 1
@@ -340,7 +332,7 @@ if (Test-Path $VvCoreDll) {
         if (-not $vvAsset) { throw "download-windows-x64.exe アセットが見つかりません" }
 
         $VvDownloaderPath = Join-Path $TmpDir "voicevox_downloader.exe"
-        Download-File $vvAsset.browser_download_url $VvDownloaderPath "voicevox_downloader.exe"
+        Invoke-FileDownload $vvAsset.browser_download_url $VvDownloaderPath "voicevox_downloader.exe"
 
         New-Item -ItemType Directory -Force -Path $VvDir | Out-Null
 

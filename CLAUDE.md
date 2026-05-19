@@ -64,7 +64,6 @@ Foxhole (UE4 4.24.3) チャット傍受 → Ollama 翻訳 → Sherpa-ONNX / VOIC
 | Translation | PerformancePreset | "Medium" | Low / Medium / High |
 | Overlay | DemoMode | true | false = 実チャット駆動 |
 | TTS | Language | "auto" | auto = テキストから自動判定 |
-| TTS | SpeakingRate | 1.0 | 読み上げ速度 (0.5〜2.0) |
 | TTS | RadioEffect | true | ラジオ DSP エフェクト |
 | TTS | VoicevoxStyleId | 3 | VOICEVOX スタイル ID (3 = ずんだもんノーマル) |
 | TTS | SpeakTranslated | true | true = 翻訳後を読み上げ / false = 原文 |
@@ -154,10 +153,6 @@ dict/open_jtalk_dic_utf_8-1.11/
 - VOICEVOX 初期化成功 + 言語=JA → VOICEVOX (style_id=3 = ずんだもんノーマル)
 - VOICEVOX 失敗または非 JA → Sherpa-ONNX にフォールバック
 - 両方とも使用不可 → TTS スレッドを起動しない (スキップ)
-
-### ラジオエフェクト (`ApplyRadioEffect`)
-
-増幅 1.4× → HPF 300Hz → LPF 3400Hz → クリッピング ±0.85 (Biquad Q=√2/2)
 
 ---
 
