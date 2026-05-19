@@ -698,6 +698,7 @@ static void TtsWorker() {
     HRESULT hr = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
     if (FAILED(hr)) {
         logging::Debug("[TTS] XAudio2Create 失敗: 0x%08X", hr);
+        g_ttsRunning.store(false);
         return;
     }
 
