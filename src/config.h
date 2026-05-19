@@ -9,7 +9,6 @@
 struct Config {
     // [General]
     bool        enableConsole = true;
-    std::string logFilePath;
 
     // [Translation]
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";

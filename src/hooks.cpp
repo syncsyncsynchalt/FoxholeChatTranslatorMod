@@ -344,9 +344,6 @@ bool hooks::Init() {
     const Config& cfg = config::Get();
 
     logging::Init(baseDir.c_str(), cfg.enableConsole);
-    if (!cfg.logFilePath.empty()) {
-        logging::SetChatLogPath(cfg.logFilePath.c_str());
-    }
 
     logging::Debug("===================================");
     logging::Debug("Foxhole Chat Translator");
@@ -364,7 +361,7 @@ bool hooks::Init() {
         logging::Debug("GNames 未検出 - 遅延リトライで再試行");
     }
 
-    logging::Debug("チャットログ出力先: %s", cfg.logFilePath.c_str());
+    logging::Debug("チャットログ出力先: %schat_log.txt", baseDir.c_str());
     return true;
 }
 
