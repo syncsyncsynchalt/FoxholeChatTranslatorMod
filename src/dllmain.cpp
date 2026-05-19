@@ -540,9 +540,8 @@ static DWORD WINAPI InitThread(LPVOID param) {
         LogLoader("メインモジュール: base=0x%llX size=0x%X", moduleBase, moduleSize);
     }
 
-    int initDelay = GetPrivateProfileIntA("General", "InitDelayMs", 10000, configPath);
-    LogLoader("UE4 初期化を待機中 (%dms)...", initDelay);
-    Sleep(initDelay);
+    LogLoader("UE4 初期化を待機中 (10000ms)...");
+    Sleep(10000);
 
     // MinHook 初期化
     MH_STATUS mhStatus = MH_Initialize();
