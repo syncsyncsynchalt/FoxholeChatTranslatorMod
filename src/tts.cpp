@@ -509,8 +509,12 @@ static bool ParseWavPcm(const uint8_t* wav, uintptr_t size, PcmData& out) {
     const uint8_t* dataPtr = nullptr;
     size_t pos = 12;
 
-    while (pos + 8 <= static_cast<size_t>(size)) {
+    const size_t fileSize = static_cast<size_t>(size);
+    while (pos + 8 <= fileSize) {
         uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(&wav[pos + 4]);
+        size_t chunkEnd = pos + 8 + static_cast<size_t>(chunkSize);
+        // オーバーフロー・範囲外チェック: chunkEnd が折り返すか fileSize を超える場合は終了
+        if (chunkEnd < pos || chunkEnd > fileSize) break;
         if (!memcmp(&wav[pos], "fmt ", 4) && chunkSize >= 16) {
             sampleRate    = *reinterpret_cast<const uint32_t*>(&wav[pos + 12]);
             bitsPerSample = *reinterpret_cast<const uint16_t*>(&wav[pos + 22]);
@@ -518,10 +522,11 @@ static bool ParseWavPcm(const uint8_t* wav, uintptr_t size, PcmData& out) {
             dataPtr  = &wav[pos + 8];
             dataSize = chunkSize;
         }
-        pos += 8 + chunkSize;
+        pos = chunkEnd;
         if (chunkSize % 2) pos++;
     }
     if (!dataPtr || !sampleRate || bitsPerSample != 16) return false;
+    if (dataPtr + dataSize > wav + fileSize) return false;  // data チャンクがバッファ内に収まるか確認
 
     out.sampleRate = static_cast<int32_t>(sampleRate);
     out.samples.assign(reinterpret_cast<const int16_t*>(dataPtr),
