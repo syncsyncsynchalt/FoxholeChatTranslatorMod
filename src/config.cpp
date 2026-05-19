@@ -20,7 +20,6 @@ void config::Load(const char* baseDir) {
     std::string configPath = dir + "config.ini";
 
     g_config.enableConsole = GetPrivateProfileIntA("General", "EnableConsole", 1, configPath.c_str()) != 0;
-    g_config.initDelayMs = GetPrivateProfileIntA("General", "InitDelayMs", 10000, configPath.c_str());
 
     std::string logPath = ReadIniStr(configPath.c_str(), "General", "LogFilePath", "");
     g_config.logFilePath = logPath.empty() ? (dir + "chat_log.txt") : logPath;

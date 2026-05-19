@@ -10,7 +10,6 @@ struct Config {
     // [General]
     bool        enableConsole = true;
     std::string logFilePath;
-    int         initDelayMs = 10000;
 
     // [Translation]
     std::string ollamaEndpoint = "http://localhost:11434/api/generate";
