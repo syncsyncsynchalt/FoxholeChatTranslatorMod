@@ -28,7 +28,7 @@ void config::Load(const char* baseDir) {
     g_config.targetLanguage = ReadIniStr(configPath.c_str(), "Translation", "TargetLanguage", "Japanese");
     g_config.performancePreset = ReadIniStr(configPath.c_str(), "Translation", "PerformancePreset", "Medium");
 
-    g_config.demoMode       = GetPrivateProfileIntA("Overlay", "DemoMode", 1, configPath.c_str()) != 0;
+    g_config.demoMode       = GetPrivateProfileIntA("General", "DemoMode", 1, configPath.c_str()) != 0;
 
     g_config.ttsLanguage = ReadIniStr(configPath.c_str(), "TTS", "Language", "auto");
 
