@@ -210,6 +210,13 @@ static void HealthWorker() {
 // ============================================================
 
 void ollama::Init(const std::string& ollamaDir, const std::string& endpoint) {
+    // Shutdown を経ずに再 Init された場合の防衛
+    if (g_healthThread.joinable()) {
+        g_running.store(false);
+        g_healthCv.notify_all();
+        g_healthThread.join();
+    }
+
     g_ollamaDir = ollamaDir;
     g_managed   = IsLocalEndpoint(endpoint);
 
