@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: CMake 構成
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: ビルド (Release)
+        run: cmake --build build --config Release --parallel
+
+      - name: Ollama バイナリを取得
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/ollama/ollama/releases/latest" `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "ChatTranslator-CI" }
+          $asset = $release.assets | Where-Object { $_.name -eq "ollama-windows-amd64.zip" }
+          if (-not $asset) { throw "ollama-windows-amd64.zip がリリースに見つかりません" }
+
+          Write-Host "Ollama $($release.tag_name) をダウンロード中..."
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "ollama.zip"
+          New-Item -ItemType Directory -Path "tools\ollama" -Force | Out-Null
+          Expand-Archive -Path "ollama.zip" -DestinationPath "tools\ollama" -Force
+          Remove-Item "ollama.zip"
+          Write-Host "Ollama バイナリ取得完了"
+
+      - name: リリース ZIP を作成
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $outDir  = "ChatTranslator-$version"
+          New-Item -ItemType Directory -Path $outDir | Out-Null
+
+          # DLL + 設定
+          Copy-Item "build\Release\version.dll"        $outDir
+          Copy-Item "build\Release\chat_translator.dll" $outDir
+          Copy-Item "config.ini"                        $outDir
+          Copy-Item "term_protection.txt"               $outDir
+
+          # インストーラー
+          Copy-Item "install.ps1"  $outDir
+          Copy-Item "setup_tts.ps1" $outDir
+
+          # アセット
+          New-Item -ItemType Directory -Path "$outDir\assets" | Out-Null
+          Copy-Item "assets\NotoSansCJKjp-Regular.otf" "$outDir\assets\"
+          Copy-Item "assets\radio_on.wav"               "$outDir\assets\"
+          Copy-Item "assets\radio_off.wav"              "$outDir\assets\"
+
+          # Ollama (バイナリのみ、models/ は初回起動時に自動 pull)
+          New-Item -ItemType Directory -Path "$outDir\tools" | Out-Null
+          Copy-Item -Recurse "tools\ollama" "$outDir\tools\ollama"
+
+          # ZIP 化
+          $zipName = "ChatTranslator-$version.zip"
+          Compress-Archive -Path "$outDir\*" -DestinationPath $zipName
+          Write-Host "パッケージ完了: $zipName"
+
+      - name: GitHub Release を作成して ZIP をアップロード
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ChatTranslator-*.zip
+          generate_release_notes: true

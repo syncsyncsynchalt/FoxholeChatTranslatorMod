@@ -1,69 +1,97 @@
 # Foxhole Chat Translator
 
-Foxholeのゲーム内チャットをリアルタイムで日本語に翻訳し、原文を音声で読み上げる雰囲気Mod。
-
-英語・ロシア語・韓国語・中国語のチャットが自動的に日本語に翻訳されて画面に表示され、同時に音声で読み上げられます。翻訳はローカルAI（Ollama）で処理するため、インターネット接続やAPIキーは不要です。
+英語・ロシア語・韓国語・中国語のチャットをリアルタイムで日本語に翻訳するMod。**ずんだもんの声で読み上げもできます。**
 
 ![動作イメージ](docs/demo.png)
 
-> **注意**: DLLインジェクション方式のため EAC BAN のリスクがあります。自己責任でご利用ください。
+---
 
-## できること
+## こんな感じで動きます
 
-- ゲーム内チャット（全チャンネル）をリアルタイムで自動翻訳
-- 翻訳結果を画面右下にオーバーレイ表示（原文＋翻訳の2行）
-- チャットメッセージを音声で読み上げ（送信者ごとに異なる声）
-- ラジオアイコンのクリックでON/OFF切替
-- 翻訳AIの異常検知と自動復旧
+```
+[Squad] DontSleep_US: enemy tanks north, need AT fast
+→ 「北に敵戦車。対戦車装備が至急必要」
+
+[Logi] Иван_RU: нужны патроны на передовой
+→ 「前線で弾薬が必要」
+
+[Local] 철수_KR: 다리 폭파해야 해요
+→ 「橋を爆破する必要があります」
+```
+
+翻訳はPC内のAIが処理するため、**外部サービスへの登録も課金も不要**です。
+
+---
+
+## 機能
+
+| 機能 | 内容 |
+|------|------|
+| チャット翻訳 | 英語・ロシア語・韓国語・中国語 → 日本語をリアルタイム表示 |
+| ずんだもん読み上げ | 翻訳テキストをずんだもんの声で読み上げ |
+| オーバーレイ表示 | 画面右下に原文と翻訳を同時表示 |
+| ワンクリックON/OFF | ラジオアイコンで即座に切り替え |
+
+---
+
+## ⚠️ BANリスクについて
+
+EAC（不正行為対策）に検知されてBANされる可能性があります。現時点でBAN報告はありませんが、**自己責任でご利用ください。**
+
+---
+
+## 動作環境
+
+Windows 10 / 11（64ビット）、Steam版Foxhole、空きディスク約5GB
+
+---
 
 ## インストール
 
-### 1. ファイルを配置
+### 1. ZIPをダウンロードして解凍
 
-以下のファイルを `Foxhole\War\Binaries\Win64\` にコピーしてください：
+**[最新版をダウンロード](https://github.com/syncsyncsynchalt/FoxholeChatTranslatorMod/releases/latest)**
 
-```
-War\Binaries\Win64\
-  ├── version.dll          ← Modローダー
-  ├── chat_translator.dll  ← 翻訳エンジン
-  ├── config.ini           ← 設定ファイル
-  ├── assets\
-  │     ├── NotoSansCJKjp-Regular.otf  ← フォント
-  │     ├── radio_on.wav               ← サウンド
-  │     └── radio_off.wav              ← サウンド
-  └── tools\
-        └── ollama\         ← 翻訳AIエンジン（同梱済み）
-```
+### 2. インストーラーを起動
 
-### 2. 音声読み上げの準備（任意）
+`install.ps1` を右クリック →「**PowerShell で実行**」
 
-音声読み上げを使うには、Windows の音声パックをインストールします。管理者権限の PowerShell で実行してください：
+Foxholeのインストール先が自動検出されてインストールされます。
 
-```powershell
-Add-WindowsCapability -Online -Name "Language.Speech~~~en-US~0.0.1.0"
-Add-WindowsCapability -Online -Name "Language.Speech~~~zh-CN~0.0.1.0"
-Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ru-RU~0.0.1.0"
-Add-WindowsCapability -Online -Name "Language.TextToSpeech~~~ko-KR~0.0.1.0"
-```
+> **エラーが出た場合:** PowerShell を管理者として開き、以下を実行してください:
+> ```
+> Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+> ```
 
-日本語音声は Windows 日本語版なら標準搭載です。この手順をスキップしても翻訳テキスト表示は動作します。
+### 3. Foxholeを起動
 
-### 3. ゲームを起動
+> **📥 初回起動のみ:** 翻訳AIのデータ（約3GB）が自動でダウンロードされます。準備が終わると自動で翻訳が始まります（目安：5〜15分）。
 
-通常通りFoxholeを起動するだけで自動的に有効になります。初回はAIモデル（約3GB）のダウンロードが行われるため、翻訳が始まるまで数分かかります。
+---
 
 ## 使い方
 
-- **画面右下のラジオアイコン**をクリックするとON/OFFが切り替わります
-- ON：チャットが翻訳されて表示＋読み上げ
-- OFF（半透明）：翻訳停止
-- 赤色：翻訳AIに異常発生 → クリックで再起動
+画面右下の **ラジオアイコン** をクリックするだけです。
+
+| アイコン | 状態 |
+|---------|------|
+| 通常（白） | 翻訳・読み上げ ON |
+| 半透明 | 翻訳・読み上げ OFF |
+| 赤色 | 翻訳AIに異常あり（クリックで再起動） |
+
+---
+
+## 音声読み上げ（ずんだもん）
+
+インストール時に案内されます。後から追加する場合は `setup_tts.ps1` を右クリック →「**PowerShell で実行**」。
+
+約500MB〜1GBのダウンロードが発生します。スキップしてもテキスト翻訳は正常に動作します。
+
+---
 
 ## アンインストール
 
-`War\Binaries\Win64\` から以下を削除するだけです：
-- version.dll
-- chat_translator.dll
-- config.ini
-- assets フォルダ
-- tools フォルダ
+1. Steamライブラリで Foxhole を右クリック →「プロパティ」→「ローカルファイル」→「参照」
+2. `War\Binaries\Win64\` 内の以下を削除:
+   - `version.dll` / `chat_translator.dll` / `config.ini`
+   - `assets` フォルダ / `tools` フォルダ
