@@ -598,7 +598,7 @@ static DWORD WINAPI InitThread(LPVOID param) {
         return 1;
     }
 
-    int peIndex = GetPrivateProfileIntA("Addresses", "ProcessEventVtableIndex", 66, configPath);
+    constexpr int peIndex = 66; // UE4 4.24.3 ProcessEvent vtable インデックス
     uintptr_t peAddr = reinterpret_cast<uintptr_t>(vtable[peIndex]);
     LogLoader("ProcessEvent: vtable[%d] = 0x%llX (+0x%llX)",
               peIndex, peAddr, peAddr - moduleBase);
