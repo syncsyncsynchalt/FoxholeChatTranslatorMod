@@ -99,7 +99,7 @@ Write-Ok "Target: $targetDir"
 # ================================================================
 if ($Uninstall) {
     Write-Head "Uninstall"
-    $removeFiles = @("version.dll", "chat_translator.dll", "config.ini", "term_protection.txt")
+    $removeFiles = @("version.dll", "chat_translator.dll", "chat_translator_live.dll", "config.ini", "term_protection.txt", "chat_log.txt", "loader_log.txt", "debug_log.txt", "imgui.ini")
     $removeDirs  = @("assets", "tools")
     $anyRemoved  = $false
     foreach ($f in $removeFiles) {

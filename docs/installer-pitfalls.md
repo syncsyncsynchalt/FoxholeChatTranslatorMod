@@ -104,7 +104,36 @@ winget install Ollama.Ollama --silent --disable-interactivity --force
 
 ---
 
-## 5. install.ps1 の UTF-8 BOM 必須
+## 5. -Uninstall が削除すべきファイル一覧
+
+### 背景
+ゲーム実行中に mod が生成するファイルが複数あり、当初の uninstall リストは静的な配布ファイルしか含んでいなかった。
+
+### 削除すべきファイル (全て `War\Binaries\Win64\` 直下)
+
+| ファイル/ディレクトリ | 種別 | 生成タイミング |
+|---|---|---|
+| `version.dll` | 配布 | インストール時 |
+| `chat_translator.dll` | 配布 | インストール時 |
+| `chat_translator_live.dll` | 実行時生成 | ゲーム起動時 (ホットリロード用コピー) |
+| `config.ini` | 配布 | インストール時 |
+| `term_protection.txt` | 配布 | インストール時 |
+| `chat_log.txt` | 実行時生成 | ゲーム起動後 (翻訳ログ) |
+| `loader_log.txt` | 実行時生成 | ゲーム起動後 (ローダーログ) |
+| `debug_log.txt` | 実行時生成 | ゲーム起動後 (デバッグログ) |
+| `imgui.ini` | 実行時生成 | ゲーム起動後 (ImGui ウィンドウ設定) |
+| `assets\` | 配布ディレクトリ | インストール時 |
+| `tools\` | 配布ディレクトリ | インストール時 (Ollama/TTS ツール) |
+
+### 確認方法
+```powershell
+# インストール後に何が置かれているか確認する
+Get-ChildItem "War\Binaries\Win64" -File | Where-Object { $_.Name -notlike "FoxholeClient*" -and $_.Name -notlike "EasyAntiCheat*" }
+```
+
+---
+
+## 6. install.ps1 の UTF-8 BOM 必須
 
 ### 症状
 PS5 + 日本語 Windows で実行するとスクリプトが正しくパースされない。例:
