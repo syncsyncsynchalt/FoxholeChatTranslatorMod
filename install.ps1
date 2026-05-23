@@ -5,13 +5,13 @@
 #   .\install.ps1 -Dev                               # dev mode  (DLLs from build\Release\)
 #   .\install.ps1 -FoxholePath "D:\Games\Foxhole"    # manual Foxhole path
 #   .\install.ps1 -LangsOnly ja,en                   # limit TTS model languages
-#   .\install.ps1 -Uninstall                         # remove all mod files
+#
+# To uninstall: .\uninstall.ps1
 
 param(
     [string]$FoxholePath = "",
     [switch]$Dev,
-    [string]$LangsOnly = "",
-    [switch]$Uninstall
+    [string]$LangsOnly = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -93,44 +93,6 @@ if (-not (Test-Path $targetDir)) {
     exit 1
 }
 Write-Ok "Target: $targetDir"
-
-# ================================================================
-# Uninstall
-# ================================================================
-if ($Uninstall) {
-    Write-Head "Uninstall"
-    $removeFiles = @("version.dll", "chat_translator.dll", "chat_translator_live.dll", "config.ini", "term_protection.txt", "chat_log.txt", "loader_log.txt", "debug_log.txt", "imgui.ini")
-    $removeDirs  = @("assets", "tools")
-    $anyRemoved  = $false
-    foreach ($f in $removeFiles) {
-        $p = Join-Path $targetDir $f
-        if (Test-Path $p) {
-            Remove-Item $p -Force
-            Write-Ok "Removed: $f"
-            $anyRemoved = $true
-        } else {
-            Write-Step "Not found (skipped): $f"
-        }
-    }
-    foreach ($d in $removeDirs) {
-        $p = Join-Path $targetDir $d
-        if (Test-Path $p) {
-            Remove-Item $p -Recurse -Force
-            Write-Ok "Removed: $d\"
-            $anyRemoved = $true
-        } else {
-            Write-Step "Not found (skipped): $d\"
-        }
-    }
-    if ($anyRemoved) {
-        Write-Host ""
-        Write-Host "Uninstall complete." -ForegroundColor Green
-    } else {
-        Write-Warn "No mod files found. Already uninstalled?"
-    }
-    try { Read-Host "Press Enter to exit" } catch { }
-    exit 0
-}
 
 # ================================================================
 # [3/5] Mod files
@@ -458,7 +420,7 @@ Write-Host "     (Translation may take a few minutes to start)"
 Write-Host "  3. Toggle translation with the radio icon in the bottom-right corner"
 Write-Host ""
 Write-Host "Uninstall:"
-Write-Host "  .\install.ps1 -Uninstall"
+Write-Host "  .\uninstall.ps1"
 Write-Host ""
 
 try { Read-Host "Press Enter to exit" } catch { }
