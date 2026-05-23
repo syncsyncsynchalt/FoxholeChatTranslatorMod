@@ -55,7 +55,6 @@ jobs:
 
           # インストーラー
           Copy-Item "install.ps1"  $outDir
-          Copy-Item "setup_tts.ps1" $outDir
 
           # アセット
           New-Item -ItemType Directory -Path "$outDir\assets" | Out-Null

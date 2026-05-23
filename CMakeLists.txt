@@ -123,55 +123,6 @@ set_target_properties(chat_translator PROPERTIES
 )
 
 # ============================================================
-# Post-build: copy DLLs to game binary directory
-# CI環境では -DENABLE_GAME_COPY=OFF を指定してスキップする
-# ============================================================
-option(ENABLE_GAME_COPY "ビルド後にゲームディレクトリへ自動コピーする (CI では OFF)" ON)
-
-if(ENABLE_GAME_COPY)
-    set(GAME_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../War/Binaries/Win64")
-
-    # version.dll はゲーム起動前にコピー必要 (ゲーム中は更新不可)
-    add_custom_command(TARGET version POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:version>"
-            "${GAME_BIN_DIR}/version.dll"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
-            "${GAME_BIN_DIR}/config.ini"
-        COMMENT "Copying version.dll and config.ini to ${GAME_BIN_DIR}"
-    )
-
-    # chat_translator.dll はゲーム起動中でもコピー可能 (ホットリロード対応)
-    add_custom_command(TARGET chat_translator POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:chat_translator>"
-            "${GAME_BIN_DIR}/chat_translator.dll"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
-            "${GAME_BIN_DIR}/config.ini"
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "${GAME_BIN_DIR}/assets"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/radio_on.wav"
-            "${GAME_BIN_DIR}/assets/radio_on.wav"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/radio_off.wav"
-            "${GAME_BIN_DIR}/assets/radio_off.wav"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/NotoSansCJKjp-Regular.otf"
-            "${GAME_BIN_DIR}/assets/NotoSansCJKjp-Regular.otf"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/ollama"
-            "${GAME_BIN_DIR}/tools/ollama"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/term_protection.txt"
-            "${GAME_BIN_DIR}/term_protection.txt"
-        COMMENT "Copying chat_translator.dll + assets + tools to ${GAME_BIN_DIR} (F9でリロード可能)"
-    )
-endif()
-
-# ============================================================
 # テスト用ローダー (DLL動作確認)
 # ============================================================
 add_executable(test_loader test/test_loader.cpp)

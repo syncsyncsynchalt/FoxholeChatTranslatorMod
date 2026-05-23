@@ -303,7 +303,7 @@ static bool InitVoicevox(const std::string& ttsDir) {
     std::string dllPath = vvDir + "c_api\\lib\\voicevox_core.dll";
 
     if (GetFileAttributesA(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        logging::Debug("[TTS-VV] セットアップ未完了 (setup_tts.ps1 を実行してください)");
+        logging::Debug("[TTS-VV] セットアップ未完了 (install.ps1 を実行してください)");
         return false;
     }
 
@@ -796,7 +796,7 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId) {
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
     if (!sherpaOk)
-        logging::Debug("[TTS] sherpa-onnx.dll が見つかりません。setup_tts.ps1 を実行してください。");
+        logging::Debug("[TTS] sherpa-onnx.dll が見つかりません。install.ps1 を実行してください。");
 
     InitVoicevox(g_ttsDir);
 

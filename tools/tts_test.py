@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 TTS テストツール - Sherpa-ONNX Piper VITS 版
-setup_tts.ps1 でインストールした models/ をゲーム起動なしでテストする。
+install.ps1 でインストールした models/ をゲーム起動なしでテストする。
 
 使い方:
   python tools/tts_test.py
@@ -263,7 +263,7 @@ class VoicevoxEngine:
             vv = self._vv_dir()
             dll_path = os.path.join(vv, "c_api", "lib", "voicevox_core.dll")
             if not os.path.exists(dll_path):
-                self._error = "voicevox_core.dll なし (setup_tts.ps1 を実行してください)"
+                self._error = "voicevox_core.dll なし (install.ps1 を実行してください)"
                 return
 
             ort_dir  = os.path.join(vv, "onnxruntime", "lib")
@@ -549,7 +549,7 @@ class App:
                 f'"{py}" -m pip install {deps}\n\n'
                 f"--- 使用中の Python ---\n{py}\n\n"
                 + (f"--- エラー詳細 ---\n{err_detail}\n\n" if err_detail else "")
-                + "モデルが未セットアップの場合は先に setup_tts.ps1 を実行してください。")
+                + "モデルが未セットアップの場合は先に install.ps1 を実行してください。")
         else:
             self._refresh_model_status()
 
@@ -724,14 +724,14 @@ class App:
                 f"インストール済み言語: {', '.join(installed)}\n\n"
                 f"モデルディレクトリ:\n{self.tts_dir}\n\n"
                 f"他の言語を追加する場合:\n"
-                f"  .\\setup_tts.ps1 -LangsOnly <lang>\n"
+                f"  .\\install.ps1 -LangsOnly <lang>\n"
                 f"  例: -LangsOnly ko")
         else:
-            self.status_var.set("モデルが見つかりません — setup_tts.ps1 を実行してください")
+            self.status_var.set("モデルが見つかりません — install.ps1 を実行してください")
             self._set_info(
                 f"モデルが見つかりません。\n\n"
                 f"以下を実行してモデルをダウンロードしてください:\n"
-                f"  .\\setup_tts.ps1\n\n"
+                f"  .\\install.ps1\n\n"
                 f"インストール先:\n{self.tts_dir}")
 
     # ----------------------------------------------------------
@@ -895,7 +895,7 @@ class App:
                 lang = "en"
             else:
                 self.status_var.set(
-                    f"[{lang}] モデル未インストール  →  .\\setup_tts.ps1 -LangsOnly {lang}")
+                    f"[{lang}] モデル未インストール  →  .\\install.ps1 -LangsOnly {lang}")
                 return
 
         self._stop_flag.clear()
