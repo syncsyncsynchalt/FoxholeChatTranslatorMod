@@ -4,6 +4,9 @@ tools/ollama/
 # Ollama モデルデータ (pull したモデル)
 tools/ollama/models/
 
+# フォント (インストーラーが実行時にダウンロード、16MB のためリポジトリ管理外)
+assets/NotoSansCJKjp-Regular.otf
+
 # ビルド出力
 build/
 

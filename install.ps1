@@ -123,8 +123,17 @@ foreach ($src in @($configSrc, $termSrc)) {
 
 $assetsTarget = Join-Path $targetDir "assets"
 New-Item -ItemType Directory -Path $assetsTarget -Force | Out-Null
-Copy-Item (Join-Path $assetsDir "*") $assetsTarget -Recurse -Force
+Copy-Item (Join-Path $assetsDir "*") $assetsTarget -Recurse -Force -Exclude "NotoSansCJKjp-Regular.otf"
 Write-Step "assets\"
+
+$fontDest = Join-Path $assetsTarget "NotoSansCJKjp-Regular.otf"
+if (Test-Path $fontDest) {
+    Write-Ok "Font - already installed, skipped."
+} else {
+    Write-Step "Font: NotoSansCJKjp-Regular.otf (~16 MB)"
+    Invoke-Download "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf" $fontDest
+    Write-Ok "Font downloaded."
+}
 
 Write-Ok "Mod files copied."
 

@@ -53,14 +53,14 @@ jobs:
           Copy-Item "config.ini"                        $outDir
           Copy-Item "term_protection.txt"               $outDir
 
-          # インストーラー
-          Copy-Item "install.ps1"  $outDir
+          # インストーラー / アンインストーラー
+          Copy-Item "install.ps1"    $outDir
+          Copy-Item "uninstall.ps1"  $outDir
 
-          # アセット
+          # アセット (フォントはインストーラーが実行時にダウンロード)
           New-Item -ItemType Directory -Path "$outDir\assets" | Out-Null
-          Copy-Item "assets\NotoSansCJKjp-Regular.otf" "$outDir\assets\"
-          Copy-Item "assets\radio_on.wav"               "$outDir\assets\"
-          Copy-Item "assets\radio_off.wav"              "$outDir\assets\"
+          Copy-Item "assets\radio_on.wav"  "$outDir\assets\"
+          Copy-Item "assets\radio_off.wav" "$outDir\assets\"
 
           # Ollama (バイナリのみ、models/ は初回起動時に自動 pull)
           New-Item -ItemType Directory -Path "$outDir\tools" | Out-Null
