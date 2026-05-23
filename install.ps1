@@ -419,7 +419,7 @@ Write-Host "  3. Toggle translation with the radio icon in the bottom-right corn
 Write-Host ""
 Write-Host "Uninstall:"
 Write-Host "  Delete version.dll / chat_translator.dll / config.ini"
-Write-Host "  / assets\ / tools\ from War\Binaries\Win64\"
+Write-Host "  / term_protection.txt / assets\ / tools\ from War\Binaries\Win64\"
 Write-Host ""
 
 try { Read-Host "Press Enter to exit" } catch { }
