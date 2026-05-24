@@ -8,6 +8,7 @@
 
 #include "tts.h"
 #include "tts_install.h"
+#include "config.h"
 #include "log.h"
 
 #include <windows.h>
@@ -676,8 +677,10 @@ static void TtsWorker() {
             lang = DetectLanguage(req.text.c_str());
         }
 
-        // VOICEVOX (日本語) — Sherpa-ONNX より優先
-        if (lang == Lang::JA && g_vvReady) {
+        // VOICEVOX (日本語ずんだもん) — JAZモード時のみ使用。JAモードはSherpa-ONNXを使う
+        TranslationMode tlMode = config::GetTranslationMode();
+        bool useVoicevox = (lang == Lang::JA && g_vvReady && tlMode == TranslationMode::JAZ);
+        if (useVoicevox) {
             PcmData vvPcm;
             if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
             if (g_ttsStop.load()) continue;

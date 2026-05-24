@@ -4,7 +4,7 @@
 // ============================================================
 #include <string>
 
-enum class RadioState { ON, OFF, FAULT, RESTARTING };
+enum class RadioState { ON, FAULT, RESTARTING };
 
 namespace ollama {
 
@@ -22,10 +22,7 @@ void DetachThread();
 // 現在のラジオ状態を取得 (スレッドセーフ)
 RadioState GetRadioState();
 
-// ユーザーによる有効/無効切り替え
-void SetUserEnabled(bool enabled);
-
-// Ollama 再起動を要求 (非同期: ヘルスワーカーが処理)
-void RequestRestart();
+// 自動リトライの進捗を取得 (RESTARTING 状態のとき意味を持つ)
+void GetRestartProgress(int& attempt, int& maxAttempts);
 
 } // namespace ollama

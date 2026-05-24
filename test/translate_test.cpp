@@ -294,7 +294,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
             cfg.performancePreset = args[++i];
             presetSpecified = true;
         } else if (args[i] == "--lang" && i + 1 < (int)args.size()) {
-            cfg.targetLang = args[++i];
+            ++i; // targetLang は config::GetTranslationMode() に移行済み、引数は無視
         } else if (args[i] == "--file" && i + 1 < (int)args.size()) {
             inputFile = args[++i];
         } else if (args[i] == "--output" && i + 1 < (int)args.size()) {
@@ -388,7 +388,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
         printf("=== Foxhole Chat Translation Test ===\n");
         printf("Endpoint: %s\n", cfg.endpoint.c_str());
         printf("Preset:   %s\n", cfg.performancePreset.c_str());
-        printf("Target:   %s\n", cfg.targetLang.c_str());
+        printf("Target:   (runtime TranslationMode)\n");
         printf("テキストを入力してください (空行で終了):\n\n");
 
         char buf[1024];

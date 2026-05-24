@@ -1,19 +1,17 @@
 // ============================================================
 // overlay.cpp - DX11 オーバーレイ描画 (ImGui)
-// ゲームの Present フック内で呼ばれ、ラジオアイコン + 翻訳テキストを表示する
+// ゲームの Present フック内で呼ばれ、翻訳テキストと切り替えボタンを表示する
 // ============================================================
 
 #include "overlay.h"
 #include "ollama.h"
 #include "log.h"
-#include "radio_icon.h"
 #include "tts.h"
 #include "translate.h"
 #include "config.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
-#include <mmsystem.h>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -28,15 +26,12 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 // 内部状態
 // ============================================================
 
-static bool                       g_initialized    = false;
-static ID3D11Device*              g_device          = nullptr;
-static ID3D11DeviceContext*       g_context         = nullptr;
-static HWND                       g_hwnd            = nullptr;
-static ID3D11ShaderResourceView*  g_radioTextureSRV = nullptr;
-static std::string                g_radioOnWav;
-static std::string                g_radioOffWav;
+static bool                       g_initialized = false;
+static ID3D11Device*              g_device      = nullptr;
+static ID3D11DeviceContext*       g_context     = nullptr;
+static HWND                       g_hwnd        = nullptr;
 static std::string                g_assetsDir;
-static ImFont*                    g_cjkFont         = nullptr;
+static ImFont*                    g_cjkFont     = nullptr;
 
 static const ImWchar g_cjkGlyphRanges[] = {
     0x0020, 0x00FF,
@@ -75,47 +70,6 @@ static const float g_demoInterval = 10.0f;
 static std::atomic<bool> g_textChanged{false};
 
 // ============================================================
-// テクスチャ作成
-// ============================================================
-
-static bool CreateRadioTexture() {
-    D3D11_TEXTURE2D_DESC texDesc = {};
-    texDesc.Width            = RADIO_ICON_WIDTH;
-    texDesc.Height           = RADIO_ICON_HEIGHT;
-    texDesc.MipLevels        = 1;
-    texDesc.ArraySize        = 1;
-    texDesc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.Usage            = D3D11_USAGE_DEFAULT;
-    texDesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
-
-    D3D11_SUBRESOURCE_DATA subResource = {};
-    subResource.pSysMem     = g_radioIconData;
-    subResource.SysMemPitch = RADIO_ICON_WIDTH * 4;
-
-    ID3D11Texture2D* texture = nullptr;
-    HRESULT hr = g_device->CreateTexture2D(&texDesc, &subResource, &texture);
-    if (FAILED(hr)) {
-        logging::Debug("[Overlay] テクスチャ作成失敗: 0x%08X", hr);
-        return false;
-    }
-
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format              = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    hr = g_device->CreateShaderResourceView(texture, &srvDesc, &g_radioTextureSRV);
-    texture->Release();
-
-    if (FAILED(hr)) {
-        logging::Debug("[Overlay] SRV 作成失敗: 0x%08X", hr);
-        return false;
-    }
-    return true;
-}
-
-// ============================================================
 // ImGui 初期化
 // ============================================================
 
@@ -150,10 +104,6 @@ static bool InitImGui(IDXGISwapChain* swapChain) {
     ImGui_ImplWin32_Init(g_hwnd);
     ImGui_ImplDX11_Init(g_device, g_context);
 
-    if (!CreateRadioTexture()) {
-        logging::Debug("[Overlay] ラジオテクスチャ作成失敗");
-    }
-
     logging::Debug("[Overlay] ImGui 初期化完了 (HWND=0x%p)", g_hwnd);
     return true;
 }
@@ -162,19 +112,11 @@ static bool InitImGui(IDXGISwapChain* swapChain) {
 // マーキースクロール描画ヘルパー
 // ============================================================
 
-static void RenderMarqueeText(const char* label, const char* text, float areaWidth,
+static void RenderMarqueeText(const char* id, const char* text, float areaWidth,
                               float& scrollPos, float deltaTime) {
-    ImGui::TextUnformatted(label);
-    ImGui::SameLine();
+    float childWidth = (areaWidth < 10.0f) ? 10.0f : areaWidth;
 
-    float labelWidth = ImGui::GetCursorPosX();
-    float childWidth = areaWidth - labelWidth;
-    if (childWidth < 10.0f) childWidth = 10.0f;
-
-    char childId[64];
-    snprintf(childId, sizeof(childId), "##marquee_%s", label);
-
-    ImGui::BeginChild(childId, ImVec2(childWidth, ImGui::GetTextLineHeightWithSpacing()),
+    ImGui::BeginChild(id, ImVec2(childWidth, ImGui::GetTextLineHeightWithSpacing()),
                       false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     ImVec2 textSize = ImGui::CalcTextSize(text);
@@ -189,6 +131,32 @@ static void RenderMarqueeText(const char* label, const char* text, float areaWid
     ImGui::TextUnformatted(text);
 
     ImGui::EndChild();
+}
+
+// ============================================================
+// TL/TTS ボタンラベル
+// ============================================================
+
+static const char* TranslationModeLabel(TranslationMode m) {
+    switch (m) {
+    case TranslationMode::Off: return "TL:--";
+    case TranslationMode::JA:  return "TL:JA";
+    case TranslationMode::JAZ: return "TL:JAZ";
+    case TranslationMode::EN:  return "TL:EN";
+    case TranslationMode::RU:  return "TL:RU";
+    case TranslationMode::ZH:  return "TL:ZH";
+    case TranslationMode::KO:  return "TL:KO";
+    default:                   return "TL:??";
+    }
+}
+
+static const char* TtsModeLabel(TtsMode m) {
+    switch (m) {
+    case TtsMode::Off:        return "TTS:--";
+    case TtsMode::Original:   return "TTS:Src";
+    case TtsMode::Translated: return "TTS:Tr";
+    default:                  return "TTS:??";
+    }
 }
 
 // ============================================================
@@ -220,110 +188,176 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     ImGui::NewFrame();
 
     ImGuiIO& io = ImGui::GetIO();
-    float iconSize      = 32.0f;
-    float margin        = 12.0f;
-    float textAreaWidth = 297.0f;
-    float textAreaHeight = 33.0f;
-    float gap  = 4.0f;
-    float padX = 6.0f;
-    float padY = 2.0f;
 
-    float totalWidth  = padX + textAreaWidth + padX + gap + iconSize + padX;
-    float totalHeight = padY + textAreaHeight + padY;
+    // レイアウト定数
+    static const float kTextWidth = 270.0f;
+    static const float kGap       = 4.0f;
+    static const float kPadX      = 6.0f;
+    static const float kPadY      = 3.0f;
+    static const float kMargin    = 12.0f;
+    static const float kFPX       = 4.0f;  // FramePadding.x
 
-    float winX = io.DisplaySize.x - totalWidth - margin;
-    float winY = io.DisplaySize.y - totalHeight - margin;
+    // フォントを先に Push してメトリクスを正確に取得
+    if (g_cjkFont) ImGui::PushFont(g_cjkFont);
+
+    float lineH   = ImGui::GetTextLineHeight();
+    float lineHWS = ImGui::GetTextLineHeightWithSpacing();
+
+    // ボタン幅 = 全ラベルの最大テキスト幅 + 両側 FramePadding + 余白
+    // 両ボタン同一幅にするため全ラベルを走査
+    static const char* kAllLabels[] = {
+        "TL:--","TL:JA","TL:JAZ","TL:EN","TL:RU","TL:ZH","TL:KO",
+        "TTS:--","TTS:Src","TTS:Tr", nullptr
+    };
+    float maxLabelW = 0.0f;
+    for (int i = 0; kAllLabels[i]; ++i) {
+        float w = ImGui::CalcTextSize(kAllLabels[i]).x;
+        if (w > maxLabelW) maxLabelW = w;
+    }
+    float kBtnWidth = maxLabelW + 2.0f * kFPX + 4.0f;  // +4 は左右各2pxの余白
+
+    float totalW = kPadX + kBtnWidth + kGap + kTextWidth + kPadX;
+    float totalH = kPadY + lineHWS + lineHWS + kPadY;
+
+    float winX = io.DisplaySize.x - totalW - kMargin;
+    float winY = io.DisplaySize.y - totalH - kMargin;
 
     if (g_textChanged.exchange(false)) {
         g_scrollOrig  = 0.0f;
         g_scrollTrans = 0.0f;
     }
 
-    RadioState state = ollama::GetRadioState();
-
-    ImGui::SetNextWindowPos(ImVec2(winX, winY));
-    ImGui::SetNextWindowSize(ImVec2(totalWidth, totalHeight));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(padX, padY));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-
-    if (state == RadioState::ON || state == RadioState::RESTARTING) {
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.4f));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    // デモモード: タイマー駆動でメッセージを切り替え
+    if (config::Get().demoMode) {
+        g_demoTimer += io.DeltaTime;
+        if (g_demoTimer >= g_demoInterval) {
+            g_demoTimer = 0.0f;
+            g_demoIndex = (g_demoIndex + 1) % g_demoCount;
+            TranslationMode mode = config::GetTranslationMode();
+            if (mode != TranslationMode::Off) {
+                translate::Queue("", "", g_demoMessages[g_demoIndex]);
+            } else {
+                std::lock_guard<std::mutex> lock(g_textMutex);
+                g_originalText   = g_demoMessages[g_demoIndex];
+                g_translatedText = "";
+            }
+        }
     }
 
-    ImGui::Begin("##radio_overlay", nullptr,
+    std::string origText, transText;
+    {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        origText  = g_originalText;
+        transText = g_translatedText;
+    }
+
+    // 翻訳行のステータステキストを決定
+    RadioState radioState = ollama::GetRadioState();
+    std::string statusText;
+    if (config::GetTranslationMode() == TranslationMode::Off) {
+        statusText = "[Off]";
+    } else if (radioState == RadioState::RESTARTING) {
+        int attempt = 0, maxAttempts = 0;
+        ollama::GetRestartProgress(attempt, maxAttempts);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "[Restarting %d/%d...]", attempt, maxAttempts);
+        statusText = buf;
+    } else if (radioState == RadioState::FAULT) {
+        statusText = "[Error]";
+    } else {
+        statusText = transText;
+    }
+
+    // 初回のみデフォルト位置 (右下) に配置。以降はドラッグで移動した位置を維持
+    static ImVec2 s_winPos = ImVec2(-1.f, -1.f);
+    if (s_winPos.x < 0.f) s_winPos = ImVec2(winX, winY);
+
+    ImGui::SetNextWindowPos(s_winPos);
+    ImGui::SetNextWindowSize(ImVec2(totalW, totalH));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kPadX, kPadY));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.45f));
+
+    ImGui::Begin("##translator_overlay", nullptr,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoNav |
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
+        ImGuiWindowFlags_NoScrollbar);
 
-    // --- テキスト領域 (ラジオ ON / FAULT / RESTARTING 時) ---
-    if (state != RadioState::OFF) {
-        if (config::Get().demoMode) {
-            g_demoTimer += io.DeltaTime;
-            if (g_demoTimer >= g_demoInterval) {
-                g_demoTimer = 0.0f;
-                g_demoIndex = (g_demoIndex + 1) % g_demoCount;
-                translate::Queue("", "", g_demoMessages[g_demoIndex]);
-            }
+    // タイトルバーなしでもドラッグで移動できるようにする
+    // IsWindowHovered() はchild windowで誤動作するため、生座標でヒットテスト
+    static bool s_dragging = false;
+    if (!s_dragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        ImVec2 mp = io.MousePos;
+        ImVec2 wp = ImGui::GetWindowPos();
+        ImVec2 ws = ImGui::GetWindowSize();
+        bool inWindow = mp.x >= wp.x && mp.x <= wp.x + ws.x &&
+                        mp.y >= wp.y && mp.y <= wp.y + ws.y;
+        if (inWindow && !ImGui::IsAnyItemHovered()) {
+            s_dragging = true;
         }
+    }
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        s_dragging = false;
+    }
+    if (s_dragging) {
+        s_winPos.x += io.MouseDelta.x;
+        s_winPos.y += io.MouseDelta.y;
+        ImGui::SetWindowPos(s_winPos);
+    }
 
-        std::string origText, transText;
-        {
-            std::lock_guard<std::mutex> lock(g_textMutex);
-            origText  = g_originalText;
-            transText = g_translatedText;
+    // FramePadding.y=1 でボタン内テキストを縦中央に揃える
+    const float kBtnH = lineH + 2.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(kFPX, 1.0f));
+
+    auto RenderRow = [&](const char* marqueeId, const char* text, float& scroll,
+                         const char* btnLabel, auto onBtnClick) {
+        float rowTopY = ImGui::GetCursorPosY();
+
+        // ボタンを左端・行の縦中央に配置
+        float btnOffY = (lineHWS - kBtnH) * 0.5f;
+        ImGui::SetCursorPos(ImVec2(0.0f, rowTopY + btnOffY));
+
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 0.9f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+        if (ImGui::Button(btnLabel, ImVec2(kBtnWidth, kBtnH))) {
+            onBtnClick();
         }
+        ImGui::PopStyleColor(3);
 
-        if (g_cjkFont) ImGui::PushFont(g_cjkFont);
-
-        ImGui::BeginChild("##text_area", ImVec2(textAreaWidth, textAreaHeight),
-                          false, ImGuiWindowFlags_NoScrollbar);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 1));
-
-        float contentWidth = textAreaWidth;
-        RenderMarqueeText(u8"原文: ", origText.c_str(), contentWidth,
-                          g_scrollOrig, io.DeltaTime);
-        RenderMarqueeText(u8"翻訳: ", transText.c_str(), contentWidth,
-                          g_scrollTrans, io.DeltaTime);
-
+        // テキスト領域をボタン右に配置
+        ImGui::SetCursorPos(ImVec2(kBtnWidth + kGap, rowTopY));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        RenderMarqueeText(marqueeId, text, kTextWidth, scroll, io.DeltaTime);
         ImGui::PopStyleVar();
-        ImGui::EndChild();
 
-        if (g_cjkFont) ImGui::PopFont();
+        // 次行の先頭へ
+        ImGui::SetCursorPos(ImVec2(0.0f, rowTopY + lineHWS));
+    };
 
-        ImGui::SameLine(0, gap);
-    } else {
-        ImGui::SetCursorPosX(textAreaWidth + gap);
-    }
+    // --- 行1: TTS ボタン + 原文 ---
+    RenderRow("##mq_orig", origText.c_str(), g_scrollOrig,
+              TtsModeLabel(config::GetTtsMode()), [&]() {
+        config::CycleTtsMode();
+        logging::Debug("[Overlay] TtsMode -> %s", TtsModeLabel(config::GetTtsMode()));
+    });
 
-    // --- ラジオアイコン ---
-    float iconPadY = (totalHeight - iconSize) * 0.5f;
-    ImGui::SetCursorPosY(iconPadY);
-    if (g_radioTextureSRV) {
-        ImVec4 tint;
-        switch (state) {
-        case RadioState::ON:         tint = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); break;
-        case RadioState::OFF:        tint = ImVec4(1.0f, 1.0f, 1.0f, 0.3f); break;
-        case RadioState::FAULT:      tint = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); break;
-        case RadioState::RESTARTING: tint = ImVec4(1.0f, 0.8f, 0.0f, 1.0f); break;
+    // --- 行2: TL ボタン + 訳文/ステータス ---
+    RenderRow("##mq_tran", statusText.c_str(), g_scrollTrans,
+              TranslationModeLabel(config::GetTranslationMode()), [&]() {
+        config::CycleTranslationMode();
+        if (config::GetTranslationMode() == TranslationMode::Off) {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            g_translatedText = "";
         }
-        ImGui::Image((ImTextureID)g_radioTextureSRV, ImVec2(iconSize, iconSize),
-                     ImVec2(0, 0), ImVec2(1, 1), tint);
-        if (ImGui::IsItemClicked()) {
-            if (state == RadioState::FAULT) {
-                logging::Debug("[Overlay] Ollama 再起動クリック");
-                ollama::RequestRestart();
-            } else if (state == RadioState::ON || state == RadioState::OFF) {
-                bool wasOn = (state == RadioState::ON);
-                ollama::SetUserEnabled(!wasOn);
-                logging::Debug("[Overlay] ラジオ %s", wasOn ? "OFF" : "ON");
-                const char* wav = wasOn ? g_radioOffWav.c_str() : g_radioOnWav.c_str();
-                PlaySoundA(wav, nullptr, SND_FILENAME | SND_ASYNC);
-            }
-        }
-    }
+        logging::Debug("[Overlay] TranslationMode -> %s",
+            TranslationModeLabel(config::GetTranslationMode()));
+    });
+
+    ImGui::PopStyleVar(); // FramePadding
+
+    if (g_cjkFont) ImGui::PopFont();
 
     ImGui::End();
     ImGui::PopStyleColor();
@@ -359,9 +393,7 @@ bool overlay::Init() {
     std::string dir(dllPath);
     size_t lastSlash = dir.rfind('\\');
     if (lastSlash != std::string::npos) dir = dir.substr(0, lastSlash + 1);
-    g_assetsDir   = dir + "assets\\";
-    g_radioOnWav  = g_assetsDir + "radio_on.wav";
-    g_radioOffWav = g_assetsDir + "radio_off.wav";
+    g_assetsDir = dir + "assets\\";
 
     translate::SetResultCallback([](const translate::TranslateResult& r) {
         {
@@ -372,12 +404,24 @@ bool overlay::Init() {
         g_textChanged.store(true);
         logging::Translation(r.channel.c_str(), r.sender.c_str(),
                              r.original.c_str(), r.translated.c_str());
-        const char* ttsText = config::Get().ttsSpeakTranslated ? r.translated.c_str() : r.original.c_str();
-        tts::Speak(ttsText, r.sender.empty() ? nullptr : r.sender.c_str());
+
+        TtsMode ttsMode = config::GetTtsMode();
+        if (ttsMode != TtsMode::Off) {
+            const char* ttsText = (ttsMode == TtsMode::Translated)
+                ? r.translated.c_str()
+                : r.original.c_str();
+            tts::Speak(ttsText, r.sender.empty() ? nullptr : r.sender.c_str());
+        }
     });
 
     if (config::Get().demoMode) {
-        translate::Queue("", "", g_demoMessages[0]);
+        TranslationMode mode = config::GetTranslationMode();
+        if (mode != TranslationMode::Off) {
+            translate::Queue("", "", g_demoMessages[0]);
+        } else {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            g_originalText = g_demoMessages[0];
+        }
     }
 
     logging::Debug("[Overlay] Init (遅延初期化モード)");
@@ -403,7 +447,8 @@ LRESULT overlay::OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 bool overlay::IsRadioOn() {
-    return ollama::GetRadioState() == RadioState::ON;
+    return config::GetTranslationMode() != TranslationMode::Off
+        && ollama::GetRadioState() == RadioState::ON;
 }
 
 void overlay::SetDisplayText(const char* original, const char* translated) {
@@ -414,7 +459,6 @@ void overlay::SetDisplayText(const char* original, const char* translated) {
 
 void overlay::OnChatMessage(const std::string& sender, const std::string& message) {
     if (config::Get().demoMode) return;
-    if (ollama::GetRadioState() != RadioState::ON) return;
     if (message.empty()) return;
 
     {
@@ -433,7 +477,20 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
         }
     }
 
-    translate::Queue("", sender, message);
+    // 原文は常に保存
+    {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        g_originalText = message;
+    }
+
+    TranslationMode mode = config::GetTranslationMode();
+    if (mode != TranslationMode::Off) {
+        translate::Queue("", sender, message);
+    } else {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        g_translatedText = "";
+        g_textChanged.store(true);
+    }
 }
 
 void overlay::Shutdown() {
@@ -443,7 +500,6 @@ void overlay::Shutdown() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    if (g_radioTextureSRV) { g_radioTextureSRV->Release(); g_radioTextureSRV = nullptr; }
     if (g_context) { g_context->Release(); g_context = nullptr; }
     if (g_device)  { g_device->Release();  g_device  = nullptr; }
 

@@ -137,6 +137,7 @@ target_compile_options(test_loader PRIVATE /utf-8)
 add_executable(translate_test
     test/translate_test.cpp
     src/translate.cpp
+    src/config.cpp
     src/log.cpp
 )
 target_include_directories(translate_test PRIVATE src)
@@ -155,4 +156,30 @@ add_custom_command(TARGET test_loader POST_BUILD
         "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
         "$<TARGET_FILE_DIR:test_loader>/config.ini"
     COMMENT "Copying DLLs and config.ini for test_loader"
+)
+
+# ============================================================
+# オーバーレイ UI テストホスト (DX11 ウィンドウ、ゲーム不要)
+# version.dll と同ディレクトリに置くと DX11 初期化がクラッシュするため
+# 専用サブディレクトリ (overlay_test/) に出力する
+# ============================================================
+add_executable(overlay_test test/overlay_test.cpp)
+target_compile_definitions(overlay_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_options(overlay_test PRIVATE /utf-8)
+target_link_libraries(overlay_test PRIVATE d3d11 dxgi)
+
+set_target_properties(overlay_test PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/overlay_test"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/overlay_test"
+    RUNTIME_OUTPUT_DIRECTORY         "${CMAKE_BINARY_DIR}/overlay_test"
+)
+
+add_custom_command(TARGET overlay_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:chat_translator>"
+        "${CMAKE_BINARY_DIR}/overlay_test/chat_translator.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/config.ini"
+        "${CMAKE_BINARY_DIR}/overlay_test/config.ini"
+    COMMENT "Copying chat_translator.dll and config.ini for overlay_test"
 )

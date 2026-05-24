@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "translate.h"
+#include "config.h"
 #include "log.h"
 #include <nlohmann/json.hpp>
 
@@ -35,7 +36,6 @@ static std::wstring  g_host;
 static INTERNET_PORT g_port      = 11434;
 static std::wstring  g_path;
 static std::string   g_model;
-static std::string   g_targetLang;
 static int           g_numCtx    = 256;
 static int           g_numThread = 2;
 static float         g_temperature = 0.1f;
@@ -328,12 +328,43 @@ static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
     return s + ".";
 }
 
+static std::string BuildPrompt(TranslationMode mode) {
+    switch (mode) {
+    case TranslationMode::JA:
+        return "Translate the following war game chat message into Japanese accurately."
+               " Keep the original meaning."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    case TranslationMode::JAZ:
+        return "Translate the following war game chat message into Japanese."
+               " Use Zundamon's speech style: end every sentence with なのだ or のだ"
+               " (e.g. 〜なのだ！ 〜のだ。). Use ボク for first person if needed."
+               " Keep the tone bright, innocent, and energetic."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    case TranslationMode::EN:
+        return "Translate the following war game chat message into English accurately."
+               " Keep the original meaning."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    case TranslationMode::RU:
+        return "Translate the following war game chat message into Russian accurately."
+               " Keep the original meaning."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    case TranslationMode::ZH:
+        return "Translate the following war game chat message into Chinese (Simplified) accurately."
+               " Keep the original meaning."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    case TranslationMode::KO:
+        return "Translate the following war game chat message into Korean accurately."
+               " Keep the original meaning."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    default:
+        return "Translate the following war game chat message into Japanese accurately."
+               " Output ONLY the translated text. No explanations, no extra sentences.";
+    }
+}
+
 static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt,
                                     bool hasPlaceholders) {
-    std::string prompt =
-        "Translate the following war game chat message to " + g_targetLang + " accurately."
-        " Keep the original meaning. End sentences with 〜のだ or 〜なのだ (Zundamon style)."
-        " Output ONLY the translated text. No explanations, no extra sentences.";
+    std::string prompt = BuildPrompt(config::GetTranslationMode());
     if (hasPlaceholders)
         prompt += " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output.";
     prompt += "\n\n" + text;
@@ -681,7 +712,6 @@ bool translate::Init(const TranslateConfig& cfg) {
         logging::Debug("[Translate] URL パース失敗: %s", cfg.endpoint.c_str());
         return false;
     }
-    g_targetLang = cfg.targetLang;
 
     ApplyPreset(cfg.performancePreset);
 
@@ -696,8 +726,8 @@ bool translate::Init(const TranslateConfig& cfg) {
     g_running = true;
     g_thread  = std::thread(WorkerThread);
 
-    logging::Debug("[Translate] 初期化完了 (model=%s, target=%s, endpoint=%s)",
-        g_model.c_str(), g_targetLang.c_str(), cfg.endpoint.c_str());
+    logging::Debug("[Translate] 初期化完了 (model=%s, endpoint=%s)",
+        g_model.c_str(), cfg.endpoint.c_str());
     return true;
 }
 

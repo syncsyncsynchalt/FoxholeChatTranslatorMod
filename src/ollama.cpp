@@ -32,10 +32,11 @@ static HANDLE            g_ollamaProcess   = nullptr;
 static HANDLE            g_ollamaJobObject = nullptr;
 static INTERNET_PORT     g_ollamaPort      = 11435; // 同梱 Ollama がバインドするポート
 
+static const int               MAX_RESTART_ATTEMPTS = 5;
 static std::atomic<RadioState> g_radioState{RadioState::ON};
-static std::atomic<bool>       g_userEnabled{true};
 static std::atomic<bool>       g_running{false};
 static std::atomic<bool>       g_restartRequested{false};
+static std::atomic<int>        g_restartAttempt{0};
 
 static std::thread             g_healthThread;
 static std::mutex              g_healthMutex;
@@ -655,27 +656,39 @@ static void HealthWorker() {
 
         if (g_restartRequested.exchange(false)) {
             if (g_managed) {
+                int attempt = g_restartAttempt.fetch_add(1) + 1;
+                logging::Debug("[Ollama] 自動再起動試行 %d/%d", attempt, MAX_RESTART_ATTEMPTS);
                 g_radioState.store(RadioState::RESTARTING);
                 bool ok = EnsureRunning();
-                g_radioState.store(ok ? RadioState::ON : RadioState::FAULT);
-                logging::Debug("[Ollama] 再起動 %s", ok ? "成功" : "失敗");
                 if (ok) {
-                    logging::Debug("[Ollama] 翻訳システム準備完了 - チャットメッセージを翻訳します");
+                    g_restartAttempt.store(0);
+                    g_radioState.store(RadioState::ON);
+                    logging::Debug("[Ollama] 再起動成功 - 翻訳システム準備完了");
+                } else if (attempt >= MAX_RESTART_ATTEMPTS) {
+                    g_radioState.store(RadioState::FAULT);
+                    logging::Debug("[Ollama] 再起動上限 (%d回) 到達 - FAULT状態に移行", MAX_RESTART_ATTEMPTS);
+                } else {
+                    // 次の定期ヘルスチェックで再試行
+                    g_restartRequested.store(true);
+                    logging::Debug("[Ollama] 再起動失敗 (%d/%d) - 再試行待機", attempt, MAX_RESTART_ATTEMPTS);
                 }
             }
             continue;
         }
 
         // 定期ヘルスチェック
-        if (!g_userEnabled.load()) continue;
         bool ok = translate::IsHealthy();
         RadioState cur = g_radioState.load();
         if (ok) {
-            if (cur == RadioState::FAULT || cur == RadioState::OFF)
+            if (cur == RadioState::FAULT) {
+                g_restartAttempt.store(0);
                 g_radioState.store(RadioState::ON);
+            }
         } else if (cur == RadioState::ON) {
-            g_radioState.store(g_managed ? RadioState::FAULT : RadioState::OFF);
-            logging::Debug("[Ollama] ダウン検出 (%s)", g_managed ? "FAULT" : "OFF");
+            logging::Debug("[Ollama] ダウン検出 - 自動リトライを開始");
+            g_restartAttempt.store(0);
+            g_restartRequested.store(true);
+            g_healthCv.notify_one();
         }
     }
     logging::Debug("[Ollama] ヘルスワーカー終了");
@@ -697,11 +710,13 @@ void ollama::Init(const std::string& ollamaDir, const std::string& endpoint) {
     g_managed     = IsLocalEndpoint(endpoint);
     g_ollamaPort  = ParsePortFromEndpoint(endpoint);
 
+    g_restartAttempt.store(0);
+
     if (g_managed) {
         logging::Debug("[Ollama] ローカルエンドポイント: 自動管理モード");
         if (!EnsureRunning()) {
-            logging::Debug("[Ollama] 初期化失敗 - FAULT 状態で続行");
-            g_radioState.store(RadioState::FAULT);
+            logging::Debug("[Ollama] 初期化失敗 - 自動リトライを開始");
+            g_restartRequested.store(true);
         }
     } else {
         logging::Debug("[Ollama] リモートエンドポイント: 接続のみモード");
@@ -755,17 +770,7 @@ RadioState ollama::GetRadioState() {
     return g_radioState.load();
 }
 
-void ollama::SetUserEnabled(bool enabled) {
-    g_userEnabled.store(enabled);
-    if (!enabled) {
-        g_radioState.store(RadioState::OFF);
-    } else if (g_radioState.load() == RadioState::OFF) {
-        // 再有効化: ヘルスチェックで ON/FAULT に遷移させる
-        g_healthCv.notify_one();
-    }
-}
-
-void ollama::RequestRestart() {
-    g_restartRequested.store(true);
-    g_healthCv.notify_one();
+void ollama::GetRestartProgress(int& attempt, int& maxAttempts) {
+    attempt     = g_restartAttempt.load();
+    maxAttempts = MAX_RESTART_ATTEMPTS;
 }

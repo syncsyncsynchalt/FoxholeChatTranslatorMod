@@ -29,8 +29,7 @@ __declspec(dllexport) void* WorkerInit() {
 
     // 1. translate: WinHTTP セッション + ワーカースレッド起動
     translate::TranslateConfig tcfg;
-    tcfg.endpoint         = cfg.ollamaEndpoint;
-    tcfg.targetLang       = cfg.targetLanguage;
+    tcfg.endpoint          = cfg.ollamaEndpoint;
     tcfg.performancePreset = cfg.performancePreset;
     translate::Init(tcfg);
 
@@ -38,8 +37,8 @@ __declspec(dllexport) void* WorkerInit() {
     // (translate::Init 後に呼ぶ: EnsureModel が g_model を参照するため)
     ollama::Init("", cfg.ollamaEndpoint);
 
-    // 3. TTS: 音声合成ワーカー起動
-    tts::Init(cfg.ttsLanguage.c_str(), cfg.ttsVoicevoxStyleId);
+    // 3. TTS: 音声合成ワーカー起動 (言語は自動判定、エンジン選択はTranslationModeに委ねる)
+    tts::Init("auto", cfg.ttsVoicevoxStyleId);
 
     // 4. overlay: ImGui 遅延初期化登録 + 翻訳コールバック設定
     overlay::Init();
@@ -68,6 +67,31 @@ __declspec(dllexport) void* WorkerGetRenderCallback() {
 
 __declspec(dllexport) void* WorkerGetWndProcCallback() {
     return reinterpret_cast<void*>(&overlay::OnWndProc);
+}
+
+// テストホスト専用: overlay::OnChatMessage を直接呼び出す
+__declspec(dllexport) void WorkerOnChatMessage(const char* sender, const char* message) {
+    if (sender && message) {
+        overlay::OnChatMessage(std::string(sender), std::string(message));
+    }
+}
+
+// テストホスト専用: hooks をスキップして overlay/translate/tts/ollama のみ初期化
+// ゲームなしでオーバーレイ UI を確認するために使用する
+__declspec(dllexport) void* WorkerInitTest(const char* baseDir) {
+    config::Load(baseDir);
+    const Config& cfg = config::Get();
+
+    translate::TranslateConfig tcfg;
+    tcfg.endpoint          = cfg.ollamaEndpoint;
+    tcfg.performancePreset = cfg.performancePreset;
+    translate::Init(tcfg);
+
+    ollama::Init("", cfg.ollamaEndpoint);
+    tts::Init("auto", cfg.ttsVoicevoxStyleId);
+    overlay::Init();
+
+    return reinterpret_cast<void*>(&overlay::OnPresent);
 }
 
 } // extern "C"

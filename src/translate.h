@@ -10,8 +10,7 @@
 namespace translate {
 
 struct TranslateConfig {
-    std::string endpoint         = "http://localhost:11434/api/generate";
-    std::string targetLang       = "Japanese";
+    std::string endpoint          = "http://localhost:11434/api/generate";
     std::string performancePreset = "Medium"; // "Low" / "Medium" / "High"
 };
 
