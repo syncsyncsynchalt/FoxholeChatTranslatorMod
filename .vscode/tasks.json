@@ -18,7 +18,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build & Deploy (Release)",
+      "label": "Build (Release)",
       "type": "shell",
       "command": "cmake",
       "args": ["--build", "build", "--config", "Release", "--parallel"],
@@ -38,6 +38,29 @@
       "problemMatcher": "$msCompile"
     },
     {
+      "label": "Deploy",
+      "type": "shell",
+      "command": "cmd",
+      "args": ["/c", "install.bat"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build & Deploy (Release)",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Build (Release)", "Deploy"],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Build chat_translator (Hot Reload)",
       "type": "shell",
       "command": "cmake",
@@ -52,6 +75,22 @@
         "panel": "shared"
       },
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Uninstall",
+      "type": "shell",
+      "command": "cmd",
+      "args": ["/c", "uninstall.bat"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
     },
     {
       "label": "Run Translate Test Tool",

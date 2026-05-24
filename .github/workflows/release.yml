@@ -36,8 +36,8 @@ jobs:
           Copy-Item "term_protection.txt"               $outDir
 
           # インストーラー / アンインストーラー
-          Copy-Item "install.ps1"    $outDir
-          Copy-Item "uninstall.ps1"  $outDir
+          Copy-Item "install.bat"    $outDir
+          Copy-Item "uninstall.bat"  $outDir
 
           # アセット (フォントはインストーラーが実行時にダウンロード)
           New-Item -ItemType Directory -Path "$outDir\assets" | Out-Null
