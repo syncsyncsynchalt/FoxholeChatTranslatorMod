@@ -816,8 +816,8 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId) {
     tts_install::StartIfNeeded(g_ttsDir, g_ttsLanguage);
 
     if (!sherpaOk && !g_vvReady) {
-        logging::Debug("[TTS] TTS エンジンが利用できません。");
-        return;
+        logging::Debug("[TTS] TTS エンジン未検出 - インストール完了後に自動ロード");
+        // fall through: スレッドを起動して hot-reload ループに任せる
     }
 
     g_ttsRunning.store(true);
