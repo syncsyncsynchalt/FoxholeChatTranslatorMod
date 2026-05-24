@@ -521,10 +521,39 @@ static bool IsModelAvailable() {
     return statusCode == 200;
 }
 
+// ストリーミング JSON から文字列フィールドを抽出 ("key":"値")
+static std::string ExtractJsonStr(const std::string& line, const char* key) {
+    std::string search = std::string("\"") + key + "\":\"";
+    size_t p = line.find(search);
+    if (p == std::string::npos) return "";
+    p += search.size();
+    std::string result;
+    while (p < line.size() && line[p] != '"') {
+        if (line[p] == '\\') { p++; if (p < line.size()) result += line[p++]; }
+        else result += line[p++];
+    }
+    return result;
+}
+
+// ストリーミング JSON から数値フィールドを抽出 ("key":数値)
+static size_t ExtractJsonUint(const std::string& line, const char* key) {
+    std::string search = std::string("\"") + key + "\":";
+    size_t p = line.find(search);
+    if (p == std::string::npos) return 0;
+    p += search.size();
+    while (p < line.size() && line[p] == ' ') p++;
+    size_t end = p;
+    while (end < line.size() && isdigit(static_cast<unsigned char>(line[end]))) end++;
+    if (end == p) return 0;
+    try { return std::stoull(line.substr(p, end - p)); }
+    catch (...) { return 0; }
+}
+
 static bool PullModel() {
     logging::Debug("[Translate] モデル '%s' をダウンロード中...", g_model.c_str());
     if (!g_hSession) return false;
-    std::string body = nlohmann::json{{"name", g_model}, {"stream", false}}.dump();
+    // stream: true でレスポンスを行単位に受け取り、進捗をリアルタイム表示する
+    std::string body = nlohmann::json{{"name", g_model}, {"stream", true}}.dump();
     HINTERNET hConnect = WinHttpConnect(g_hSession, g_host.c_str(), g_port, 0);
     if (!hConnect) return false;
     HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", L"/api/pull",
@@ -537,17 +566,76 @@ static bool PullModel() {
         (LPVOID)body.c_str(), (DWORD)body.size(), (DWORD)body.size(), 0);
     if (ok) ok = WinHttpReceiveResponse(hRequest, nullptr);
     DWORD statusCode = 0;
-    DWORD size = sizeof(statusCode);
+    DWORD szLen = sizeof(statusCode);
     if (ok) WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &size, WINHTTP_NO_HEADER_INDEX);
-    if (ok) {
+        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &szLen, WINHTTP_NO_HEADER_INDEX);
+
+    if (ok && statusCode == 200) {
+        // ストリーミングレスポンスを行単位で処理して進捗表示
+        // 1MB未満のblobは設定ファイル等の小物なので進捗表示しない
+        static const size_t MIN_PROGRESS_BYTES = 1 * 1024 * 1024;
+        char rawBuf[65536];
         DWORD avail = 0, read = 0;
-        do {
-            if (!WinHttpQueryDataAvailable(hRequest, &avail) || avail == 0) break;
-            std::string buf(avail, '\0');
-            WinHttpReadData(hRequest, &buf[0], avail, &read);
-        } while (avail > 0);
+        std::string lineBuf;
+        size_t lastBlobTotal = 0; // blobが変わったらカウンターをリセットするために追跡
+        int lastPct    = -1;
+        int lastLogPct = -1;
+        while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0) {
+            DWORD toRead = (avail < sizeof(rawBuf)) ? avail : sizeof(rawBuf);
+            if (!WinHttpReadData(hRequest, rawBuf, toRead, &read) || read == 0) break;
+            for (DWORD i = 0; i < read; i++) {
+                char c = rawBuf[i];
+                if (c == '\n' || c == '\r') {
+                    if (!lineBuf.empty()) {
+                        size_t total     = ExtractJsonUint(lineBuf, "total");
+                        size_t completed = ExtractJsonUint(lineBuf, "completed");
+                        // 新しいblobが始まったらカウンターをリセット
+                        if (total > 0 && total != lastBlobTotal) {
+                            lastBlobTotal = total;
+                            lastPct    = -1;
+                            lastLogPct = -1;
+                        }
+                        // 1MB以上のblobのみ進捗表示 (小物blobの 0.0/0.0 MB ノイズを抑制)
+                        if (total >= MIN_PROGRESS_BYTES) {
+                            int pct = static_cast<int>(100.0 * completed / total);
+                            // コンソール: 1% ごとに同一行を上書き
+                            if (pct != lastPct) {
+                                lastPct = pct;
+                                logging::Progress("[Model-DL] %s: %.1f / %.1f MB (%d%%)",
+                                    g_model.c_str(),
+                                    completed / 1048576.0,
+                                    total     / 1048576.0,
+                                    pct);
+                            }
+                            // ファイル: 10% ごとにチェックポイント記録
+                            int logStep = pct / 10;
+                            if (logStep != lastLogPct) {
+                                lastLogPct = logStep;
+                                logging::Debug("[Model-DL] %s: %.1f / %.1f MB (%d%%)",
+                                    g_model.c_str(),
+                                    completed / 1048576.0,
+                                    total     / 1048576.0,
+                                    pct);
+                            }
+                        }
+                        // 検証・書き込みフェーズのステータスメッセージを記録
+                        if (total == 0) {
+                            std::string status = ExtractJsonStr(lineBuf, "status");
+                            if (status.find("verifying sha256") != std::string::npos) {
+                                logging::Debug("[Model-DL] %s: SHA256 検証中...", g_model.c_str());
+                            } else if (status.find("writing manifest") != std::string::npos) {
+                                logging::Debug("[Model-DL] %s: マニフェスト書き込み中...", g_model.c_str());
+                            }
+                        }
+                        lineBuf.clear();
+                    }
+                } else {
+                    lineBuf += c;
+                }
+            }
+        }
     }
+
     WinHttpCloseHandle(hRequest);
     WinHttpCloseHandle(hConnect);
     if (statusCode == 200) {
