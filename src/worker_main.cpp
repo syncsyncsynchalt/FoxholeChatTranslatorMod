@@ -15,6 +15,7 @@
 #include "translate.h"
 #include "ollama.h"
 #include "tts.h"
+#include "tts_install.h"
 #include "config.h"
 
 extern "C" {
@@ -51,6 +52,7 @@ __declspec(dllexport) void WorkerShutdown() {
     // ollama::Shutdown() より前に描画ループを止める
     overlay::Shutdown();
     ollama::Shutdown();   // Job Object 閉鎖 → Ollama プロセス終了
+    tts_install::Shutdown();
     tts::Shutdown();
     translate::Shutdown();
     hooks::Shutdown();

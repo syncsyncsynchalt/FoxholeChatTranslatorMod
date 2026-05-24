@@ -7,12 +7,14 @@
 // ============================================================
 
 #include "tts.h"
+#include "tts_install.h"
 #include "log.h"
 
 #include <windows.h>
 #include <xaudio2.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <map>
 #include <mutex>
@@ -303,7 +305,7 @@ static bool InitVoicevox(const std::string& ttsDir) {
     std::string dllPath = vvDir + "c_api\\lib\\voicevox_core.dll";
 
     if (GetFileAttributesA(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        logging::Debug("[TTS-VV] セットアップ未完了 (install.ps1 を実行してください)");
+        logging::Debug("[TTS-VV] VOICEVOX DLL が見つかりません (自動インストール待機中)");
         return false;
     }
 
@@ -640,8 +642,21 @@ static void TtsWorker() {
         TtsRequest req;
         {
             std::unique_lock<std::mutex> lock(g_ttsMutex);
-            g_ttsCv.wait(lock, [] { return !g_ttsQueue.empty() || !g_ttsRunning.load(); });
+            bool hasReq = g_ttsCv.wait_for(lock, std::chrono::seconds(30),
+                [] { return !g_ttsQueue.empty() || !g_ttsRunning.load(); });
             if (!g_ttsRunning.load()) break;
+            if (!hasReq) {
+                // タイムアウト: インストール完了後に各エンジンを再試行
+                if (!g_sherpaLib) {
+                    if (LoadSherpaLib(g_ttsDir))
+                        logging::Debug("[TTS] Sherpa-ONNX ロード完了");
+                }
+                if (!g_vvReady) {
+                    if (InitVoicevox(g_ttsDir))
+                        logging::Debug("[TTS] VOICEVOX 初期化完了、ずんだもんに切り替えます");
+                }
+                continue;
+            }
             req = g_ttsQueue.front();
             g_ttsQueue.pop();
         }
@@ -795,10 +810,10 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId) {
                    g_ttsLanguage.c_str(), voicevoxStyleId, g_ttsDir.c_str());
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
-    if (!sherpaOk)
-        logging::Debug("[TTS] sherpa-onnx.dll が見つかりません。install.ps1 を実行してください。");
-
     InitVoicevox(g_ttsDir);
+
+    // 不足コンポーネントをバックグラウンドで自動インストール
+    tts_install::StartIfNeeded(g_ttsDir, g_ttsLanguage);
 
     if (!sherpaOk && !g_vvReady) {
         logging::Debug("[TTS] TTS エンジンが利用できません。");

@@ -104,6 +104,7 @@ add_library(chat_translator SHARED
     src/translate.cpp
     src/ollama.cpp
     src/tts.cpp
+    src/tts_install.cpp
 )
 
 target_include_directories(chat_translator PRIVATE src)
