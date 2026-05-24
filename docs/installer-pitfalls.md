@@ -155,3 +155,48 @@ $utf8Bom = New-Object System.Text.UTF8Encoding $true
 ```
 
 `Edit` / `Write` ツール (Claude Code) は BOM なしで保存するため、毎回この手順が必要。
+
+---
+
+## 7. 配布 ZIP に大きなファイルを同梱しない
+
+### 背景
+`NotoSansCJKjp-Regular.otf` (16 MB) を `assets/` に入れてリポジトリ管理・ZIP 同梱していたため、
+ZIP が 14 MB になっていた。
+
+### 解決策
+フォントは `install.ps1` が実行時に noto-cjk GitHub からダウンロードする方式に変更。
+既にインストール済みの場合はスキップ。
+
+```powershell
+$fontDest = Join-Path $assetsTarget "NotoSansCJKjp-Regular.otf"
+if (Test-Path $fontDest) {
+    Write-Ok "Font - already installed, skipped."
+} else {
+    Invoke-Download "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf" $fontDest
+}
+```
+
+`assets/NotoSansCJKjp-Regular.otf` は `.gitignore` に追加済み。
+同様に大きなバイナリは git 管理せず、インストーラーが実行時取得する方針を取ること。
+
+---
+
+## 8. release.yml と install.ps1 の整合性
+
+### 症状
+CI の Release ワークフローが Ollama バイナリ (`ollama-windows-amd64.zip`) を
+ダウンロードして ZIP に同梱していたが、`install.ps1` はそれを一切参照せず
+winget 経由でインストールしていた。同梱 Ollama は完全に無視されていた。
+
+### 原因
+install.ps1 の Ollama 検出パスに `$scriptDir\tools\ollama\ollama.exe` が含まれておらず、
+CI の同梱ステップと install.ps1 の挙動が乖離していた。
+
+### 解決策
+install.ps1 が使わないものは CI でも同梱しない。
+v0.1.2 で Ollama 同梱ステップを削除し、install.ps1 の winget 方式に統一。
+
+### 教訓
+release.yml を変更したら `install.ps1` の挙動と照合すること。
+ZIP に含まれるファイルが install.ps1 で実際に使われているか確認する。
