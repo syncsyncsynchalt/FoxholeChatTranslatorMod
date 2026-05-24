@@ -38,6 +38,18 @@ static std::string                g_radioOffWav;
 static std::string                g_assetsDir;
 static ImFont*                    g_cjkFont         = nullptr;
 
+static const ImWchar g_cjkGlyphRanges[] = {
+    0x0020, 0x00FF,
+    0x0400, 0x04FF,
+    0x2000, 0x206F,
+    0x3000, 0x30FF,
+    0x31F0, 0x31FF,
+    0x4E00, 0x9FFF,
+    0xAC00, 0xD7AF,
+    0xFF00, 0xFFEF,
+    0, 0
+};
+
 static std::mutex   g_textMutex;
 static std::string  g_originalText;
 static std::string  g_translatedText;
@@ -125,25 +137,14 @@ static bool InitImGui(IDXGISwapChain* swapChain) {
 
     std::string fontPath = g_assetsDir + "NotoSansCJKjp-Regular.otf";
     if (GetFileAttributesA(fontPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        static const ImWchar glyphRanges[] = {
-            0x0020, 0x00FF,
-            0x0400, 0x04FF,
-            0x2000, 0x206F,
-            0x3000, 0x30FF,
-            0x31F0, 0x31FF,
-            0x4E00, 0x9FFF,
-            0xAC00, 0xD7AF,
-            0xFF00, 0xFFEF,
-            0, 0
-        };
-        g_cjkFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 14.0f, nullptr, glyphRanges);
+        g_cjkFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 14.0f, nullptr, g_cjkGlyphRanges);
         if (g_cjkFont) {
             logging::Debug("[Overlay] CJK フォント読み込み成功: %s", fontPath.c_str());
         } else {
             logging::Debug("[Overlay] CJK フォント読み込み失敗: %s", fontPath.c_str());
         }
     } else {
-        logging::Debug("[Overlay] CJK フォントが見つかりません: %s", fontPath.c_str());
+        logging::Debug("[Overlay] CJK フォントが見つかりません (後でロード試行): %s", fontPath.c_str());
     }
 
     ImGui_ImplWin32_Init(g_hwnd);
@@ -195,6 +196,25 @@ static void RenderMarqueeText(const char* label, const char* text, float areaWid
 // ============================================================
 
 static void RenderFrame(IDXGISwapChain* swapChain) {
+    // フォントが未ロードの場合、300フレームごとにファイル出現を確認してホットロード
+    if (g_cjkFont == nullptr) {
+        static int s_fontCheckFrame = 0;
+        if (++s_fontCheckFrame >= 300) {
+            s_fontCheckFrame = 0;
+            std::string fontPath = g_assetsDir + "NotoSansCJKjp-Regular.otf";
+            if (GetFileAttributesA(fontPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                ImGuiIO& io = ImGui::GetIO();
+                g_cjkFont = io.Fonts->AddFontFromFileTTF(
+                    fontPath.c_str(), 14.0f, nullptr, g_cjkGlyphRanges);
+                if (g_cjkFont) {
+                    ImGui_ImplDX11_InvalidateDeviceObjects();
+                    ImGui_ImplDX11_CreateDeviceObjects();
+                    logging::Debug("[Overlay] CJK フォント ホットロード完了");
+                }
+            }
+        }
+    }
+
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
