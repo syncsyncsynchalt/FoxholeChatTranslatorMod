@@ -59,7 +59,7 @@ Foxhole (UE4 4.24.3) チャット傍受 → Ollama 翻訳 → Sherpa-ONNX / VOIC
 | Discovery | FunctionNameFilter | "" | 関数名フィルタ (カンマ区切り) |
 | Stage2 | Prefix | "★" | チャット接頭辞 |
 | Translation | Enabled | true | 翻訳機能 |
-| Translation | OllamaEndpoint | "http://localhost:11434/api/generate" | Ollama API |
+| Translation | OllamaEndpoint | "http://localhost:11435/api/generate" | Ollama API |
 | Translation | TargetLanguage | "Japanese" | 翻訳先言語 |
 | Translation | PerformancePreset | "Medium" | Low / Medium / High |
 | Overlay | DemoMode | true | false = 実チャット駆動 |
