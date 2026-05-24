@@ -12,4 +12,7 @@ namespace tts_install {
     std::string GetStatusText();
 
     void Shutdown();
+
+    // DLL_PROCESS_DETACH (プロセス終了) 専用: スレッドを detach して std::terminate を防ぐ
+    void DetachThread();
 }

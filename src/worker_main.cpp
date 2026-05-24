@@ -85,6 +85,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
             // ollama::DetachThread() は Job Object も閉じて Ollama を終了させる。
             ollama::DetachThread();
             translate::DetachThread();
+            tts_install::DetachThread();
             tts::DetachThread();
         }
         break;

@@ -48,6 +48,7 @@ static const char kSherpaOnnxArchiveUrl[] =
 // ============================================================
 
 static std::atomic<bool> g_running{false};
+static std::atomic<bool> g_cancel{false};
 static std::thread        g_thread;
 static std::mutex         g_statusMutex;
 static std::string        g_statusText;
@@ -193,7 +194,7 @@ static bool HttpDownloadToFile(const char* urlA, const char* destPath, const cha
         size_t downloaded = 0;
         int lastPct    = -1;
         int lastLogPct = -1;
-        while (ok) {
+        while (ok && !g_cancel.load()) {
             avail = 0;
             if (!WinHttpQueryDataAvailable(req, &avail)) { ok = false; break; }
             if (avail == 0) break;
@@ -228,12 +229,14 @@ static bool HttpDownloadToFile(const char* urlA, const char* destPath, const cha
                 }
             }
         }
+        if (g_cancel.load()) ok = false;
         if (label && ok) {
             logging::Debug("[TTS-DL] %s: 完了 (%.1f MB)", label, downloaded / 1048576.0);
         }
     }
 
     if (f) fclose(f);
+    if (!ok) DeleteFileA(destPath);
     WinHttpCloseHandle(req);
     WinHttpCloseHandle(conn);
     WinHttpCloseHandle(sess);
@@ -734,27 +737,28 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
     for (int i = 0; i < kN; i++) modelOk[i] = ModelInstalled(modelsDir, kModels[i]);
 
     // ステップ 1/4: フォント
-    if (!fontOk) {
+    if (!fontOk && !g_cancel.load()) {
         logging::Debug("[TTS-Install] ステップ 1/4: フォントをインストール中...");
         fontOk = InstallFont(assetsDir, tmpDir);
         if (!fontOk) logging::Debug("[TTS-Install] フォント失敗、続行");
-    } else {
+    } else if (fontOk) {
         logging::Debug("[TTS-Install] ステップ 1/4: フォント - インストール済み");
     }
 
     // ステップ 2/4: Sherpa-ONNX DLL
-    if (!sherpaOk) {
+    if (!sherpaOk && !g_cancel.load()) {
         logging::Debug("[TTS-Install] ステップ 2/4: Sherpa-ONNX DLL をインストール中...");
         sherpaOk = InstallSherpaOnnxDll(ttsDir, tmpDir);
         if (!sherpaOk) logging::Debug("[Sherpa] DLL 失敗、続行");
-    } else {
+    } else if (sherpaOk) {
         logging::Debug("[TTS-Install] ステップ 2/4: Sherpa-ONNX DLL - インストール済み");
     }
 
     // ステップ 3/4: Sherpa-ONNX 音声モデル
-    logging::Debug("[TTS-Install] ステップ 3/4: Sherpa-ONNX 音声モデルをインストール中...");
+    if (!g_cancel.load())
+        logging::Debug("[TTS-Install] ステップ 3/4: Sherpa-ONNX 音声モデルをインストール中...");
     bool needsVoicevox = (ttsLang == "auto" || ttsLang.empty());
-    for (int i = 0; i < kN; i++) {
+    for (int i = 0; i < kN && !g_cancel.load(); i++) {
         const auto& m = kModels[i];
         if (!ShouldInstallLang(ttsLang, m.lang)) continue;
         if (strcmp(m.lang, "ja") == 0) needsVoicevox = true;
@@ -767,7 +771,7 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
     }
 
     // ステップ 4/4: VOICEVOX Core (日本語用)
-    if (needsVoicevox) {
+    if (needsVoicevox && !g_cancel.load()) {
         vvOk = VoicevoxInstalled(ttsDir);
         if (!vvOk) {
             logging::Debug("[TTS-Install] ステップ 4/4: VOICEVOX Core をインストール中...");
@@ -791,7 +795,8 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
         logging::Debug("[TTS-Install]   VOICEVOX Core   : %s", vvOk ? "OK" : "失敗");
 
     RemoveDirRecursive(tmpDir.c_str());
-    SetStatus("TTS インストール完了");
+    if (!g_cancel.load())
+        SetStatus("TTS インストール完了");
     g_running.store(false);
 }
 
@@ -831,6 +836,13 @@ std::string tts_install::GetStatusText() {
 }
 
 void tts_install::Shutdown() {
+    g_cancel.store(true);
     g_running.store(false);
     if (g_thread.joinable()) g_thread.join();
+    g_cancel.store(false);
+}
+
+void tts_install::DetachThread() {
+    g_cancel.store(true);
+    if (g_thread.joinable()) g_thread.detach();
 }
