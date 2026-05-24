@@ -18,6 +18,9 @@ void Shutdown();
 // デバッグログ出力 (debug_log.txt + コンソール)
 void Debug(const char* fmt, ...);
 
+// 進捗表示 (コンソールのみ、\r で同一行を上書き。ファイルには記録しない)
+void Progress(const char* fmt, ...);
+
 // チャットログ出力 (chat_log.txt)
 // logFilePath が空の場合は baseDir/chat_log.txt に出力
 void Chat(const char* channel, const char* sender, const char* message);

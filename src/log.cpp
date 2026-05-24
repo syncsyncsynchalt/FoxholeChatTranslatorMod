@@ -14,7 +14,8 @@ static std::mutex g_logMutex;
 static FILE*      g_debugLogFile       = nullptr;
 static FILE*      g_chatLogFile        = nullptr;
 static FILE*      g_translationLogFile = nullptr;
-static bool       g_enableConsole = true;
+static bool       g_enableConsole    = true;
+static bool       g_lastWasProgress  = false; // 直前の出力が \r 進捗行かどうか
 static std::string g_baseDir;
 static std::string g_chatLogPath;
 
@@ -54,12 +55,32 @@ void logging::Debug(const char* fmt, ...) {
     std::lock_guard<std::mutex> lock(g_logMutex);
 
     if (g_enableConsole) {
+        // 直前が \r 進捗行なら改行して確定してから新しい行を出す
+        if (g_lastWasProgress) printf("\n");
         printf("[ChatTranslator] %s\n", buf);
+        fflush(stdout);
+        g_lastWasProgress = false;
     }
 
     if (g_debugLogFile) {
         fprintf(g_debugLogFile, "[ChatTranslator] %s\n", buf);
         fflush(g_debugLogFile);
+    }
+}
+
+void logging::Progress(const char* fmt, ...) {
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    std::lock_guard<std::mutex> lock(g_logMutex);
+    if (g_enableConsole) {
+        // \r で行頭に戻り同一行を上書き。trailing spaces で前行の残りを消す
+        printf("\r[ChatTranslator] %-70s", buf);
+        fflush(stdout);
+        g_lastWasProgress = true;
     }
 }
 
