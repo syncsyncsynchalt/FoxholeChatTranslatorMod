@@ -28,59 +28,8 @@ import configparser
 import threading
 import os
 import re as _re
-import math
 
 
-# ============================================================
-# ラジオエフェクト (tts.cpp ApplyRadioEffect と同一ロジック)
-# HPF 300Hz → LPF 3400Hz → クリッピング
-# ============================================================
-
-def _biquad_coeffs_hpf(fc: float, fs: float):
-    w0    = 2 * math.pi * fc / fs
-    alpha = math.sin(w0) / (2 * 0.7071067811865476)
-    cosw0 = math.cos(w0)
-    a0    = 1 + alpha
-    b = [(1+cosw0)/2/a0, -(1+cosw0)/a0, (1+cosw0)/2/a0]
-    a = [1.0, -2*cosw0/a0, (1-alpha)/a0]
-    return b, a
-
-def _biquad_coeffs_lpf(fc: float, fs: float):
-    w0    = 2 * math.pi * fc / fs
-    alpha = math.sin(w0) / (2 * 0.7071067811865476)
-    cosw0 = math.cos(w0)
-    a0    = 1 + alpha
-    b = [(1-cosw0)/2/a0, (1-cosw0)/a0, (1-cosw0)/2/a0]
-    a = [1.0, -2*cosw0/a0, (1-alpha)/a0]
-    return b, a
-
-def _biquad_filter(x, b, a):
-    try:
-        from scipy.signal import lfilter
-        return lfilter(b, a, x)
-    except ImportError:
-        pass
-    import numpy as np
-    y  = np.empty_like(x)
-    b0, b1, b2 = b
-    a1, a2     = a[1], a[2]
-    x1 = x2 = y1 = y2 = 0.0
-    for i in range(len(x)):
-        yi   = b0*x[i] + b1*x1 + b2*x2 - a1*y1 - a2*y2
-        x2, x1 = x1, float(x[i])
-        y2, y1 = y1, yi
-        y[i]   = yi
-    return y
-
-def apply_radio_effect(samples, sample_rate: int):
-    import numpy as np
-    fs  = float(sample_rate)
-    out = np.asarray(samples, dtype=np.float64)
-    out = _biquad_filter(out, *_biquad_coeffs_hpf(300.0,  fs))
-    out = _biquad_filter(out, *_biquad_coeffs_lpf(3400.0, fs))
-    clip = 0.85
-    out  = np.clip(out * 1.4, -clip, clip) / clip
-    return np.clip(out, -1.0, 1.0).astype(np.float32)
 
 # ============================================================
 # 言語判定 (tts.cpp DetectLanguage と同じロジック)
@@ -427,7 +376,6 @@ def load_config(base_dir: str) -> dict:
     defaults = {
         "tts_language": "auto",
         "tts_speaking_rate": 1.0,
-        "tts_radio_effect": True,
         "translation_enabled": True,
         "target_language": "Japanese",
         "performance_preset": "Medium",
@@ -447,7 +395,6 @@ def load_config(base_dir: str) -> dict:
     return {
         "tts_language":          gs("TTS",         "Language",           "auto"),
         "tts_speaking_rate":     gf("TTS",         "SpeakingRate",       1.0),
-        "tts_radio_effect":      gi("TTS",         "RadioEffect",        1) != 0,
         "tts_voicevox_style_id": gi("TTS",         "VoicevoxStyleId",    3),
         "translation_enabled":gi("Translation", "Enabled",            1) != 0,
         "target_language":    gs("Translation", "TargetLanguage",     "Japanese"),
@@ -583,7 +530,6 @@ class App:
         rows = [
             ("TTS言語",     c["tts_language"]),
             ("読み上げ速度", f'{c["tts_speaking_rate"]:.2f}'),
-            ("ラジオ効果",  "ON" if c["tts_radio_effect"] else "OFF"),
             ("翻訳先",      c["target_language"]),
             ("プリセット",  c["performance_preset"]),
         ]
@@ -834,8 +780,6 @@ class App:
         lang  = detect_language(text) if mode == "auto" else mode
         speed = float(self.rate_var.get())
 
-        radio_on = self.cfg.get("tts_radio_effect", True)
-
         # VOICEVOX (日本語) — C++ 同様に Sherpa より優先
         # sherpa-onnx 未インストールでも VOICEVOX があれば動作する
         if lang == "ja" and self.vv_engine.ready:
@@ -857,8 +801,6 @@ class App:
                     samples, sr = result
                     self.root.after(0, lambda: self.gen_lbl.config(text="再生中 (VOICEVOX)…"))
                     arr = np.array(samples, dtype=np.float32)
-                    if radio_on:
-                        arr = apply_radio_effect(arr, sr)
                     sd.play(arr, sr, blocking=False)
                     import time
                     while True:
@@ -871,8 +813,7 @@ class App:
                         except Exception:
                             break
                         time.sleep(0.05)
-                    radio_tag = " [ラジオON]" if radio_on else ""
-                    msg = f"完了 (VOICEVOX)  {len(samples)/sr:.1f}秒  sr={sr}Hz{radio_tag}"
+                    msg = f"完了 (VOICEVOX)  {len(samples)/sr:.1f}秒  sr={sr}Hz"
                 except Exception as e:
                     msg = f"エラー: {e}"
                 self.root.after(0, lambda m=msg: self._on_done(m))
@@ -918,8 +859,6 @@ class App:
                 self.root.after(0, lambda: self.gen_lbl.config(text="再生中…"))
 
                 arr = np.array(samples, dtype=np.float32)
-                if radio_on:
-                    arr = apply_radio_effect(arr, sr)
                 sd.play(arr, sr, blocking=False)
                 import time
                 while True:
@@ -933,9 +872,8 @@ class App:
                         break
                     time.sleep(0.05)
 
-                radio_tag = " [ラジオON]" if radio_on else ""
-                fb_tag    = f" (EN fallback)" if actual_lang != lang else ""
-                msg = f"完了  lang={actual_lang}{fb_tag}  {len(samples)/sr:.1f}秒  sr={sr}Hz{radio_tag}"
+                fb_tag = f" (EN fallback)" if actual_lang != lang else ""
+                msg = f"完了  lang={actual_lang}{fb_tag}  {len(samples)/sr:.1f}秒  sr={sr}Hz"
             except Exception as e:
                 import sys
                 py = sys.executable

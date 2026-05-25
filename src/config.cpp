@@ -52,6 +52,13 @@ void config::Load(const char* baseDir) {
     g_config.ttsVoicevoxStyleId = static_cast<uint32_t>(
         GetPrivateProfileIntA("TTS", "VoicevoxStyleId", 3, configPath.c_str()));
 
+    {
+        float v = static_cast<float>(atof(ReadIniStr(configPath.c_str(), "TTS", "Volume", "0.8").c_str()));
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        g_config.ttsVolume = v;
+    }
+
     std::string ttsMode = ReadIniStr(configPath.c_str(), "TTS", "Mode", "Translated");
     g_ttsMode.store(static_cast<int>(ParseTtsMode(ttsMode)));
 }

@@ -36,7 +36,8 @@ struct Config {
     bool        demoMode         = true;
 
     // [TTS]
-    uint32_t    ttsVoicevoxStyleId = 3; // 3=ずんだもんノーマル
+    uint32_t    ttsVoicevoxStyleId = 3;   // 3=ずんだもんノーマル
+    float       ttsVolume          = 0.8f; // 0.0〜1.0
 };
 
 namespace config {

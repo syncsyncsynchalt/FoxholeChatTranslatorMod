@@ -435,6 +435,22 @@ static bool InitVoicevox(const std::string& ttsDir) {
 
 struct PcmData { std::vector<int16_t> samples; int32_t sampleRate = 0; };
 
+// 16kHz ダウンサンプル (モノラル 16bit 16000Hz — 狭帯域音声品質)
+// ナイーブ間引き = アンチエイリアスなし → エイリアシングが無線らしい質感を加える
+static void ResampleTo16k(std::vector<int16_t>& samples, int32_t& sampleRate) {
+    const int32_t kDstRate = 16000;
+    if (sampleRate <= kDstRate) return;
+    int srcCount = static_cast<int>(samples.size());
+    int dstCount = static_cast<int>(static_cast<int64_t>(srcCount) * kDstRate / sampleRate);
+    std::vector<int16_t> out(dstCount);
+    for (int i = 0; i < dstCount; i++) {
+        int srcIdx = static_cast<int>(static_cast<int64_t>(i) * sampleRate / kDstRate);
+        out[i] = samples[srcIdx < srcCount ? srcIdx : srcCount - 1];
+    }
+    samples    = std::move(out);
+    sampleRate = kDstRate;
+}
+
 static bool ParseWavPcm(const uint8_t* wav, uintptr_t size, PcmData& out) {
     if (size < 12) return false;
     if (memcmp(wav, "RIFF", 4) || memcmp(wav + 8, "WAVE", 4)) return false;
@@ -585,7 +601,7 @@ static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     cfg.model.num_threads        = 2;
     cfg.model.debug              = 0;
     cfg.model.provider           = "cpu";
-    cfg.max_num_sentences        = 1;
+    cfg.max_num_sentences        = 5;
 
     SherpaOnnxOfflineTts* handle = g_fnCreate(&cfg);
     if (!handle)
@@ -614,6 +630,7 @@ struct TtsRequest {
 };
 
 static constexpr size_t MAX_TTS_QUEUE_SIZE = 8;
+static constexpr float  kPlaybackSpeed     = 1.0f;  // 再生速度 (1.0=等速)
 
 static std::thread             g_ttsThread;
 static std::mutex              g_ttsMutex;
@@ -685,6 +702,8 @@ static void TtsWorker() {
             if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
             if (g_ttsStop.load()) continue;
 
+            ResampleTo16k(vvPcm.samples, vvPcm.sampleRate);
+
             WAVEFORMATEX wfx = {};
             wfx.wFormatTag      = WAVE_FORMAT_PCM;
             wfx.nChannels       = 1;
@@ -705,6 +724,8 @@ static void TtsWorker() {
             buf.Flags      = XAUDIO2_END_OF_STREAM;
 
             sourceVoice->SubmitSourceBuffer(&buf);
+            sourceVoice->SetVolume(config::Get().ttsVolume);
+            sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
             sourceVoice->Start(0);
 
             for (;;) {
@@ -732,7 +753,20 @@ static void TtsWorker() {
 
         if (g_ttsStop.load()) continue;
 
-        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, req.text.c_str(), 0, 1.0f);
+        // VITS モデルはアテンション機構の限界を超えた長文で同一箇所ループが発生する
+        // 文境界を優先して 180 文字以内に切り詰める
+        static const size_t kMaxTtsChars = 180;
+        std::string ttsText = req.text;
+        if (ttsText.size() > kMaxTtsChars) {
+            static const char kBoundary[] = ".!?;,\n";
+            size_t cut = std::string::npos;
+            for (size_t i = kMaxTtsChars; i > kMaxTtsChars / 2; --i) {
+                if (strchr(kBoundary, ttsText[i])) { cut = i + 1; break; }
+            }
+            ttsText = ttsText.substr(0, cut != std::string::npos ? cut : kMaxTtsChars);
+        }
+
+        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, ttsText.c_str(), 0, 1.0f);
         if (!audio || audio->n <= 0) {
             if (audio) g_fnFreeAudio(audio);
             logging::Debug("[TTS] 合成失敗またはサンプルなし");
@@ -745,8 +779,8 @@ static void TtsWorker() {
         }
 
         // float32 PCM [-1,1] → int16
-        int sampleRate  = audio->sample_rate;
-        int numSamples  = audio->n;
+        int32_t sampleRate = audio->sample_rate;
+        int     numSamples = audio->n;
         std::vector<int16_t> pcm16(numSamples);
         for (int i = 0; i < numSamples; i++) {
             float v = audio->samples[i];
@@ -755,6 +789,8 @@ static void TtsWorker() {
             pcm16[i] = static_cast<int16_t>(v * 32767.0f);
         }
         g_fnFreeAudio(audio);
+
+        ResampleTo16k(pcm16, sampleRate);
 
         WAVEFORMATEX wfx = {};
         wfx.wFormatTag      = WAVE_FORMAT_PCM;
@@ -777,6 +813,8 @@ static void TtsWorker() {
         buf.Flags      = XAUDIO2_END_OF_STREAM;
 
         sourceVoice->SubmitSourceBuffer(&buf);
+        sourceVoice->SetVolume(config::Get().ttsVolume);
+        sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
         sourceVoice->Start(0);
 
         for (;;) {

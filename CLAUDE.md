@@ -64,7 +64,6 @@ Foxhole (UE4 4.24.3) チャット傍受 → Ollama 翻訳 → Sherpa-ONNX / VOIC
 | Translation | PerformancePreset | "Medium" | Low / Medium / High |
 | Overlay | DemoMode | true | false = 実チャット駆動 |
 | TTS | Language | "auto" | auto = テキストから自動判定 |
-| TTS | RadioEffect | true | ラジオ DSP エフェクト |
 | TTS | VoicevoxStyleId | 3 | VOICEVOX スタイル ID (3 = ずんだもんノーマル) |
 | TTS | SpeakTranslated | true | true = 翻訳後を読み上げ / false = 原文 |
 | Addresses | ProcessEventVtableIndex | 66 | ProcessEvent vtable インデックス |
