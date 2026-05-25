@@ -3,10 +3,15 @@
 // ゲームなしで chat_translator.dll のオーバーレイを確認する
 //
 // 操作:
-//   TL ボタン  : クリックで翻訳モード循環 (TL:-- -> TL:JA -> ... -> TL:KO)
-//   TTS ボタン : クリックで TTS モード循環 (TTS:-- -> TTS:Src -> TTS:Tr)
-//   F1         : デモメッセージを手動送信
-//   ESC        : 終了
+//   F1     : デモメッセージを手動送信
+//   L      : ログ再生 一時停止/再開
+//   R      : ログ再生 先頭から再開
+//   ESC    : 終了
+//
+// 起動オプション:
+//   --log <path>      : 読み込む chat_log.txt のパス
+//   --interval <ms>   : メッセージ間隔 (デフォルト 3000ms)
+//   --no-auto         : 起動後の自動再生を無効化
 //
 // 注意: version.dll と同ディレクトリに置くと D3D11 初期化がクラッシュする。
 //       CMake が build/overlay_test/ に出力するのはこのため。
@@ -16,7 +21,12 @@
 #include <d3d11.h>
 #include <dxgi.h>
 #include <cstdio>
+#include <cstring>
 #include <string>
+#include <vector>
+#include <atomic>
+#include <thread>
+#include <chrono>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -63,6 +73,122 @@ static const char* kTestMessages[] = {
 };
 static const int kTestMessageCount = sizeof(kTestMessages) / sizeof(kTestMessages[0]);
 static int g_msgIndex = 0;
+
+// ============================================================
+// ログ再生
+// ============================================================
+
+struct LogEntry {
+    std::string sender;
+    std::string message;
+};
+
+static std::vector<LogEntry> g_logEntries;
+static std::atomic<bool>     g_replayRunning{false};
+static std::atomic<bool>     g_replayPaused{false};
+static std::atomic<int>      g_replayIndex{0};
+static int                   g_replayIntervalMs = 3000;
+static bool                  g_replayLoop       = false;
+static std::thread           g_replayThread;
+
+// chat_log.txt の1行をパース: "[timestamp] [channel] sender: message"
+static bool ParseLogLine(const char* line, LogEntry* out) {
+    if (!line || line[0] != '[') return false;
+
+    // タイムスタンプブロック "]" を探す
+    const char* p = strchr(line, ']');
+    if (!p || p[1] != ' ') return false;
+    p += 2;
+
+    // チャンネルブロック "[channel]"
+    if (*p != '[') return false;
+    p = strchr(p, ']');
+    if (!p || p[1] != ' ') return false;
+    p += 2;
+
+    // "sender: message" を分割 (最初の ": " で区切る)
+    const char* colon = strstr(p, ": ");
+    if (!colon) return false;
+
+    out->sender  = std::string(p, static_cast<size_t>(colon - p));
+    out->message = std::string(colon + 2);
+
+    // 末尾の改行を除去
+    while (!out->message.empty() &&
+           (out->message.back() == '\n' || out->message.back() == '\r')) {
+        out->message.pop_back();
+    }
+
+    return !out->sender.empty() && !out->message.empty();
+}
+
+static int LoadChatLog(const char* path) {
+    FILE* f = fopen(path, "r");
+    if (!f) return 0;
+
+    char line[1024];
+    int  count = 0;
+    while (fgets(line, sizeof(line), f)) {
+        LogEntry e;
+        if (ParseLogLine(line, &e)) {
+            g_logEntries.push_back(std::move(e));
+            count++;
+        }
+    }
+    fclose(f);
+    return count;
+}
+
+static void StartReplayThread() {
+    g_replayRunning = true;
+    g_replayPaused  = false;
+
+    g_replayThread = std::thread([]() {
+        int total = static_cast<int>(g_logEntries.size());
+        while (g_replayRunning) {
+            if (g_replayPaused) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+
+            int idx = g_replayIndex.fetch_add(1);
+            if (idx >= total) {
+                if (g_replayLoop) {
+                    g_replayIndex = 0;
+                    printf("[Replay] ループ再開\n");
+                    // 先頭に戻る前もインターバル待機する
+                    for (int i = 0; i < g_replayIntervalMs / 100 && g_replayRunning; i++) {
+                        if (g_replayPaused) break;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+                    continue;
+                }
+                printf("\n[Replay] 全メッセージ送信完了 (%d件)\n", total);
+                g_replayRunning = false;
+                break;
+            }
+
+            const auto& e = g_logEntries[idx];
+            if (g_fnChatMsg) {
+                g_fnChatMsg(e.sender.c_str(), e.message.c_str());
+            }
+            printf("[Replay %d/%d] %s: %s\n",
+                   idx + 1, total, e.sender.c_str(), e.message.c_str());
+            fflush(stdout);
+
+            // インターバル待機 (100ms 刻みで停止チェック)
+            for (int i = 0; i < g_replayIntervalMs / 100 && g_replayRunning; i++) {
+                if (g_replayPaused) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+    });
+}
+
+static void StopReplayThread() {
+    g_replayRunning = false;
+    if (g_replayThread.joinable()) g_replayThread.join();
+}
 
 // ============================================================
 // DX11 初期化
@@ -124,11 +250,40 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_KEYDOWN:
         if (wp == VK_ESCAPE) {
             PostQuitMessage(0);
+
         } else if (wp == VK_F1 && g_fnChatMsg) {
             const char* msg_text = kTestMessages[g_msgIndex % kTestMessageCount];
             g_fnChatMsg("TestUser", msg_text);
             printf("[F1] メッセージ送信: %s\n", msg_text);
             g_msgIndex++;
+
+        } else if (wp == 'L') {
+            if (g_logEntries.empty()) {
+                printf("[Replay] ログが読み込まれていません\n");
+            } else if (g_replayRunning && !g_replayPaused) {
+                g_replayPaused = true;
+                printf("[Replay] 一時停止 (%d/%d)\n",
+                       g_replayIndex.load(), (int)g_logEntries.size());
+            } else if (g_replayRunning && g_replayPaused) {
+                g_replayPaused = false;
+                printf("[Replay] 再開 (%d/%d)\n",
+                       g_replayIndex.load(), (int)g_logEntries.size());
+            } else {
+                // 再生完了後: 続きから再開
+                StartReplayThread();
+                printf("[Replay] 再生開始 (%d/%d)\n",
+                       g_replayIndex.load(), (int)g_logEntries.size());
+            }
+
+        } else if (wp == 'R') {
+            if (g_logEntries.empty()) {
+                printf("[Replay] ログが読み込まれていません\n");
+            } else {
+                StopReplayThread();
+                g_replayIndex = 0;
+                StartReplayThread();
+                printf("[Replay] 先頭から再開 (%d件)\n", (int)g_logEntries.size());
+            }
         }
         return 0;
 
@@ -143,12 +298,28 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 // エントリポイント
 // ============================================================
 
-int main() {
+int main(int argc, char* argv[]) {
     AllocConsole();
     freopen("CONOUT$", "w", stdout);
     SetConsoleOutputCP(CP_UTF8);
     printf("=== Overlay Test Host ===\n");
-    printf("操作: TL/TTS ボタンをクリック | F1=テストメッセージ送信 | ESC=終了\n\n");
+
+    // コマンドライン引数解析
+    std::string logPath;
+    bool        autoPlay = true;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+            logPath = argv[++i];
+        } else if (strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
+            g_replayIntervalMs = atoi(argv[++i]);
+            if (g_replayIntervalMs < 100) g_replayIntervalMs = 100;
+        } else if (strcmp(argv[i], "--no-auto") == 0) {
+            autoPlay = false;
+        } else if (strcmp(argv[i], "--loop") == 0) {
+            g_replayLoop = true;
+        }
+    }
 
     // ウィンドウ登録・作成
     WNDCLASSEXA wc = {};
@@ -162,7 +333,7 @@ int main() {
 
     g_hwnd = CreateWindowExA(
         0, "OverlayTestHost",
-        "Overlay Test Host  [F1: テストメッセージ送信]  [ESC: 終了]",
+        "Overlay Test Host  [F1: test msg]  [L: pause/resume]  [R: restart]  [ESC: exit]",
         WS_OVERLAPPEDWINDOW,
         100, 100, 1280, 720,
         nullptr, nullptr, wc.hInstance, nullptr);
@@ -219,17 +390,44 @@ int main() {
     }
 
     printf("OK: WorkerInitTest 完了\n");
-    printf("\n--- テスト手順 ---\n");
-    printf("1. 右下のオーバーレイに Orig:/Tran: の2行と TL/TTS ボタンが見えること\n");
-    printf("2. TL ボタンを7回クリックして TL:JAZ->TL:EN->TL:RU->TL:ZH->TL:KO->TL:-->TL:JA->TL:JAZ と循環すること\n");
-    printf("3. TL:--> のとき Tran: [Off] が表示されること\n");
-    printf("4. TTS ボタンを3回クリックして TTS:Tr->TTS:-->TTS:Src->TTS:Tr と循環すること\n");
-    printf("5. F1 キーでテストメッセージが Orig: 行に表示されること\n");
-    printf("6. DemoMode=1 の場合は自動でメッセージが流れること\n");
-    if (!g_fnChatMsg) {
-        printf("INFO: WorkerOnChatMessage 未エクスポート - F1 によるメッセージ送信は無効\n");
+
+    // ログファイルをロード
+    // パス未指定の場合は baseDir の chat_log.txt を探す
+    if (logPath.empty()) {
+        logPath = std::string(baseDir) + "chat_log.txt";
     }
-    printf("------------------\n\n");
+
+    int loaded = LoadChatLog(logPath.c_str());
+    if (loaded > 0) {
+        printf("OK: ログ読み込み完了: %s (%d件, 間隔=%dms)\n",
+               logPath.c_str(), loaded, g_replayIntervalMs);
+    } else {
+        // ログなし → デモメッセージをデフォルトエントリとして使用
+        for (int i = 0; i < kTestMessageCount; i++) {
+            LogEntry e;
+            e.sender  = "TestUser";
+            e.message = kTestMessages[i];
+            g_logEntries.push_back(e);
+        }
+        g_replayLoop = true;
+        printf("INFO: ログファイルなし (%s)\n", logPath.c_str());
+        printf("INFO: デモメッセージ %d件をループ再生します\n", kTestMessageCount);
+        printf("      --log <path> でログファイルを指定できます\n");
+    }
+    printf("操作: L=一時停止/再開  R=先頭から再開  F1=手動送信\n");
+
+    // 自動再生: 翻訳・TTS 初期化完了を待ってから開始
+    if (autoPlay && !g_logEntries.empty()) {
+        printf("[Replay] 3秒後に自動再生を開始します...\n");
+        // メインループ開始後に別スレッドから開始するため遅延スレッドを使う
+        std::thread([&]() {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            if (!g_replayRunning) {
+                printf("[Replay] 自動再生開始 (%d件)\n", (int)g_logEntries.size());
+                StartReplayThread();
+            }
+        }).detach();
+    }
 
     // メインループ
     MSG winMsg = {};
@@ -254,6 +452,7 @@ int main() {
 
 done:
     printf("終了処理中...\n");
+    StopReplayThread();
 
     if (g_fnShutdown) g_fnShutdown();
     if (g_rtv)        { g_rtv->Release();       g_rtv       = nullptr; }

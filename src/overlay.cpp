@@ -407,9 +407,9 @@ bool overlay::Init() {
 
         TtsMode ttsMode = config::GetTtsMode();
         if (ttsMode != TtsMode::Off) {
-            const char* ttsText = (ttsMode == TtsMode::Translated)
-                ? r.translated.c_str()
-                : r.original.c_str();
+            // 翻訳失敗 (Ollama 接続不可) のエラー文字列は読み上げない
+            bool useTranslated = (ttsMode == TtsMode::Translated) && r.ok;
+            const char* ttsText = useTranslated ? r.translated.c_str() : r.original.c_str();
             tts::Speak(ttsText, r.sender.empty() ? nullptr : r.sender.c_str());
         }
     });

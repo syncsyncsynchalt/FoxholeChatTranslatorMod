@@ -25,6 +25,7 @@ struct TranslateResult {
     std::string sender;
     std::string original;
     std::string translated;
+    bool        ok = true; // false = 翻訳失敗 (Ollama 接続不可等)
 };
 
 using ResultCallback = std::function<void(const TranslateResult&)>;

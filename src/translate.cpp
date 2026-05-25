@@ -519,6 +519,7 @@ static void WorkerThread() {
             result.sender     = item.sender;
             result.original   = item.message;
             result.translated = translated;
+            result.ok         = !translated.empty() && translated[0] != '(';
             cb(result);
         }
     }

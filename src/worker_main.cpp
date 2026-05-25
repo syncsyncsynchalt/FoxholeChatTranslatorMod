@@ -17,6 +17,7 @@
 #include "tts.h"
 #include "tts_install.h"
 #include "config.h"
+#include "log.h"
 
 extern "C" {
 
@@ -81,6 +82,8 @@ __declspec(dllexport) void WorkerOnChatMessage(const char* sender, const char* m
 __declspec(dllexport) void* WorkerInitTest(const char* baseDir) {
     config::Load(baseDir);
     const Config& cfg = config::Get();
+
+    logging::Init(baseDir, cfg.enableConsole);
 
     translate::TranslateConfig tcfg;
     tcfg.endpoint          = cfg.ollamaEndpoint;

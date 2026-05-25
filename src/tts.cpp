@@ -642,6 +642,7 @@ static std::string             g_ttsLanguage = "auto";
 
 static void TtsWorker() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
     IXAudio2* xaudio = nullptr;
     HRESULT hr = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
@@ -680,6 +681,7 @@ static void TtsWorker() {
         }
 
         g_ttsStop.store(false);
+        logging::Debug("[TTS] ワーカー: 処理開始 text=%.60s", req.text.c_str());
 
         // 言語判定
         Lang lang = Lang::EN;
@@ -700,6 +702,8 @@ static void TtsWorker() {
         if (useVoicevox) {
             PcmData vvPcm;
             if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
+            logging::Debug("[TTS-VV] 合成完了: samples=%zu rate=%d",
+                           vvPcm.samples.size(), vvPcm.sampleRate);
             if (g_ttsStop.load()) continue;
 
             ResampleTo16k(vvPcm.samples, vvPcm.sampleRate);
@@ -716,7 +720,10 @@ static void TtsWorker() {
 
             IXAudio2SourceVoice* sourceVoice = nullptr;
             hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
-            if (FAILED(hr) || !sourceVoice) continue;
+            if (FAILED(hr) || !sourceVoice) {
+                logging::Debug("[TTS-VV] CreateSourceVoice 失敗: hr=0x%08X", hr);
+                continue;
+            }
 
             XAUDIO2_BUFFER buf = {};
             buf.AudioBytes = dataSize;
@@ -727,6 +734,7 @@ static void TtsWorker() {
             sourceVoice->SetVolume(config::Get().ttsVolume);
             sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
             sourceVoice->Start(0);
+            logging::Debug("[TTS-VV] 再生開始: %u bytes", dataSize);
 
             for (;;) {
                 if (g_ttsStop.load() || !g_ttsRunning.load()) {
@@ -834,6 +842,7 @@ static void TtsWorker() {
     if (masterVoice) masterVoice->DestroyVoice();
     if (xaudio)      xaudio->Release();
     logging::Debug("[TTS] ワーカー終了");
+    CoUninitialize();
 }
 
 // ============================================================
@@ -866,6 +875,8 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId) {
 }
 
 void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
+    logging::Debug("[TTS] Speak: running=%d text=%.60s",
+                   (int)g_ttsRunning.load(), textUtf8 ? textUtf8 : "(null)");
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
