@@ -228,11 +228,13 @@ static bool HookDXGIPresent();
 
 // 共通のコールバック処理
 static void InvokeWorkerCallback(void* thisObj, void* function, void* parms) {
-    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
+    // callback が null なら atomic ops をスキップ (ホットリロード中等)
     WorkerCallbackFn cb = g_workerCallback;
-    if (cb) {
-        cb(thisObj, function, parms);
-    }
+    if (!cb) return;
+    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
+    // fetch_add 後に再読みして UnloadWorker による null 化に追従
+    cb = g_workerCallback;
+    if (cb) cb(thisObj, function, parms);
     g_inflightHooks.fetch_sub(1, std::memory_order_release);
 }
 

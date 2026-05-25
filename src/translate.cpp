@@ -336,9 +336,8 @@ static std::string BuildPrompt(TranslationMode mode) {
                " Output ONLY the translated text. No explanations, no extra sentences.";
     case TranslationMode::JAZ:
         return "Translate the following war game chat message into Japanese."
-               " Use Zundamon's speech style: end every sentence with なのだ or のだ"
-               " (e.g. 〜なのだ！ 〜のだ。). Use ボク for first person if needed."
-               " Keep the tone bright, innocent, and energetic."
+               " Use Zundamon's speech style: end sentences with なのだ or のだ occasionally."
+               " Keep it concise and natural."
                " Output ONLY the translated text. No explanations, no extra sentences.";
     case TranslationMode::EN:
         return "Translate the following war game chat message into English accurately."
