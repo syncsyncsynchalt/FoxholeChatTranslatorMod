@@ -408,6 +408,34 @@ static bool CopyNamedDir(const char* srcRoot, const char* targetName, const char
     return found;
 }
 
+// ディレクトリツリーから最初の .onnx ファイルを探して destPath にコピー (見つかったら true)
+// VITS モデルはアーカイブ内のファイル名が統一されていないため model.onnx に統一するために使う
+static bool FindAndCopyOnnxAsModel(const char* srcRoot, const char* destPath) {
+    char pattern[MAX_PATH];
+    _snprintf(pattern, sizeof(pattern), "%s\\*", srcRoot);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return false;
+    bool found = false;
+    do {
+        if (fd.cFileName[0] == '.') continue;
+        char child[MAX_PATH];
+        _snprintf(child, sizeof(child), "%s\\%s", srcRoot, fd.cFileName);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            found = FindAndCopyOnnxAsModel(child, destPath);
+        } else {
+            size_t l = strlen(fd.cFileName);
+            if (l > 5 && _stricmp(fd.cFileName + l - 5, ".onnx") == 0) {
+                CopyFileA(child, destPath, FALSE);
+                found = true;
+            }
+        }
+        if (found) break;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return found;
+}
+
 // 指定ファイル名をディレクトリツリーから検索して destPath にコピー (見つかったら true)
 static bool FindAndCopyFile(const char* srcRoot, const char* filename, const char* destPath) {
     char pattern[MAX_PATH];
@@ -638,11 +666,8 @@ static bool InstallModel(const ModelDef& m, const std::string& modelsDir,
         // VITS
         FindAndCopyFile(extractDir.c_str(), "tokens.txt", (langDir + "tokens.txt").c_str());
         FindAndCopyFile(extractDir.c_str(), "lexicon.txt", (langDir + "lexicon.txt").c_str());
-        // *.onnx を model.onnx としてコピー (最初に見つかったもの)
-        CopyFilesIf(extractDir.c_str(), langDir.c_str(), [](const char* n) {
-            size_t l = strlen(n);
-            return l > 5 && _stricmp(n + l - 5, ".onnx") == 0;
-        });
+        // *.onnx を model.onnx として保存 (アーカイブ内のファイル名は統一されていない)
+        FindAndCopyOnnxAsModel(extractDir.c_str(), (langDir + "model.onnx").c_str());
 
         // espeak-ng-data (まだなければ)
         std::string espeakDest = ttsDir + "espeak-ng-data";
@@ -804,6 +829,23 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
 // 公開 API
 // ============================================================
 
+// VITS モデルの旧インストール移行: *.onnx → model.onnx へリネーム (再ダウンロード不要)
+static void MigrateVitsModelIfNeeded(const std::string& modelsDir, const ModelDef& m) {
+    if (m.supertonic) return;
+    std::string langDir   = modelsDir + m.lang + "\\";
+    std::string modelOnnx = langDir + "model.onnx";
+    if (GetFileAttributesA(modelOnnx.c_str()) != INVALID_FILE_ATTRIBUTES) return;
+    char pat[MAX_PATH];
+    _snprintf(pat, sizeof(pat), "%s*.onnx", langDir.c_str());
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    std::string src = langDir + fd.cFileName;
+    FindClose(h);
+    if (MoveFileA(src.c_str(), modelOnnx.c_str()))
+        logging::Debug("[TTS-Install] [%s] %s -> model.onnx に移行", m.lang, fd.cFileName);
+}
+
 void tts_install::StartIfNeeded(const std::string& ttsDir, const std::string& ttsLang) {
     if (g_running.load()) return;
 
@@ -812,6 +854,7 @@ void tts_install::StartIfNeeded(const std::string& ttsDir, const std::string& tt
     bool needModel    = false;
     std::string modelsDir = ttsDir + "models\\";
     for (const auto& m : kModels) {
+        MigrateVitsModelIfNeeded(modelsDir, m);  // 旧インストールを model.onnx に統一
         if (ShouldInstallLang(ttsLang, m.lang) && !ModelInstalled(modelsDir, m)) {
             needModel = true; break;
         }
