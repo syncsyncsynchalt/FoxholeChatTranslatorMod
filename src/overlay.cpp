@@ -19,6 +19,7 @@
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
+#include <deque>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -47,12 +48,19 @@ static const ImWchar g_cjkGlyphRanges[] = {
     0, 0
 };
 
-static std::mutex   g_textMutex;
-static std::string  g_originalText;
-static std::string  g_translatedText;
+struct MessageEntry {
+    std::string sender;
+    std::string original;
+    std::string translated;
+    bool        translating = false; // true = 翻訳待ち
+};
 
-static float g_scrollOrig  = 0.0f;
-static float g_scrollTrans = 0.0f;
+static std::mutex               g_textMutex;
+static std::deque<MessageEntry> g_entries;
+static const size_t             kMaxEntries = 5;
+
+static float g_scrollOrig  = 0.0f; // 最新エントリの原文スクロール
+static float g_scrollTrans = 0.0f; // 最新エントリの訳文スクロール
 
 // デモモード: 5言語自動切替
 static const char* g_demoMessages[] = {
@@ -114,6 +122,15 @@ static bool InitImGui(IDXGISwapChain* swapChain) {
 // マーキースクロール描画ヘルパー
 // ============================================================
 
+// 静的クリップ表示 (過去エントリ用: スクロールなし)
+static void RenderClippedText(const char* id, const char* text, float areaWidth) {
+    float childWidth = (areaWidth < 10.0f) ? 10.0f : areaWidth;
+    ImGui::BeginChild(id, ImVec2(childWidth, ImGui::GetTextLineHeightWithSpacing()),
+                      false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::TextUnformatted(text);
+    ImGui::EndChild();
+}
+
 static void RenderMarqueeText(const char* id, const char* text, float areaWidth,
                               float& scrollPos, float deltaTime) {
     float childWidth = (areaWidth < 10.0f) ? 10.0f : areaWidth;
@@ -141,23 +158,23 @@ static void RenderMarqueeText(const char* id, const char* text, float areaWidth,
 
 static const char* TranslationModeLabel(TranslationMode m) {
     switch (m) {
-    case TranslationMode::Off: return "TL:--";
-    case TranslationMode::JA:  return "TL:JA";
-    case TranslationMode::JAZ: return "TL:JAZ";
-    case TranslationMode::EN:  return "TL:EN";
-    case TranslationMode::RU:  return "TL:RU";
-    case TranslationMode::ZH:  return "TL:ZH";
-    case TranslationMode::KO:  return "TL:KO";
-    default:                   return "TL:??";
+    case TranslationMode::Off: return "--";
+    case TranslationMode::JA:  return "JA";
+    case TranslationMode::JAZ: return "JAZ";
+    case TranslationMode::EN:  return "EN";
+    case TranslationMode::RU:  return "RU";
+    case TranslationMode::ZH:  return "ZH";
+    case TranslationMode::KO:  return "KO";
+    default:                   return "??";
     }
 }
 
 static const char* TtsModeLabel(TtsMode m) {
     switch (m) {
-    case TtsMode::Off:        return "TTS:--";
-    case TtsMode::Original:   return "TTS:Src";
-    case TtsMode::Translated: return "TTS:Tr";
-    default:                  return "TTS:??";
+    case TtsMode::Off:        return "--";
+    case TtsMode::Original:   return "Src";
+    case TtsMode::Translated: return "Tr";
+    default:                  return "??";
     }
 }
 
@@ -212,8 +229,7 @@ static void RenderFrame() {
     if (s_lastFont != ImGui::GetFont()) {
         s_lastFont = ImGui::GetFont();
         static const char* kAllLabels[] = {
-            "TL:--","TL:JA","TL:JAZ","TL:EN","TL:RU","TL:ZH","TL:KO",
-            "TTS:--","TTS:Src","TTS:Tr", nullptr
+            "--","JA","JAZ","EN","RU","ZH","KO","Src","Tr", nullptr
         };
         float maxLabelW = 0.0f;
         for (int i = 0; kAllLabels[i]; ++i) {
@@ -224,16 +240,12 @@ static void RenderFrame() {
     }
     float kBtnWidth = s_cachedBtnW;
 
-    float totalW = kPadX + kBtnWidth + kGap + kTextWidth + kPadX;
+    static const float kToggleW  = 14.0f; // 展開トグルボタン幅 (常に確保)
+    float toggleColW = kToggleW;
+    float totalW = kPadX + toggleColW + kBtnWidth + kGap + kTextWidth + kPadX;
     float totalH = kPadY + lineHWS + lineHWS + kPadY;
 
-    float winX = io.DisplaySize.x - totalW - kMargin;
-    float winY = io.DisplaySize.y - totalH - kMargin;
-
-    if (g_textChanged.exchange(false)) {
-        g_scrollOrig  = 0.0f;
-        g_scrollTrans = 0.0f;
-    }
+    g_textChanged.exchange(false);
 
     // デモモード: タイマー駆動でメッセージを切り替え
     if (config::Get().demoMode) {
@@ -242,43 +254,69 @@ static void RenderFrame() {
             g_demoTimer = 0.0f;
             g_demoIndex = (g_demoIndex + 1) % g_demoCount;
             TranslationMode mode = config::GetTranslationMode();
+            {
+                std::lock_guard<std::mutex> lock(g_textMutex);
+                if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+                g_entries.push_back({"", g_demoMessages[g_demoIndex], "", mode != TranslationMode::Off});
+                g_scrollOrig  = 0.0f;
+                g_scrollTrans = 0.0f;
+            }
             if (mode != TranslationMode::Off) {
                 translate::Queue("", "", g_demoMessages[g_demoIndex]);
-            } else {
-                std::lock_guard<std::mutex> lock(g_textMutex);
-                g_originalText   = g_demoMessages[g_demoIndex];
-                g_translatedText = "";
             }
         }
     }
 
-    static std::string origText, transText;
+    // エントリのコピーを取得
+    std::deque<MessageEntry> entries;
     {
         std::lock_guard<std::mutex> lock(g_textMutex);
-        origText  = g_originalText;
-        transText = g_translatedText;
+        entries = g_entries;
     }
+    if (entries.empty()) entries.push_back({"", "", "", false});
 
-    // 翻訳行のステータステキストを決定
+    // 最新エントリの表示テキストを決定
+    const MessageEntry& latest   = entries.back();
+    std::string latestOrig  = latest.sender.empty() ? latest.original
+                                                     : latest.sender + u8": " + latest.original;
     RadioState radioState = ollama::GetRadioState();
-    std::string statusText;
+    std::string latestTrans;
     if (config::GetTranslationMode() == TranslationMode::Off) {
-        statusText = "[Off]";
+        latestTrans = u8"[Off]";
     } else if (radioState == RadioState::RESTARTING) {
         int attempt = 0, maxAttempts = 0;
         ollama::GetRestartProgress(attempt, maxAttempts);
         char buf[64];
-        snprintf(buf, sizeof(buf), "[Restarting %d/%d...]", attempt, maxAttempts);
-        statusText = buf;
+        snprintf(buf, sizeof(buf), u8"[Restarting %d/%d...]", attempt, maxAttempts);
+        latestTrans = buf;
     } else if (radioState == RadioState::FAULT) {
-        statusText = "[Error]";
+        latestTrans = u8"[Error]";
+    } else if (latest.translating) {
+        latestTrans = u8"[...]";
     } else {
-        statusText = transText;
+        latestTrans = latest.translated;
     }
+
+    // 過去エントリ展開/折りたたみ
+    size_t numPast = entries.size() - 1;
+    static bool s_historyExpanded = false;
+    if (numPast == 0) s_historyExpanded = false;
+
+    float historyH = (s_historyExpanded && numPast > 0) ? numPast * 2.0f * lineHWS : 0.0f;
+    totalH = kPadY + historyH + lineHWS + lineHWS + kPadY;
 
     // 初回のみデフォルト位置 (右下) に配置。以降はドラッグで移動した位置を維持
     static ImVec2 s_winPos = ImVec2(-1.f, -1.f);
-    if (s_winPos.x < 0.f) s_winPos = ImVec2(winX, winY);
+    // エントリ数変化で winY が変わるので常に下端を固定
+    float baseWinX = io.DisplaySize.x - totalW - kMargin;
+    float baseWinY = io.DisplaySize.y - totalH - kMargin;
+    if (s_winPos.x < 0.f) s_winPos = ImVec2(baseWinX, baseWinY);
+    // エントリ増減で下端がずれないよう Y を補正 (ドラッグ中は補正しない)
+    static float s_lastTotalH = totalH;
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && s_lastTotalH != totalH) {
+        s_winPos.y += s_lastTotalH - totalH; // 下端固定
+        s_lastTotalH = totalH;
+    }
 
     ImGui::SetNextWindowPos(s_winPos);
     ImGui::SetNextWindowSize(ImVec2(totalW, totalH));
@@ -318,13 +356,59 @@ static void RenderFrame() {
     const float kBtnH = lineH + 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(kFPX, 1.0f));
 
+    // --- 過去エントリ (ボタンなし、薄い色で表示) ---
+    float pastTextX = toggleColW + kBtnWidth + kGap;
+    float pastTextW = kTextWidth;
+    if (s_historyExpanded) for (size_t i = 0; i + 1 < entries.size(); ++i) {
+        const auto& e = entries[i];
+        float rowY = ImGui::GetCursorPosY();
+
+        // 原文行 (sender: original)
+        std::string line1 = e.sender.empty() ? e.original : e.sender + u8": " + e.original;
+        ImGui::SetCursorPos(ImVec2(pastTextX, rowY));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 0.85f));
+        char origId[32]; snprintf(origId, sizeof(origId), "##pq_o%zu", i);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        RenderClippedText(origId, line1.c_str(), pastTextW);
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+
+        // 訳文行
+        std::string line2 = e.translating ? u8"[...]" : e.translated;
+        ImGui::SetCursorPos(ImVec2(pastTextX, rowY + lineHWS));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.85f, 0.65f, 0.75f));
+        char transId[32]; snprintf(transId, sizeof(transId), "##pq_t%zu", i);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        RenderClippedText(transId, line2.c_str(), pastTextW);
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+
+        ImGui::SetCursorPos(ImVec2(0.0f, rowY + 2.0f * lineHWS));
+    }
+
+    // --- 展開/折りたたみトグルボタン (最新2行の左端に2行スパン、常に表示) ---
+    float mainRowsTop = ImGui::GetCursorPosY();
+    {
+        // 上端 = row1ボタン上端、下端 = row2ボタン下端 に揃える
+        float toggleBtnOffY = (lineHWS - kBtnH) * 0.5f;
+        ImGui::SetCursorPos(ImVec2(0.0f, mainRowsTop + toggleBtnOffY));
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 0.9f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+        if (ImGui::Button(s_historyExpanded ? "-" : "+", ImVec2(kToggleW, lineHWS + kBtnH)) && numPast > 0) {
+            s_historyExpanded = !s_historyExpanded;
+        }
+        ImGui::PopStyleColor(3);
+        ImGui::SetCursorPos(ImVec2(0.0f, mainRowsTop));
+    }
+
     auto RenderRow = [&](const char* marqueeId, const char* text, float& scroll,
                          const char* btnLabel, auto onBtnClick) {
         float rowTopY = ImGui::GetCursorPosY();
 
-        // ボタンを左端・行の縦中央に配置
+        // ボタンをトグル列の右・行の縦中央に配置
         float btnOffY = (lineHWS - kBtnH) * 0.5f;
-        ImGui::SetCursorPos(ImVec2(0.0f, rowTopY + btnOffY));
+        ImGui::SetCursorPos(ImVec2(toggleColW, rowTopY + btnOffY));
 
         ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 0.9f));
@@ -335,7 +419,7 @@ static void RenderFrame() {
         ImGui::PopStyleColor(3);
 
         // テキスト領域をボタン右に配置
-        ImGui::SetCursorPos(ImVec2(kBtnWidth + kGap, rowTopY));
+        ImGui::SetCursorPos(ImVec2(toggleColW + kBtnWidth + kGap, rowTopY));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
         RenderMarqueeText(marqueeId, text, kTextWidth, scroll, io.DeltaTime);
         ImGui::PopStyleVar();
@@ -344,20 +428,20 @@ static void RenderFrame() {
         ImGui::SetCursorPos(ImVec2(0.0f, rowTopY + lineHWS));
     };
 
-    // --- 行1: TTS ボタン + 原文 ---
-    RenderRow("##mq_orig", origText.c_str(), g_scrollOrig,
+    // --- 最新エントリ: TTS ボタン + 原文 ---
+    RenderRow("##mq_orig", latestOrig.c_str(), g_scrollOrig,
               TtsModeLabel(config::GetTtsMode()), [&]() {
         config::CycleTtsMode();
         logging::Debug("[Overlay] TtsMode -> %s", TtsModeLabel(config::GetTtsMode()));
     });
 
-    // --- 行2: TL ボタン + 訳文/ステータス ---
-    RenderRow("##mq_tran", statusText.c_str(), g_scrollTrans,
+    // --- 最新エントリ: TL ボタン + 訳文/ステータス ---
+    RenderRow("##mq_tran", latestTrans.c_str(), g_scrollTrans,
               TranslationModeLabel(config::GetTranslationMode()), [&]() {
         config::CycleTranslationMode();
         if (config::GetTranslationMode() == TranslationMode::Off) {
             std::lock_guard<std::mutex> lock(g_textMutex);
-            g_translatedText = "";
+            for (auto& e : g_entries) e.translating = false;
         }
         logging::Debug("[Overlay] TranslationMode -> %s",
             TranslationModeLabel(config::GetTranslationMode()));
@@ -398,8 +482,19 @@ bool overlay::Init() {
     translate::SetResultCallback([](const translate::TranslateResult& r) {
         {
             std::lock_guard<std::mutex> lock(g_textMutex);
-            g_originalText   = r.original;
-            g_translatedText = r.translated;
+            // sender + original で対応エントリを後ろから検索して更新
+            for (auto it = g_entries.rbegin(); it != g_entries.rend(); ++it) {
+                if (it->translating && it->sender == r.sender && it->original == r.original) {
+                    it->translated  = r.ok ? r.translated : r.original;
+                    it->translating = false;
+                    // 最新エントリが更新されたらスクロールをリセット
+                    if (it == g_entries.rbegin()) {
+                        g_scrollOrig  = 0.0f;
+                        g_scrollTrans = 0.0f;
+                    }
+                    break;
+                }
+            }
         }
         g_textChanged.store(true);
         logging::Translation(r.channel.c_str(), r.sender.c_str(),
@@ -415,12 +510,11 @@ bool overlay::Init() {
     });
 
     if (config::Get().demoMode) {
+        std::lock_guard<std::mutex> lock(g_textMutex);
         TranslationMode mode = config::GetTranslationMode();
+        g_entries.push_back({"", g_demoMessages[0], "", mode != TranslationMode::Off});
         if (mode != TranslationMode::Off) {
             translate::Queue("", "", g_demoMessages[0]);
-        } else {
-            std::lock_guard<std::mutex> lock(g_textMutex);
-            g_originalText = g_demoMessages[0];
         }
     }
 
@@ -468,8 +562,10 @@ bool overlay::IsRadioOn() {
 
 void overlay::SetDisplayText(const char* original, const char* translated) {
     std::lock_guard<std::mutex> lock(g_textMutex);
-    g_originalText   = original   ? original   : "";
-    g_translatedText = translated ? translated : "";
+    if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+    g_entries.push_back({"", original ? original : "", translated ? translated : "", false});
+    g_scrollOrig  = 0.0f;
+    g_scrollTrans = 0.0f;
 }
 
 void overlay::OnChatMessage(const std::string& sender, const std::string& message) {
@@ -492,19 +588,19 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
         }
     }
 
-    // 原文は常に保存
+    TranslationMode mode = config::GetTranslationMode();
+
     {
         std::lock_guard<std::mutex> lock(g_textMutex);
-        g_originalText = message;
+        if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+        g_entries.push_back({sender, message, "", mode != TranslationMode::Off});
+        g_scrollOrig  = 0.0f;
+        g_scrollTrans = 0.0f;
     }
+    g_textChanged.store(true);
 
-    TranslationMode mode = config::GetTranslationMode();
     if (mode != TranslationMode::Off) {
         translate::Queue("", sender, message);
-    } else {
-        std::lock_guard<std::mutex> lock(g_textMutex);
-        g_translatedText = "";
-        g_textChanged.store(true);
     }
 }
 
