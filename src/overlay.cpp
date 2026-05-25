@@ -13,6 +13,7 @@
 #include <d3d11.h>
 #include <dxgi.h>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
 
@@ -52,7 +53,8 @@ struct MessageEntry {
     std::string sender;
     std::string original;
     std::string translated;
-    bool        translating = false; // true = 翻訳待ち
+    bool        translating    = false; // true = 翻訳待ち
+    std::chrono::steady_clock::time_point translateStart = {};
 };
 
 static std::mutex               g_textMutex;
@@ -78,6 +80,17 @@ static float       g_demoTimer    = 0.0f;
 static const float g_demoInterval = 10.0f;
 
 static std::atomic<bool> g_textChanged{false};
+
+// translating=true のエントリ用ラベル: "[.  2s]" / "[.. 2s]" / "[...2s]"
+static std::string TranslatingLabel(const MessageEntry& e) {
+    static const char* kDots[] = { ".  ", ".. ", "..." };
+    int dotIdx = static_cast<int>(ImGui::GetTime() / 0.5) % 3;
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - e.translateStart).count();
+    char buf[32];
+    snprintf(buf, sizeof(buf), "[%s%.1fs]", kDots[dotIdx], elapsedMs / 1000.0);
+    return buf;
+}
 
 // ============================================================
 // ImGui 初期化
@@ -257,12 +270,13 @@ static void RenderFrame() {
             {
                 std::lock_guard<std::mutex> lock(g_textMutex);
                 if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-                g_entries.push_back({"", g_demoMessages[g_demoIndex], "", mode != TranslationMode::Off});
+                g_entries.push_back({"", g_demoMessages[g_demoIndex], "", mode != TranslationMode::Off,
+                                     std::chrono::steady_clock::now()});
                 g_scrollOrig  = 0.0f;
                 g_scrollTrans = 0.0f;
             }
             if (mode != TranslationMode::Off) {
-                translate::Queue("", "", g_demoMessages[g_demoIndex]);
+                translate::Queue("", "", g_demoMessages[g_demoIndex], mode, config::GetTtsMode());
             }
         }
     }
@@ -292,7 +306,7 @@ static void RenderFrame() {
     } else if (radioState == RadioState::FAULT) {
         latestTrans = u8"[Error]";
     } else if (latest.translating) {
-        latestTrans = u8"[...]";
+        latestTrans = TranslatingLabel(latest);
     } else {
         latestTrans = latest.translated;
     }
@@ -403,7 +417,7 @@ static void RenderFrame() {
         ImGui::PopStyleColor();
 
         // 訳文行
-        std::string line2 = e.translating ? u8"[...]" : e.translated;
+        std::string line2 = e.translating ? TranslatingLabel(e) : e.translated;
         ImGui::SetCursorPos(ImVec2(pastTextX, rowY + lineHWS));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.85f, 0.65f, 0.75f));
         char transId[32]; snprintf(transId, sizeof(transId), "##pq_t%zu", i);
@@ -529,10 +543,9 @@ bool overlay::Init() {
         logging::Translation(r.channel.c_str(), r.sender.c_str(),
                              r.original.c_str(), r.translated.c_str());
 
-        TtsMode ttsMode = config::GetTtsMode();
-        if (ttsMode != TtsMode::Off) {
+        if (r.ttsMode != TtsMode::Off) {
             // 翻訳失敗 (Ollama 接続不可) のエラー文字列は読み上げない
-            bool useTranslated = (ttsMode == TtsMode::Translated) && r.ok;
+            bool useTranslated = (r.ttsMode == TtsMode::Translated) && r.ok;
             const char* ttsText = useTranslated ? r.translated.c_str() : r.original.c_str();
             tts::Speak(ttsText, r.sender.empty() ? nullptr : r.sender.c_str());
         }
@@ -541,9 +554,10 @@ bool overlay::Init() {
     if (config::Get().demoMode) {
         std::lock_guard<std::mutex> lock(g_textMutex);
         TranslationMode mode = config::GetTranslationMode();
-        g_entries.push_back({"", g_demoMessages[0], "", mode != TranslationMode::Off});
+        g_entries.push_back({"", g_demoMessages[0], "", mode != TranslationMode::Off,
+                             std::chrono::steady_clock::now()});
         if (mode != TranslationMode::Off) {
-            translate::Queue("", "", g_demoMessages[0]);
+            translate::Queue("", "", g_demoMessages[0], mode, config::GetTtsMode());
         }
     }
 
@@ -622,14 +636,15 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
     {
         std::lock_guard<std::mutex> lock(g_textMutex);
         if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-        g_entries.push_back({sender, message, "", mode != TranslationMode::Off});
+        g_entries.push_back({sender, message, "", mode != TranslationMode::Off,
+                             std::chrono::steady_clock::now()});
         g_scrollOrig  = 0.0f;
         g_scrollTrans = 0.0f;
     }
     g_textChanged.store(true);
 
     if (mode != TranslationMode::Off) {
-        translate::Queue("", sender, message);
+        translate::Queue("", sender, message, mode, config::GetTtsMode());
     }
 }
 

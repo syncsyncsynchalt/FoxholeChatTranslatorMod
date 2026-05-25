@@ -45,9 +45,11 @@ static translate::SyncStats g_lastSyncStats;
 
 // ワーカースレッド
 struct QueueItem {
-    std::string channel;
-    std::string sender;
-    std::string message;
+    std::string     channel;
+    std::string     sender;
+    std::string     message;
+    TranslationMode translationMode = TranslationMode::JA;
+    TtsMode         ttsMode         = TtsMode::Off;
 };
 
 static std::thread             g_thread;
@@ -56,7 +58,7 @@ static std::condition_variable g_cv;
 static std::queue<QueueItem>   g_queue;
 static bool                    g_running = false;
 
-static constexpr size_t MAX_QUEUE_SIZE = 32;
+static constexpr size_t MAX_QUEUE_SIZE = 4;
 
 static translate::ResultCallback g_resultCallback;
 
@@ -362,8 +364,8 @@ static std::string BuildPrompt(TranslationMode mode) {
 }
 
 static std::string BuildRequestBody(const std::string& text, const std::string& systemPrompt,
-                                    bool hasPlaceholders) {
-    std::string prompt = BuildPrompt(config::GetTranslationMode());
+                                    bool hasPlaceholders, TranslationMode translationMode) {
+    std::string prompt = BuildPrompt(translationMode);
     if (hasPlaceholders)
         prompt += " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output.";
     prompt += "\n\n" + text;
@@ -398,9 +400,10 @@ static bool IsSinglePlaceholder(const std::string& s) {
 }
 
 // text を Ollama に送り、生の翻訳文字列を返す (エラー時は空文字列)
-static std::string RawTranslate(const std::string& text, const std::string& systemPrompt = "",
+static std::string RawTranslate(const std::string& text, TranslationMode translationMode,
+                                const std::string& systemPrompt = "",
                                 bool hasPlaceholders = false) {
-    std::string body     = BuildRequestBody(text, systemPrompt, hasPlaceholders);
+    std::string body     = BuildRequestBody(text, systemPrompt, hasPlaceholders, translationMode);
     std::string response = HttpPost(body);
     if (response.empty()) {
         logging::Debug("[Translate] HTTP レスポンスが空 (Ollama未起動?)");
@@ -441,7 +444,7 @@ static int CountFoundTerms(const std::string& result, const ReplacementMap& repl
     return found;
 }
 
-static std::string DoTranslate(const std::string& text) {
+static std::string DoTranslate(const std::string& text, TranslationMode translationMode) {
     ReplacementMap replacements;
     std::string protected_text = ProtectTerms(text, replacements);
 
@@ -455,7 +458,7 @@ static std::string DoTranslate(const std::string& text) {
     bool hasPlaceholders = !replacements.empty();
 
     // 1st try: プレースホルダー保護あり
-    std::string raw = RawTranslate(protected_text, systemPrompt, hasPlaceholders);
+    std::string raw = RawTranslate(protected_text, translationMode, systemPrompt, hasPlaceholders);
     if (raw.empty())
         return u8"(接続失敗: Ollamaが起動していません)";
 
@@ -467,7 +470,7 @@ static std::string DoTranslate(const std::string& text) {
         int expected = static_cast<int>(replacements.size());
         if (found * 2 < expected) {
             logging::Debug("[Translate] 保護語失落 (%d/%d) - 保護なしで再翻訳", found, expected);
-            std::string fallback = RawTranslate(text, systemPrompt, false);
+            std::string fallback = RawTranslate(text, translationMode, systemPrompt, false);
             if (!fallback.empty()) result = fallback;
         }
     }
@@ -505,7 +508,7 @@ static void WorkerThread() {
             g_queue.pop();
         }
 
-        std::string translated = DoTranslate(item.message);
+        std::string translated = DoTranslate(item.message, item.translationMode);
         TrimTrailing(translated);
 
         logging::Debug("[Translate] [%s] %s: %s -> %s",
@@ -520,6 +523,7 @@ static void WorkerThread() {
             result.original   = item.message;
             result.translated = translated;
             result.ok         = !translated.empty() && translated[0] != '(';
+            result.ttsMode    = item.ttsMode;
             cb(result);
         }
     }
@@ -752,7 +756,7 @@ void translate::SetResultCallback(translate::ResultCallback cb) {
 }
 
 std::string translate::Sync(const std::string& text) {
-    std::string result = DoTranslate(text);
+    std::string result = DoTranslate(text, config::GetTranslationMode());
     TrimTrailing(result);
     return result;
 }
@@ -761,13 +765,14 @@ translate::SyncStats translate::GetLastSyncStats() {
     return g_lastSyncStats;
 }
 
-void translate::Queue(const std::string& channel, const std::string& sender, const std::string& message) {
+void translate::Queue(const std::string& channel, const std::string& sender, const std::string& message,
+                      TranslationMode translationMode, TtsMode ttsMode) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_queue.size() >= MAX_QUEUE_SIZE) {
         logging::Debug("[Translate] キュー満杯: 最古メッセージを破棄 (size=%zu)", g_queue.size());
         g_queue.pop();
     }
-    g_queue.push({channel, sender, message});
+    g_queue.push({channel, sender, message, translationMode, ttsMode});
     g_cv.notify_one();
 }
 

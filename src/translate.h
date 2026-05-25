@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <string>
+#include "config.h"
 
 namespace translate {
 
@@ -21,11 +22,12 @@ struct SyncStats {
 };
 
 struct TranslateResult {
-    std::string channel;
-    std::string sender;
-    std::string original;
-    std::string translated;
-    bool        ok = true; // false = 翻訳失敗 (Ollama 接続不可等)
+    std::string     channel;
+    std::string     sender;
+    std::string     original;
+    std::string     translated;
+    bool            ok      = true;              // false = 翻訳失敗 (Ollama 接続不可等)
+    TtsMode         ttsMode = TtsMode::Off;      // キュー投入時のスナップショット
 };
 
 using ResultCallback = std::function<void(const TranslateResult&)>;
@@ -39,8 +41,9 @@ void Shutdown();
 // 翻訳完了時に呼ばれるコールバックを登録
 void SetResultCallback(ResultCallback cb);
 
-// 非同期翻訳キュー投入
-void Queue(const std::string& channel, const std::string& sender, const std::string& message);
+// 非同期翻訳キュー投入 (キュー投入時点のモードをスナップショットとして受け取る)
+void Queue(const std::string& channel, const std::string& sender, const std::string& message,
+           TranslationMode translationMode, TtsMode ttsMode);
 
 // 同期翻訳 (ブロッキング) - テスト・診断ツール用
 std::string Sync(const std::string& text);

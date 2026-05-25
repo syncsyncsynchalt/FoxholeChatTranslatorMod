@@ -629,8 +629,8 @@ struct TtsRequest {
     std::string text;
 };
 
-static constexpr size_t MAX_TTS_QUEUE_SIZE = 8;
-static constexpr float  kPlaybackSpeed     = 1.0f;  // 再生速度 (1.0=等速)
+static constexpr size_t MAX_TTS_QUEUE_SIZE = 2;
+static constexpr float  kPlaybackSpeed     = 1.05f;  // 再生速度 (1.0=等速)
 
 static std::thread             g_ttsThread;
 static std::mutex              g_ttsMutex;
@@ -705,8 +705,6 @@ static void TtsWorker() {
             logging::Debug("[TTS-VV] 合成完了: samples=%zu rate=%d",
                            vvPcm.samples.size(), vvPcm.sampleRate);
             if (g_ttsStop.load()) continue;
-
-            ResampleTo16k(vvPcm.samples, vvPcm.sampleRate);
 
             WAVEFORMATEX wfx = {};
             wfx.wFormatTag      = WAVE_FORMAT_PCM;
@@ -797,8 +795,6 @@ static void TtsWorker() {
             pcm16[i] = static_cast<int16_t>(v * 32767.0f);
         }
         g_fnFreeAudio(audio);
-
-        ResampleTo16k(pcm16, sampleRate);
 
         WAVEFORMATEX wfx = {};
         wfx.wFormatTag      = WAVE_FORMAT_PCM;
