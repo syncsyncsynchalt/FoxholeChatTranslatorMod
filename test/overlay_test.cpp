@@ -146,6 +146,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 int main() {
     AllocConsole();
     freopen("CONOUT$", "w", stdout);
+    SetConsoleOutputCP(CP_UTF8);
     printf("=== Overlay Test Host ===\n");
     printf("操作: TL/TTS ボタンをクリック | F1=テストメッセージ送信 | ESC=終了\n\n");
 
