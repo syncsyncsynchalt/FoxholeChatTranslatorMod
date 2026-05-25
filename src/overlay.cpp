@@ -209,7 +209,7 @@ static void RenderFrame() {
     ImGuiIO& io = ImGui::GetIO();
 
     // レイアウト定数
-    static const float kTextWidth = 270.0f;
+    static float       s_textWidth = 270.0f; // リサイズハンドルで変更可能
     static const float kGap       = 4.0f;
     static const float kPadX      = 6.0f;
     static const float kPadY      = 3.0f;
@@ -242,7 +242,7 @@ static void RenderFrame() {
 
     static const float kToggleW  = 14.0f; // 展開トグルボタン幅 (常に確保)
     float toggleColW = kToggleW;
-    float totalW = kPadX + toggleColW + kBtnWidth + kGap + kTextWidth + kPadX;
+    float totalW = kPadX + toggleColW + kBtnWidth + kGap + s_textWidth + kPadX;
     float totalH = kPadY + lineHWS + lineHWS + kPadY;
 
     g_textChanged.exchange(false);
@@ -330,10 +330,39 @@ static void RenderFrame() {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
         ImGuiWindowFlags_NoScrollbar);
 
+    // --- リサイズハンドル (右下三角グリップ、横幅変更) ---
+    static bool s_resizing = false;
+    {
+        static const float kHandleSize = 12.0f;
+        ImVec2 wp   = ImGui::GetWindowPos();
+        ImVec2 ws   = ImGui::GetWindowSize();
+        ImVec2 hMin = ImVec2(wp.x + ws.x - kHandleSize, wp.y + ws.y - kHandleSize);
+        ImVec2 hMax = ImVec2(wp.x + ws.x,               wp.y + ws.y);
+        bool overHandle = io.MousePos.x >= hMin.x && io.MousePos.x <= hMax.x &&
+                          io.MousePos.y >= hMin.y && io.MousePos.y <= hMax.y;
+        if (!s_resizing && overHandle && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            s_resizing = true;
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            s_resizing = false;
+        }
+        if (s_resizing) {
+            s_textWidth += io.MouseDelta.x;
+            if (s_textWidth < 80.0f) s_textWidth = 80.0f;
+        }
+        if (overHandle || s_resizing) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        }
+        ImU32 col = (overHandle || s_resizing)
+            ? IM_COL32(200, 200, 200, 200) : IM_COL32(140, 140, 140, 120);
+        ImGui::GetWindowDrawList()->AddTriangleFilled(
+            ImVec2(hMax.x, hMin.y), ImVec2(hMax.x, hMax.y), ImVec2(hMin.x, hMax.y), col);
+    }
+
     // タイトルバーなしでもドラッグで移動できるようにする
     // IsWindowHovered() はchild windowで誤動作するため、生座標でヒットテスト
     static bool s_dragging = false;
-    if (!s_dragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (!s_dragging && !s_resizing && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         ImVec2 mp = io.MousePos;
         ImVec2 wp = ImGui::GetWindowPos();
         ImVec2 ws = ImGui::GetWindowSize();
@@ -358,7 +387,7 @@ static void RenderFrame() {
 
     // --- 過去エントリ (ボタンなし、薄い色で表示) ---
     float pastTextX = toggleColW + kBtnWidth + kGap;
-    float pastTextW = kTextWidth;
+    float pastTextW = s_textWidth;
     if (s_historyExpanded) for (size_t i = 0; i + 1 < entries.size(); ++i) {
         const auto& e = entries[i];
         float rowY = ImGui::GetCursorPosY();
@@ -421,7 +450,7 @@ static void RenderFrame() {
         // テキスト領域をボタン右に配置
         ImGui::SetCursorPos(ImVec2(toggleColW + kBtnWidth + kGap, rowTopY));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-        RenderMarqueeText(marqueeId, text, kTextWidth, scroll, io.DeltaTime);
+        RenderMarqueeText(marqueeId, text, s_textWidth, scroll, io.DeltaTime);
         ImGui::PopStyleVar();
 
         // 次行の先頭へ
