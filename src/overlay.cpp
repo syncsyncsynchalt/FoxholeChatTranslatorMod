@@ -29,6 +29,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 static bool                       g_initialized = false;
 static ID3D11Device*              g_device      = nullptr;
 static ID3D11DeviceContext*       g_context     = nullptr;
+static ID3D11RenderTargetView*    g_rtv              = nullptr;
+static ID3D11Texture2D*           g_cachedBackBuffer = nullptr; // リサイズ検出用
 static HWND                       g_hwnd        = nullptr;
 static std::string                g_assetsDir;
 static ImFont*                    g_cjkFont     = nullptr;
@@ -163,7 +165,7 @@ static const char* TtsModeLabel(TtsMode m) {
 // フレーム描画
 // ============================================================
 
-static void RenderFrame(IDXGISwapChain* swapChain) {
+static void RenderFrame() {
     // フォントが未ロードの場合、300フレームごとにファイル出現を確認してホットロード
     if (g_cjkFont == nullptr) {
         static int s_fontCheckFrame = 0;
@@ -204,17 +206,23 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
     float lineHWS = ImGui::GetTextLineHeightWithSpacing();
 
     // ボタン幅 = 全ラベルの最大テキスト幅 + 両側 FramePadding + 余白
-    // 両ボタン同一幅にするため全ラベルを走査
-    static const char* kAllLabels[] = {
-        "TL:--","TL:JA","TL:JAZ","TL:EN","TL:RU","TL:ZH","TL:KO",
-        "TTS:--","TTS:Src","TTS:Tr", nullptr
-    };
-    float maxLabelW = 0.0f;
-    for (int i = 0; kAllLabels[i]; ++i) {
-        float w = ImGui::CalcTextSize(kAllLabels[i]).x;
-        if (w > maxLabelW) maxLabelW = w;
+    // フォント変更時のみ再計算 (毎フレームの CalcTextSize を避ける)
+    static ImFont* s_lastFont   = nullptr;
+    static float   s_cachedBtnW = 0.0f;
+    if (s_lastFont != ImGui::GetFont()) {
+        s_lastFont = ImGui::GetFont();
+        static const char* kAllLabels[] = {
+            "TL:--","TL:JA","TL:JAZ","TL:EN","TL:RU","TL:ZH","TL:KO",
+            "TTS:--","TTS:Src","TTS:Tr", nullptr
+        };
+        float maxLabelW = 0.0f;
+        for (int i = 0; kAllLabels[i]; ++i) {
+            float w = ImGui::CalcTextSize(kAllLabels[i]).x;
+            if (w > maxLabelW) maxLabelW = w;
+        }
+        s_cachedBtnW = maxLabelW + 2.0f * kFPX + 4.0f;
     }
-    float kBtnWidth = maxLabelW + 2.0f * kFPX + 4.0f;  // +4 は左右各2pxの余白
+    float kBtnWidth = s_cachedBtnW;
 
     float totalW = kPadX + kBtnWidth + kGap + kTextWidth + kPadX;
     float totalH = kPadY + lineHWS + lineHWS + kPadY;
@@ -244,7 +252,7 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
         }
     }
 
-    std::string origText, transText;
+    static std::string origText, transText;
     {
         std::lock_guard<std::mutex> lock(g_textMutex);
         origText  = g_originalText;
@@ -365,17 +373,9 @@ static void RenderFrame(IDXGISwapChain* swapChain) {
 
     ImGui::Render();
 
-    ID3D11Texture2D* backBuffer = nullptr;
-    swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
-    if (backBuffer) {
-        ID3D11RenderTargetView* rtv = nullptr;
-        g_device->CreateRenderTargetView(backBuffer, nullptr, &rtv);
-        backBuffer->Release();
-        if (rtv) {
-            g_context->OMSetRenderTargets(1, &rtv, nullptr);
-            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-            rtv->Release();
-        }
+    if (g_rtv) {
+        g_context->OMSetRenderTargets(1, &g_rtv, nullptr);
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     }
 }
 
@@ -436,7 +436,22 @@ void overlay::OnPresent(void* swapChainPtr) {
         g_initialized = true;
     }
 
-    RenderFrame(swapChain);
+    // バックバッファ変化検出 (ResizeBuffers 後はポインタが変わる)
+    // GetBuffer は安価な COM 参照カウント操作。CreateRTV は変化時のみ実行
+    ID3D11Texture2D* backBuffer = nullptr;
+    swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
+    if (backBuffer) {
+        if (backBuffer != g_cachedBackBuffer) {
+            if (g_rtv)             { g_rtv->Release();             g_rtv             = nullptr; }
+            if (g_cachedBackBuffer) { g_cachedBackBuffer->Release(); g_cachedBackBuffer = nullptr; }
+            g_device->CreateRenderTargetView(backBuffer, nullptr, &g_rtv);
+            g_cachedBackBuffer = backBuffer; // 参照カウントを保持してポインタ比較に使用
+        } else {
+            backBuffer->Release(); // 変化なし: 余分な参照を解放
+        }
+    }
+
+    RenderFrame();
 }
 
 LRESULT overlay::OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -500,8 +515,10 @@ void overlay::Shutdown() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    if (g_context) { g_context->Release(); g_context = nullptr; }
-    if (g_device)  { g_device->Release();  g_device  = nullptr; }
+    if (g_rtv)             { g_rtv->Release();             g_rtv             = nullptr; }
+    if (g_cachedBackBuffer) { g_cachedBackBuffer->Release(); g_cachedBackBuffer = nullptr; }
+    if (g_context)         { g_context->Release();         g_context         = nullptr; }
+    if (g_device)          { g_device->Release();          g_device          = nullptr; }
 
     g_initialized = false;
     g_hwnd = nullptr;
