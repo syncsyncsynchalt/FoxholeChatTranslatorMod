@@ -433,6 +433,48 @@ static bool InitVoicevox(const std::string& ttsDir) {
     return true;
 }
 
+// ============================================================
+// SEH ヘルパー: C++ デストラクタのないスコープで __try を使う
+// ============================================================
+
+// C2712 対策: __try と C++ オブジェクトを同関数内に置けないため、
+//             API 呼び出しだけを純粋な C ライクな関数に隔離する。
+
+static SherpaOnnxOfflineTts* TryCreateModel(const SherpaOnnxOfflineTtsConfig* cfg, DWORD* outCode) {
+    *outCode = 0;
+    __try {
+        return g_fnCreate(cfg);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *outCode = GetExceptionCode();
+        return nullptr;
+    }
+}
+
+static const SherpaOnnxGeneratedAudio* TryGenerate(
+    SherpaOnnxOfflineTts* model, const char* text, DWORD* outCode)
+{
+    *outCode = 0;
+    __try {
+        return g_fnGenerate(model, text, 0, 1.0f);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *outCode = GetExceptionCode();
+        return nullptr;
+    }
+}
+
+static int32_t TryVvTts(
+    VoicevoxSynthesizer* synth, const char* text, VoicevoxStyleId styleId,
+    VoicevoxTtsOptions opts, uintptr_t* outLen, uint8_t** outBuf, DWORD* outCode)
+{
+    *outCode = 0;
+    __try {
+        return g_vvTts(synth, text, styleId, opts, outLen, outBuf);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *outCode = GetExceptionCode();
+        return -1;
+    }
+}
+
 struct PcmData { std::vector<int16_t> samples; int32_t sampleRate = 0; };
 
 // 16kHz ダウンサンプル (モノラル 16bit 16000Hz — 狭帯域音声品質)
@@ -489,16 +531,30 @@ static bool SynthesizeVoicevox(const std::string& text, PcmData& out) {
     VoicevoxTtsOptions opts = g_vvDefTtsOpt ? g_vvDefTtsOpt() : VoicevoxTtsOptions{false};
     opts.enable_interrogative_upspeak = false;
 
+    if (config::Get().ttsVerboseLog)
+        logging::Debug("[TTS-VV] 合成開始: bytes=%zu text=%.40s", text.size(), text.c_str());
+
     uintptr_t wavLen = 0;
     uint8_t*  wavBuf = nullptr;
-    auto rc = g_vvTts(g_vvSynthesizer, text.c_str(), g_vvStyleId, opts, &wavLen, &wavBuf);
+    DWORD     excCode = 0;
+    int32_t   rc = TryVvTts(g_vvSynthesizer, text.c_str(), g_vvStyleId,
+                             opts, &wavLen, &wavBuf, &excCode);
+    if (excCode) {
+        logging::Debug("[TTS-VV] 合成例外 code=0x%08X text=%.40s",
+                       excCode, text.c_str());
+        return false;
+    }
     if (rc != VOICEVOX_RESULT_OK || !wavBuf) {
         logging::Debug("[TTS-VV] 合成失敗 rc=%d", rc);
         return false;
     }
     bool ok = ParseWavPcm(wavBuf, wavLen, out);
     g_vvWavFree(wavBuf);
-    if (!ok) logging::Debug("[TTS-VV] WAV 解析失敗");
+    if (!ok)
+        logging::Debug("[TTS-VV] WAV 解析失敗");
+    else if (config::Get().ttsVerboseLog)
+        logging::Debug("[TTS-VV] 合成完了: samples=%zu rate=%d",
+                       out.samples.size(), out.sampleRate);
     return ok;
 }
 
@@ -548,8 +604,12 @@ static SherpaOnnxOfflineTts* CreateSupertonicModel(const std::string& modelDir) 
     cfg.model.provider      = "cpu";
     cfg.max_num_sentences   = 1;
 
-    SherpaOnnxOfflineTts* handle = g_fnCreate(&cfg);
-    if (!handle)
+    DWORD excCode = 0;
+    SherpaOnnxOfflineTts* handle = TryCreateModel(&cfg, &excCode);
+    if (excCode)
+        logging::Debug("[TTS] Supertonic モデル作成例外 code=0x%08X: %s",
+                       excCode, modelDir.c_str());
+    else if (!handle)
         logging::Debug("[TTS] Supertonic モデル作成失敗: %s", modelDir.c_str());
     else
         logging::Debug("[TTS] Supertonic モデル作成完了: %s", modelDir.c_str());
@@ -603,8 +663,12 @@ static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     cfg.model.provider           = "cpu";
     cfg.max_num_sentences        = 5;
 
-    SherpaOnnxOfflineTts* handle = g_fnCreate(&cfg);
-    if (!handle)
+    DWORD excCode = 0;
+    SherpaOnnxOfflineTts* handle = TryCreateModel(&cfg, &excCode);
+    if (excCode)
+        logging::Debug("[TTS] VITS モデル作成例外 code=0x%08X lang=%s",
+                       excCode, LangSubdir(lang));
+    else if (!handle)
         logging::Debug("[TTS] モデル作成失敗 (lang=%s)", LangSubdir(lang));
     else
         logging::Debug("[TTS] モデル作成完了 (lang=%s)", LangSubdir(lang));
@@ -681,7 +745,8 @@ static void TtsWorker() {
         }
 
         g_ttsStop.store(false);
-        logging::Debug("[TTS] ワーカー: 処理開始 text=%.60s", req.text.c_str());
+        logging::Debug("[TTS] 処理開始: bytes=%zu text=%.60s",
+                       req.text.size(), req.text.c_str());
 
         // 言語判定
         Lang lang = Lang::EN;
@@ -696,14 +761,19 @@ static void TtsWorker() {
             lang = DetectLanguage(req.text.c_str());
         }
 
+        static const char* kLangName[] = {"EN", "RU", "KO", "ZH", "JA"};
+        const char* langStr = kLangName[static_cast<int>(lang)];
+
         // VOICEVOX (日本語ずんだもん) — JAZモード時のみ使用。JAモードはSherpa-ONNXを使う
         TranslationMode tlMode = config::GetTranslationMode();
         bool useVoicevox = (lang == Lang::JA && g_vvReady && tlMode == TranslationMode::JAZ);
+        if (config::Get().ttsVerboseLog)
+            logging::Debug("[TTS] エンジン選択: %s (lang=%s vvReady=%d tlMode=%d)",
+                           useVoicevox ? "VOICEVOX" : "Sherpa-ONNX",
+                           langStr, (int)g_vvReady, (int)tlMode);
         if (useVoicevox) {
             PcmData vvPcm;
             if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
-            logging::Debug("[TTS-VV] 合成完了: samples=%zu rate=%d",
-                           vvPcm.samples.size(), vvPcm.sampleRate);
             if (g_ttsStop.load()) continue;
 
             WAVEFORMATEX wfx = {};
@@ -750,8 +820,10 @@ static void TtsWorker() {
 
         // モデル取得 (遅延初期化)
         SherpaOnnxOfflineTts* model = GetModel(lang);
-        if (!model && lang != Lang::EN)
-            model = GetModel(Lang::EN); // 英語でフォールバック
+        if (!model && lang != Lang::EN) {
+            logging::Debug("[TTS] lang=%s モデルなし、EN でフォールバック", langStr);
+            model = GetModel(Lang::EN);
+        }
         if (!model) {
             logging::Debug("[TTS] 利用可能なモデルなし");
             continue;
@@ -770,14 +842,31 @@ static void TtsWorker() {
                 if (strchr(kBoundary, ttsText[i])) { cut = i + 1; break; }
             }
             ttsText = ttsText.substr(0, cut != std::string::npos ? cut : kMaxTtsChars);
+            logging::Debug("[TTS] テキスト切り詰め: %zu -> %zu bytes",
+                           req.text.size(), ttsText.size());
         }
 
-        const SherpaOnnxGeneratedAudio* audio = g_fnGenerate(model, ttsText.c_str(), 0, 1.0f);
-        if (!audio || audio->n <= 0) {
-            if (audio) g_fnFreeAudio(audio);
-            logging::Debug("[TTS] 合成失敗またはサンプルなし");
+        if (config::Get().ttsVerboseLog)
+            logging::Debug("[TTS] Sherpa合成開始: bytes=%zu lang=%s",
+                           ttsText.size(), langStr);
+
+        DWORD tGenStart = GetTickCount();
+        DWORD excCode2  = 0;
+        const SherpaOnnxGeneratedAudio* audio = TryGenerate(model, ttsText.c_str(), &excCode2);
+        DWORD tGenMs = GetTickCount() - tGenStart;
+        if (excCode2) {
+            logging::Debug("[TTS] Sherpa合成例外 code=0x%08X lang=%s text=%.40s",
+                           excCode2, langStr, ttsText.c_str());
             continue;
         }
+        if (!audio || audio->n <= 0) {
+            if (audio) g_fnFreeAudio(audio);
+            logging::Debug("[TTS] 合成失敗またはサンプルなし (lang=%s)", langStr);
+            continue;
+        }
+        if (config::Get().ttsVerboseLog)
+            logging::Debug("[TTS] Sherpa合成完了: samples=%d rate=%d time=%lums",
+                           audio->n, audio->sample_rate, (unsigned long)tGenMs);
 
         if (g_ttsStop.load()) {
             g_fnFreeAudio(audio);
@@ -871,9 +960,8 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId) {
 }
 
 void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
-    logging::Debug("[TTS] Speak: running=%d text=%.60s",
-                   (int)g_ttsRunning.load(), textUtf8 ? textUtf8 : "(null)");
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
+    logging::Debug("[TTS] Speak: bytes=%zu text=%.60s", strlen(textUtf8), textUtf8);
     {
         std::lock_guard<std::mutex> lock(g_ttsMutex);
         if (g_ttsQueue.size() >= MAX_TTS_QUEUE_SIZE) {

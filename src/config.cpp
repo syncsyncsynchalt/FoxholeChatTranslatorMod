@@ -61,6 +61,8 @@ void config::Load(const char* baseDir) {
 
     std::string ttsMode = ReadIniStr(configPath.c_str(), "TTS", "Mode", "Translated");
     g_ttsMode.store(static_cast<int>(ParseTtsMode(ttsMode)));
+
+    g_config.ttsVerboseLog = GetPrivateProfileIntA("TTS", "VerboseLog", 0, configPath.c_str()) != 0;
 }
 
 const Config& config::Get() {
