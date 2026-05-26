@@ -648,6 +648,16 @@ static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     }
 
     bool hasEspeak = GetFileAttributesA(espeakDir.c_str()) != INVALID_FILE_ATTRIBUTES;
+    logging::Debug("[TTS] CreateModel: lang=%s hasEspeak=%d model=%s",
+                   LangSubdir(lang), (int)hasEspeak, modelPath.c_str());
+
+    // espeak-ng を必要とする VITS モデルは Create/Generate 両フェーズで abort() クラッシュが確認済み。
+    // SEH では捕捉不可のため、呼び出す前にスキップする。
+    // ZH は espeak-ng 不要 (jieba) なので対象外。
+    if (hasEspeak && lang != Lang::ZH) {
+        logging::Debug("[TTS] %s: espeak-ng VITS は abort クラッシュ既知のためスキップ", LangSubdir(lang));
+        return nullptr;
+    }
 
     SherpaOnnxOfflineTtsConfig cfg = {};
     cfg.model.vits.model         = modelPath.c_str();
