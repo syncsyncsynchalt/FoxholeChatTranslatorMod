@@ -1,0 +1,10 @@
+[2026-05-27 10:00:01] [Team] ColonelMuster: Logi needed at Ogden Base ASAP! Smalls and heavy ammo are out!
+[2026-05-27 10:01:15] [Team] TankDriver42: 3 heavy tanks confirmed at Weathered Expanse, heading north. Need AT support now!
+[2026-05-27 10:02:30] [Team] IvanKorolev: Противник прорвал оборону на восточном фланге! Нужна срочная помощь!
+[2026-05-27 10:03:45] [Team] DmitriZhukov: Кто-нибудь привезите ресурсы на базу, запасы почти кончились!
+[2026-05-27 10:05:00] [Team] KimJunho: 전방 기지에 탄약이 부족합니다! 보급 트럭 빨리 와 주세요!
+[2026-05-27 10:06:20] [Team] ParkMinSeo: 적 보병 대규모 접근 중! Stonecradle 북쪽 방어선 지원 필요!
+[2026-05-27 10:07:35] [Team] WangFang: 前线补给告急！有没有运输队能送小口径弹药过来？
+[2026-05-27 10:08:50] [Team] LiuYang: 敌方坦克部队从东侧突破防线，需要反坦克火力立即支援！
+[2026-05-27 10:10:05] [Team] TanakaHiroshi: 補給が切れました！前線基地に小口径弾薬を届けてください！
+[2026-05-27 10:11:20] [Team] SuzukiRyo: 北側の防衛ラインが突破されました。全員フォールバックポジションへ撤退！

@@ -65,13 +65,17 @@ static HWND                    g_hwnd      = nullptr;
 // デモメッセージ (F1 キーで順番に送信)
 // ============================================================
 
-static const char* kTestMessages[] = {
-    "We need more supplies at the front line!",
-    "Enemy tanks spotted near Jade Cove, need anti-tank weapons!",
-    "Противник прорвал оборону на восточном фланге!",
-    "우리 팀에 보급이 더 필요해요!",
-    "我们需要在前线部署更多坦克！",
-    "弾薬が尽きそうだ、補給を頼む！",
+static const struct { const char* sender; const char* message; } kTestMessages[] = {
+    { "ColonelMuster",   "Logi needed at Ogden Base ASAP! Smalls and heavy ammo are out!" },
+    { "TankDriver42",    "3 heavy tanks confirmed at Weathered Expanse, heading north. Need AT support now!" },
+    { "IvanKorolev",     "Противник прорвал оборону на восточном фланге! Нужна срочная помощь!" },
+    { "DmitriZhukov",    "Кто-нибудь привезите ресурсы на базу, запасы почти кончились!" },
+    { "KimJunho",        "전방 기지에 탄약이 부족합니다! 보급 트럭 빨리 와 주세요!" },
+    { "ParkMinSeo",      "적 보병 대규모 접근 중! Stonecradle 북쪽 방어선 지원 필요!" },
+    { "WangFang",        "前线补给告急！有没有运输队能送小口径弹药过来？" },
+    { "LiuYang",         "敌方坦克部队从东侧突破防线，需要反坦克火力立即支援！" },
+    { "TanakaHiroshi",   "補給が切れました！前線基地に小口径弾薬を届けてください！" },
+    { "SuzukiRyo",       "北側の防衛ラインが突破されました。全員フォールバックポジションへ撤退！" },
 };
 static const int kTestMessageCount = sizeof(kTestMessages) / sizeof(kTestMessages[0]);
 static int g_msgIndex = 0;
@@ -260,9 +264,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             PostQuitMessage(0);
 
         } else if (wp == VK_F1 && g_fnChatMsg) {
-            const char* msg_text = kTestMessages[g_msgIndex % kTestMessageCount];
-            g_fnChatMsg("TestUser", msg_text);
-            printf("[F1] メッセージ送信: %s\n", msg_text);
+            const auto& tm = kTestMessages[g_msgIndex % kTestMessageCount];
+            g_fnChatMsg(tm.sender, tm.message);
+            printf("[F1] メッセージ送信 (%s): %s\n", tm.sender, tm.message);
             g_msgIndex++;
 
         } else if (wp == 'L') {
@@ -414,8 +418,8 @@ int main(int argc, char* argv[]) {
         // ログなし → デモメッセージをデフォルトエントリとして使用
         for (int i = 0; i < kTestMessageCount; i++) {
             LogEntry e;
-            e.sender  = "TestUser";
-            e.message = kTestMessages[i];
+            e.sender  = kTestMessages[i].sender;
+            e.message = kTestMessages[i].message;
             g_logEntries.push_back(e);
         }
         g_replayLoop = true;
