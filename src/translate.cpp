@@ -57,6 +57,7 @@ static std::mutex              g_mutex;
 static std::condition_variable g_cv;
 static std::queue<QueueItem>   g_queue;
 static bool                    g_running = false;
+static std::atomic<bool>       g_activeWork{false};
 
 static constexpr size_t MAX_QUEUE_SIZE = 4;
 
@@ -508,6 +509,7 @@ static void WorkerThread() {
             g_queue.pop();
         }
 
+        g_activeWork.store(true);
         std::string translated = DoTranslate(item.message, item.translationMode);
         TrimTrailing(translated);
 
@@ -526,6 +528,7 @@ static void WorkerThread() {
             result.ttsMode    = item.ttsMode;
             cb(result);
         }
+        g_activeWork.store(false);
     }
     logging::Debug("[Translate] ワーカースレッド終了");
 }
@@ -733,6 +736,11 @@ bool translate::Init(const TranslateConfig& cfg) {
     logging::Debug("[Translate] 初期化完了 (model=%s, endpoint=%s)",
         g_model.c_str(), cfg.endpoint.c_str());
     return true;
+}
+
+bool translate::IsBusy() {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_activeWork.load() || !g_queue.empty();
 }
 
 void translate::Shutdown() {

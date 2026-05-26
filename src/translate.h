@@ -57,6 +57,9 @@ bool IsHealthy();
 // モデルの確認・DL (ollama.cpp から呼ばれる)
 bool EnsureModel();
 
+// 翻訳キューが処理中かどうかを返す (overlay_test 送信タイミング制御用)
+bool IsBusy();
+
 // ワーカースレッドを detach (DLL_PROCESS_DETACH 緊急用)
 void DetachThread();
 

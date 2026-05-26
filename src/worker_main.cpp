@@ -70,6 +70,11 @@ __declspec(dllexport) void* WorkerGetWndProcCallback() {
     return reinterpret_cast<void*>(&overlay::OnWndProc);
 }
 
+// テストホスト専用: 翻訳・TTS パイプラインが処理中かどうかを返す (0=空き, 1=処理中)
+__declspec(dllexport) int WorkerIsBusy() {
+    return (translate::IsBusy() || tts::IsBusy()) ? 1 : 0;
+}
+
 // テストホスト専用: overlay::OnChatMessage を直接呼び出す
 __declspec(dllexport) void WorkerOnChatMessage(const char* sender, const char* message) {
     if (sender && message) {

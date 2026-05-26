@@ -712,6 +712,7 @@ static std::condition_variable g_ttsCv;
 static std::queue<TtsRequest>  g_ttsQueue;
 static std::atomic<bool>       g_ttsRunning{false};
 static std::atomic<bool>       g_ttsStop{false};
+static std::atomic<bool>       g_ttsPlaying{false};
 static std::string             g_ttsLanguage = "auto";
 
 static void TtsWorker() {
@@ -754,6 +755,8 @@ static void TtsWorker() {
             g_ttsQueue.pop();
         }
 
+        g_ttsPlaying.store(true);
+        struct PlayGuard { ~PlayGuard() { g_ttsPlaying.store(false); } } _guard;
         g_ttsStop.store(false);
         logging::Debug("[TTS] 処理開始: bytes=%zu text=%.60s",
                        req.text.size(), req.text.c_str());
@@ -830,9 +833,11 @@ static void TtsWorker() {
 
         // モデル取得 (遅延初期化)
         SherpaOnnxOfflineTts* model = GetModel(lang);
-        if (!model && lang != Lang::EN) {
-            logging::Debug("[TTS] lang=%s モデルなし、EN でフォールバック", langStr);
-            model = GetModel(Lang::EN);
+        if (!model) {
+            // espeak-ng VITS (EN/RU/KO) がスキップ済みの場合、JA Supertonic-3 で代替する。
+            // tts.json の "split":"opensource-multilingual" が示すとおり多言語対応済み。
+            logging::Debug("[TTS] lang=%s モデルなし、JA Supertonic-3 (多言語) でフォールバック", langStr);
+            model = GetModel(Lang::JA);
         }
         if (!model) {
             logging::Debug("[TTS] 利用可能なモデルなし");
@@ -981,6 +986,11 @@ void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
         g_ttsQueue.push({textUtf8});
     }
     g_ttsCv.notify_one();
+}
+
+bool tts::IsBusy() {
+    std::lock_guard<std::mutex> lock(g_ttsMutex);
+    return g_ttsPlaying.load() || !g_ttsQueue.empty();
 }
 
 void tts::Stop() {

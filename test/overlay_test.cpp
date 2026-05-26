@@ -42,16 +42,18 @@ typedef void*   (*PFN_WorkerGetWndProcCallback)();
 typedef void    (*PFN_OnPresent)(void* swapChain);
 typedef LRESULT (*PFN_OnWndProc)(HWND, UINT, WPARAM, LPARAM);
 typedef void    (*PFN_OnChatMessage)(const char* sender, const char* message);
+typedef int     (*PFN_WorkerIsBusy)();
 
 // ============================================================
 // グローバル状態
 // ============================================================
 
-static HMODULE           g_hDll        = nullptr;
-static PFN_OnPresent     g_fnPresent   = nullptr;
-static PFN_OnWndProc     g_fnWndProc   = nullptr;
-static PFN_OnChatMessage g_fnChatMsg   = nullptr;
-static PFN_WorkerShutdown g_fnShutdown = nullptr;
+static HMODULE            g_hDll        = nullptr;
+static PFN_OnPresent      g_fnPresent   = nullptr;
+static PFN_OnWndProc      g_fnWndProc   = nullptr;
+static PFN_OnChatMessage  g_fnChatMsg   = nullptr;
+static PFN_WorkerShutdown g_fnShutdown  = nullptr;
+static PFN_WorkerIsBusy   g_fnIsBusy    = nullptr;
 
 static ID3D11Device*           g_device    = nullptr;
 static ID3D11DeviceContext*    g_context   = nullptr;
@@ -156,11 +158,8 @@ static void StartReplayThread() {
                 if (g_replayLoop) {
                     g_replayIndex = 0;
                     printf("[Replay] ループ再開\n");
-                    // 先頭に戻る前もインターバル待機する
-                    for (int i = 0; i < g_replayIntervalMs / 100 && g_replayRunning; i++) {
-                        if (g_replayPaused) break;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    }
+                    // 先頭に戻る前に短い休止 (次メッセージ投入前の余白)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
                     continue;
                 }
                 printf("\n[Replay] 全メッセージ送信完了 (%d件)\n", total);
@@ -176,10 +175,19 @@ static void StartReplayThread() {
                    idx + 1, total, e.sender.c_str(), e.message.c_str());
             fflush(stdout);
 
-            // インターバル待機 (100ms 刻みで停止チェック)
-            for (int i = 0; i < g_replayIntervalMs / 100 && g_replayRunning; i++) {
-                if (g_replayPaused) break;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // TTS 再生完了待機: 翻訳パイプライン開始を待つ最低 500ms + IsBusy ポーリング
+            // IsBusy 未取得時はフォールバックとして固定インターバルを使う
+            if (g_fnIsBusy) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                for (int waited = 0; waited < 600 && g_replayRunning && !g_replayPaused; waited++) {
+                    if (!g_fnIsBusy()) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            } else {
+                for (int i = 0; i < g_replayIntervalMs / 100 && g_replayRunning; i++) {
+                    if (g_replayPaused) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
             }
         }
     });
@@ -367,6 +375,7 @@ int main(int argc, char* argv[]) {
     g_fnShutdown     = (PFN_WorkerShutdown)          GetProcAddress(g_hDll, "WorkerShutdown");
     auto fnGetWndCb  = (PFN_WorkerGetWndProcCallback)GetProcAddress(g_hDll, "WorkerGetWndProcCallback");
     g_fnChatMsg      = (PFN_OnChatMessage)           GetProcAddress(g_hDll, "WorkerOnChatMessage");
+    g_fnIsBusy       = (PFN_WorkerIsBusy)            GetProcAddress(g_hDll, "WorkerIsBusy");
 
     if (!fnInitTest) {
         printf("FAIL: WorkerInitTest エクスポートが見つかりません\n");

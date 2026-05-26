@@ -15,6 +15,9 @@ void Init(const char* language = "auto", uint32_t voicevoxStyleId = 3);
 // sender が非NULLの場合、送信者名から決定論的に声色を選択する
 void Speak(const char* textUtf8, const char* senderUtf8 = nullptr);
 
+// TTS キューが処理中または再生中かどうかを返す (overlay_test 送信タイミング制御用)
+bool IsBusy();
+
 // 現在の読み上げを中断
 void Stop();
 
