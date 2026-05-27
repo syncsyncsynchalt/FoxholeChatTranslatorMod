@@ -31,6 +31,7 @@ if not exist "!SRC!version.dll" (
 copy /y "!SRC!version.dll"          "!TARGET!\" >nul
 copy /y "!SRC!chat_translator.dll"  "!TARGET!\" >nul
 copy /y "%~dp0term_protection.txt"  "!TARGET!\" >nul
+copy /y "%~dp0tts_readings.txt"     "!TARGET!\" >nul
 if not exist "!TARGET!\config.ini" copy /y "%~dp0config.ini" "!TARGET!\" >nul
 if not exist "!TARGET!\assets\."   mkdir "!TARGET!\assets"
 xcopy /y /e /q "%~dp0assets\*" "!TARGET!\assets\" >nul

@@ -20,8 +20,10 @@
 #include <map>
 #include <mutex>
 #include <queue>
+#include <regex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 // ============================================================
@@ -214,6 +216,97 @@ static Lang DetectLanguage(const char* textUtf8) {
     if (hiragana > 0 || katakana > 0) return Lang::JA;
     if (cjk > 0)                   return Lang::ZH;
     return Lang::EN;
+}
+
+// ============================================================
+// TTS 読み辞書 (tts_readings.txt)
+// 書式: pattern [lang]=読み [i]
+// ============================================================
+
+struct TtsReading { std::regex re; std::string replacement; };
+static std::unordered_map<std::string, std::vector<TtsReading>> g_ttsReadings;
+
+static void LoadTtsReadings(const std::string& path) {
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) {
+        logging::Debug("[TTS] tts_readings.txt 未検出: %s", path.c_str());
+        return;
+    }
+    int count = 0;
+    char buf[512];
+    while (fgets(buf, sizeof(buf), f)) {
+        // 末尾の改行・空白を除去
+        size_t len = strlen(buf);
+        while (len > 0 && (buf[len-1] == '\r' || buf[len-1] == '\n' || buf[len-1] == ' '))
+            buf[--len] = '\0';
+        if (len == 0 || buf[0] == '#') continue;
+
+        // '=' で左右に分割
+        char* eq = strchr(buf, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        std::string left  = buf;
+        std::string right = eq + 1;
+
+        // 右部: 末尾 " i" → icase フラグ
+        bool icase = false;
+        if (right.size() >= 2 && right.back() == 'i' && right[right.size()-2] == ' ') {
+            icase = true;
+            right = right.substr(0, right.size() - 2);
+        }
+        while (!right.empty() && (right.back() == ' ' || right.back() == '\t'))
+            right.pop_back();
+        if (right.empty()) continue;
+
+        // 左部: 末尾スペースで pattern と lang に分割
+        while (!left.empty() && (left.back() == ' ' || left.back() == '\t'))
+            left.pop_back();
+        std::string lang, pattern;
+        size_t sp = left.rfind(' ');
+        if (sp == std::string::npos) {
+            pattern = left;
+            lang    = "";  // 全言語
+        } else {
+            lang    = left.substr(sp + 1);
+            pattern = left.substr(0, sp);
+            while (!pattern.empty() && (pattern.back() == ' ' || pattern.back() == '\t'))
+                pattern.pop_back();
+        }
+        if (pattern.empty()) continue;
+
+        // \b を自動付与
+        std::string reStr;
+        if (pattern.size() < 2 || pattern.substr(0, 2) != "\\b") reStr = "\\b";
+        reStr += pattern;
+        if (pattern.size() < 2 || pattern.substr(pattern.size()-2) != "\\b") reStr += "\\b";
+
+        auto flags = std::regex::ECMAScript;
+        if (icase) flags |= std::regex::icase;
+        try {
+            g_ttsReadings[lang].push_back({std::regex(reStr, flags), right});
+            count++;
+        } catch (const std::regex_error&) {
+            logging::Debug("[TTS] tts_readings.txt 正規表現エラー: %s", reStr.c_str());
+        }
+    }
+    fclose(f);
+    logging::Debug("[TTS] tts_readings.txt: %d エントリ読み込み (%s)", count, path.c_str());
+}
+
+static std::string ApplyTtsReadings(const std::string& text, const char* lang) {
+    if (g_ttsReadings.empty()) return text;
+    std::string result = text;
+    auto it = g_ttsReadings.find("");
+    if (it != g_ttsReadings.end())
+        for (auto& r : it->second)
+            result = std::regex_replace(result, r.re, r.replacement);
+    if (lang) {
+        it = g_ttsReadings.find(lang);
+        if (it != g_ttsReadings.end())
+            for (auto& r : it->second)
+                result = std::regex_replace(result, r.re, r.replacement);
+    }
+    return result;
 }
 
 // ============================================================
@@ -810,6 +903,14 @@ static void TtsWorker() {
         if (g_ttsLanguage == "auto" && lang == Lang::ZH &&
             (tlMode == TranslationMode::JA || tlMode == TranslationMode::JAZ))
             lang = Lang::JA;
+
+        // TTS 読み辞書を適用 (英単語 → 各言語の読み)
+        static const char* kLangKey[] = {"en", "ru", "ko", "zh", "ja"};
+        const char* langKey = kLangKey[static_cast<int>(lang)];
+        std::string processedText = ApplyTtsReadings(req.text, langKey);
+        if (processedText != req.text)
+            logging::Debug("[TTS] 読み辞書適用: %s → %s", req.text.c_str(), processedText.c_str());
+
         bool useVoicevox = (lang == Lang::JA && g_vvReady);
         if (config::Get().ttsVerboseLog)
             logging::Debug("[TTS] エンジン選択: %s (lang=%s vvReady=%d tlMode=%d)",
@@ -819,7 +920,7 @@ static void TtsWorker() {
             PcmData vvPcm;
             // JAZ=ずんだもん / JA=青山龍星 (15.vvm 未ロード時はずんだもんにフォールバック)
             uint32_t vvStyle = (tlMode == TranslationMode::JAZ || !g_vv15Ready) ? g_vvStyleId : g_vvJaStyleId;
-            if (!SynthesizeVoicevox(req.text, vvPcm, vvStyle)) continue;
+            if (!SynthesizeVoicevox(processedText, vvPcm, vvStyle)) continue;
             if (g_ttsStop.load()) continue;
 
             WAVEFORMATEX wfx = {};
@@ -882,7 +983,7 @@ static void TtsWorker() {
         // VITS モデルはアテンション機構の限界を超えた長文で同一箇所ループが発生する
         // 文境界を優先して 180 文字以内に切り詰める
         static const size_t kMaxTtsChars = 180;
-        std::string ttsText = req.text;
+        std::string ttsText = processedText;
         if (ttsText.size() > kMaxTtsChars) {
             static const char kBoundary[] = ".!?;,\n";
             size_t cut = std::string::npos;
@@ -992,6 +1093,14 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevox
     g_ttsDir = GetTtsToolDir();
     logging::Debug("[TTS] Init (language=%s, vvStyleId=%u, vvJaStyleId=%u, dir=%s)",
                    g_ttsLanguage.c_str(), voicevoxStyleId, voicevoxJaStyleId, g_ttsDir.c_str());
+
+    // g_ttsDir は "path\tools\tts\" — "tools\tts\" を除いて DLL ディレクトリを得る
+    static const char kSuffix[] = "tools\\tts\\";
+    std::string baseDir = g_ttsDir;
+    if (baseDir.size() >= sizeof(kSuffix) - 1 &&
+        baseDir.compare(baseDir.size() - (sizeof(kSuffix)-1), sizeof(kSuffix)-1, kSuffix) == 0)
+        baseDir.resize(baseDir.size() - (sizeof(kSuffix) - 1));
+    LoadTtsReadings(baseDir + "tts_readings.txt");
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
     InitVoicevox(g_ttsDir);
