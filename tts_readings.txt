@@ -27,6 +27,18 @@ cmat ja=シーマット i
 rmat ja=アールマット i
 emat ja=イーマット i
 smat ja=エスマット i
+amat ja=エーマット i
+conc ja=コンク i
+ssups? ja=エスサップ i
+arty ja=アーティ i
+HTDs? ja=エイチティーディー i
+WTDs? ja=ダブリューティーディー i
+LUV ja=エルユーブイ
+MPF ja=エムピーエフ
+ATR ja=エーティーアール
+Para ja=パラ i
+WC ja=ダブリューシー
+Nukes? ja=ニューク i
 
 # ===========================================================
 # 韓国語 (Sherpa vits-mimic3-ko_KO-kss_low)
@@ -46,9 +58,23 @@ cmat ko=씨맷 i
 rmat ko=알맷 i
 emat ko=이맷 i
 smat ko=에스맷 i
+amat ko=에이맷 i
+conc ko=콩크 i
+msups? ko=엠섭 i
+bsups? ko=비섭 i
+ssups? ko=에스섭 i
+arty ko=아티 i
 stockpile ko=스톡파일 i
 seaport ko=시포트 i
 garrison ko=개리슨 i
+HTDs? ko=에이치티디 i
+WTDs? ko=더블유티디 i
+LUV ko=엘유브이
+MPF ko=엠피에프
+ATR ko=에이티알
+Para ko=파라 i
+WC ko=더블유씨
+Nukes? ko=뉴크 i
 
 # ===========================================================
 # 中国語・ロシア語: espeak-ng が英語フォールバックを処理できるため初期は省略

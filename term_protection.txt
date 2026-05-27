@@ -9,32 +9,147 @@
 #   Wardens? i   → warden / Warden / wardens / Wardens にマッチ
 #   QRF          → QRF のみにマッチ (大文字限定)
 
-# ファクション名
+# ファクション名・派閥ニックネーム
 Wardens? i
 Colonials? i
 Collies? i
+Goblins? i
+Squids? i
+Blues? i
+Blueberries? i
 
-# 素材略語 (basic / construction / refined / explosive / salvage materials)
+# 素材略語 (basic / construction / refined / explosive / salvage / assembly / concrete materials)
 bmat i
 cmat i
 rmat i
 emat i
 smat i
+amat i
+conc i
 
-# 軍事略語
+# 燃料種別
+diesel i
+petrol i
+
+# 軍事・車両略語
 QRF
 SPG
 GBs?
 AA
 BTs?
+APC
+APCs?
+LTs?
+HTs?
+HTDs?
+WTDs?
+LUV
+MPT
 
-# ゲーム内略語
+# 武器固有コードネーム (チャットに頻出する固有名)
+Bonesaw i
+Ignifist i
+Cutler i
+Mammon i
+Lamentum i
+Cremari i
+Bomastone i
+Tremola i
+Carnyx i
+Nukes? i
+
+# 構造物・施設略語
+BBs?
+SCs?
+ATGs?
+MGGs?
+UGFs?
+FBs?
+ICs?
+MPF
+
+# 施設名 (フルネーム)
+stockpile i
+seaport i
+garrison i
+
+# ゲーム内補給・役職略語
 logi i
 inf i
 msups? i
 bsups? i
+ssups? i
+arty i
+ATR
+Para i
 
-# 施設名
-stockpile i
-seaport i
-garrison i
+# 戦術・ゲームシステム用語
+VPs?
+RDZ
+WC
+Partisans? i
+Satchels? i
+Hexes? i
+
+# マップリージョン名 (全 56 hex)
+# "The X" 系は "The X" 形式と "X" 単体の両方を収録 (The Gutter / The Fingers / The Moors は誤マッチ回避のため全文形式のみ)
+Acrithia i
+Allod's Bight i
+Ash Fields i
+Basin Sionnach i
+Callahan's Passage i
+Callum's Cape i
+Clanshead Valley i
+Colonial Home Region i
+Deadlands i
+Endless Shore i
+Farranac Coast i
+Fisherman's Row i
+Godcrofts i
+Great March i
+Howl County i
+Kalokai i
+King's Cage i
+Kuura Strand i
+Loch Mór i
+Lykos Isle i
+Marban Hollow i
+Morgen's Crossing i
+Nevish Line i
+Olavi's Wake i
+Ónyx i
+Origin i
+Palantine Berm i
+Pari Peak i
+Piper's Enclave i
+Reaching Trail i
+Reaver's Pass i
+Red River i
+Sableport i
+Shackled Chasm i
+Speaking Woods i
+Stema Landing i
+Stlican Shelf i
+Stonecradle i
+Tempest Island i
+Terminus i
+The Clahstra i
+Clahstra i
+The Drowned Vale i
+Drowned Vale i
+The Fingers i
+The Gutter i
+The Heartlands i
+Heartlands i
+The Linn of Mercy i
+Linn of Mercy i
+The Moors i
+The Oarbreaker Isles i
+Oarbreaker Isles i
+Tyrant Foothills i
+Umbral Wildwood i
+Viper Pit i
+Warden Home Region i
+Weathered Expanse i
+Westgate i
+Wresta i
