@@ -36,7 +36,8 @@ struct Config {
     bool        demoMode         = true;
 
     // [TTS]
-    uint32_t    ttsVoicevoxStyleId = 3;     // 3=ずんだもんノーマル
+    uint32_t    ttsVoicevoxStyleId   = 3;     // 3=ずんだもんノーマル (JAZ モード)
+    uint32_t    ttsVoicevoxJaStyleId = 13;   // 13=青山龍星ノーマル (JA モード)
     float       ttsVolume          = 0.8f;  // 0.0〜1.0
     bool        ttsVerboseLog      = false; // 合成フェーズの詳細ログ
 };

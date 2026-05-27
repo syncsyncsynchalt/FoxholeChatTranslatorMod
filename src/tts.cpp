@@ -2,7 +2,7 @@
 // tts.cpp - 多言語TTS (Sherpa-ONNX / VOICEVOX Core)
 //
 // sherpa-onnx.dll / voicevox_core.dll を tools/tts/ から動的ロード
-// 日本語: VOICEVOX (ずんだもん), その他: Sherpa-ONNX Piper/Supertonic
+// 日本語: VOICEVOX (JA=青山龍星/JAZ=ずんだもん), その他: Sherpa-ONNX Piper/Supertonic
 // 再生: XAudio2
 // ============================================================
 
@@ -246,7 +246,9 @@ static PFN_DestroyAudio g_fnFreeAudio = nullptr;
 // VOICEVOX グローバル
 static HMODULE               g_vvLib        = nullptr;
 static bool                  g_vvReady      = false;
-static uint32_t              g_vvStyleId    = 3;
+static uint32_t              g_vvStyleId    = 3;   // JAZ モード (ずんだもんノーマル)
+static uint32_t              g_vvJaStyleId  = 13;  // JA モード (青山龍星ノーマル)
+static bool                  g_vv15Ready    = false; // 15.vvm (青山龍星) ロード済みフラグ
 
 static PFN_VvOnnxLoad        g_vvOnnxLoad   = nullptr;
 static PFN_VvJtalkNew        g_vvJtalkNew   = nullptr;
@@ -428,10 +430,12 @@ static bool InitVoicevox(const std::string& ttsDir) {
         return false;
     }
 
-    logging::Debug("[TTS-VV] 初期化完了: %d VVM, styleId=%u", loaded, g_vvStyleId);
+    g_vv15Ready = (GetFileAttributesA((vvmsDir + "15.vvm").c_str()) != INVALID_FILE_ATTRIBUTES);
+    logging::Debug("[TTS-VV] 初期化完了: %d VVM, styleId=%u, vv15Ready=%d", loaded, g_vvStyleId, g_vv15Ready);
     g_vvReady = true;
     return true;
 }
+
 
 // ============================================================
 // SEH ヘルパー: C++ デストラクタのないスコープで __try を使う
@@ -527,17 +531,17 @@ static bool ParseWavPcm(const uint8_t* wav, uintptr_t size, PcmData& out) {
     return true;
 }
 
-static bool SynthesizeVoicevox(const std::string& text, PcmData& out) {
+static bool SynthesizeVoicevox(const std::string& text, PcmData& out, uint32_t styleId) {
     VoicevoxTtsOptions opts = g_vvDefTtsOpt ? g_vvDefTtsOpt() : VoicevoxTtsOptions{false};
     opts.enable_interrogative_upspeak = false;
 
     if (config::Get().ttsVerboseLog)
-        logging::Debug("[TTS-VV] 合成開始: bytes=%zu text=%.40s", text.size(), text.c_str());
+        logging::Debug("[TTS-VV] 合成開始: bytes=%zu styleId=%u text=%.40s", text.size(), styleId, text.c_str());
 
     uintptr_t wavLen = 0;
     uint8_t*  wavBuf = nullptr;
     DWORD     excCode = 0;
-    int32_t   rc = TryVvTts(g_vvSynthesizer, text.c_str(), g_vvStyleId,
+    int32_t   rc = TryVvTts(g_vvSynthesizer, text.c_str(), styleId,
                              opts, &wavLen, &wavBuf, &excCode);
     if (excCode) {
         logging::Debug("[TTS-VV] 合成例外 code=0x%08X text=%.40s",
@@ -570,6 +574,28 @@ struct LangModel {
 static std::mutex              g_modelMutex;
 static std::map<Lang, LangModel> g_models;
 static std::string             g_ttsDir;
+
+// 15.vvm (青山龍星) をシンセサイザーに追加ロード — ダウンロード完了後の hot-reload 用
+static void TryLoadVvm15() {
+    if (!g_vvReady || g_vv15Ready) return;
+    if (!g_vvModelOpen || !g_vvLoadModel || !g_vvModelDel || !g_vvSynthesizer) return;
+    std::string path = g_ttsDir + "voicevox\\models\\vvms\\15.vvm";
+    if (GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES) return;
+
+    VoicevoxVoiceModelFile* model = nullptr;
+    if (g_vvModelOpen(path.c_str(), &model) != VOICEVOX_RESULT_OK || !model) {
+        logging::Debug("[TTS-VV] 15.vvm ロード失敗");
+        return;
+    }
+    auto rc = g_vvLoadModel(g_vvSynthesizer, model);
+    g_vvModelDel(model);
+    if (rc != VOICEVOX_RESULT_OK) {
+        logging::Debug("[TTS-VV] 15.vvm シンセサイザーへのロード失敗 rc=%d", rc);
+        return;
+    }
+    g_vv15Ready = true;
+    logging::Debug("[TTS-VV] 15.vvm ロード完了 (青山龍星 style=%u 有効)", g_vvJaStyleId);
+}
 
 static const char* LangSubdir(Lang lang) {
     switch (lang) {
@@ -749,6 +775,7 @@ static void TtsWorker() {
                     if (InitVoicevox(g_ttsDir))
                         logging::Debug("[TTS] VOICEVOX 初期化完了、ずんだもんに切り替えます");
                 }
+                TryLoadVvm15();  // 15.vvm ダウンロード完了後に青山龍星を hot-load
                 continue;
             }
             req = g_ttsQueue.front();
@@ -777,16 +804,22 @@ static void TtsWorker() {
         static const char* kLangName[] = {"EN", "RU", "KO", "ZH", "JA"};
         const char* langStr = kLangName[static_cast<int>(lang)];
 
-        // VOICEVOX (日本語ずんだもん) — JAZモード時のみ使用。JAモードはSherpa-ONNXを使う
+        // VOICEVOX (日本語) — JA/JAZ モード共通。JAZ=ずんだもん (style=3)、JA=青山龍星 (style=13)
         TranslationMode tlMode = config::GetTranslationMode();
-        bool useVoicevox = (lang == Lang::JA && g_vvReady && tlMode == TranslationMode::JAZ);
+        // 純漢字テキスト(了解・南下・防衛等)が ZH と誤判定される問題を補正
+        if (g_ttsLanguage == "auto" && lang == Lang::ZH &&
+            (tlMode == TranslationMode::JA || tlMode == TranslationMode::JAZ))
+            lang = Lang::JA;
+        bool useVoicevox = (lang == Lang::JA && g_vvReady);
         if (config::Get().ttsVerboseLog)
             logging::Debug("[TTS] エンジン選択: %s (lang=%s vvReady=%d tlMode=%d)",
                            useVoicevox ? "VOICEVOX" : "Sherpa-ONNX",
                            langStr, (int)g_vvReady, (int)tlMode);
         if (useVoicevox) {
             PcmData vvPcm;
-            if (!SynthesizeVoicevox(req.text, vvPcm)) continue;
+            // JAZ=ずんだもん / JA=青山龍星 (15.vvm 未ロード時はずんだもんにフォールバック)
+            uint32_t vvStyle = (tlMode == TranslationMode::JAZ || !g_vv15Ready) ? g_vvStyleId : g_vvJaStyleId;
+            if (!SynthesizeVoicevox(req.text, vvPcm, vvStyle)) continue;
             if (g_ttsStop.load()) continue;
 
             WAVEFORMATEX wfx = {};
@@ -949,15 +982,16 @@ static void TtsWorker() {
 // 公開 API
 // ============================================================
 
-void tts::Init(const char* language, uint32_t voicevoxStyleId) {
+void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevoxJaStyleId) {
     if (g_ttsRunning.load()) return;
 
-    g_ttsLanguage = (language && *language) ? language : "auto";
-    g_vvStyleId   = voicevoxStyleId;
+    g_ttsLanguage  = (language && *language) ? language : "auto";
+    g_vvStyleId    = voicevoxStyleId;
+    g_vvJaStyleId  = voicevoxJaStyleId;
 
     g_ttsDir = GetTtsToolDir();
-    logging::Debug("[TTS] Init (language=%s, vvStyleId=%u, dir=%s)",
-                   g_ttsLanguage.c_str(), voicevoxStyleId, g_ttsDir.c_str());
+    logging::Debug("[TTS] Init (language=%s, vvStyleId=%u, vvJaStyleId=%u, dir=%s)",
+                   g_ttsLanguage.c_str(), voicevoxStyleId, voicevoxJaStyleId, g_ttsDir.c_str());
 
     bool sherpaOk = LoadSherpaLib(g_ttsDir);
     InitVoicevox(g_ttsDir);

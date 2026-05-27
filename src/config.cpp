@@ -51,6 +51,8 @@ void config::Load(const char* baseDir) {
 
     g_config.ttsVoicevoxStyleId = static_cast<uint32_t>(
         GetPrivateProfileIntA("TTS", "VoicevoxStyleId", 3, configPath.c_str()));
+    g_config.ttsVoicevoxJaStyleId = static_cast<uint32_t>(
+        GetPrivateProfileIntA("TTS", "VoicevoxJaStyleId", 13, configPath.c_str()));
 
     {
         float v = static_cast<float>(atof(ReadIniStr(configPath.c_str(), "TTS", "Volume", "0.8").c_str()));

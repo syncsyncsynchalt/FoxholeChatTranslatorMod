@@ -9,7 +9,7 @@ namespace tts {
 
 // 初期化 (ワーカースレッド起動)
 // language: "auto"=テキストから自動判定 / "ja" "en" "ru" "zh" "ko"=強制指定
-void Init(const char* language = "auto", uint32_t voicevoxStyleId = 3);
+void Init(const char* language = "auto", uint32_t voicevoxStyleId = 3, uint32_t voicevoxJaStyleId = 13);
 
 // テキストを非同期で読み上げ (言語は自動判定)
 // sender が非NULLの場合、送信者名から決定論的に声色を選択する

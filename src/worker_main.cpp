@@ -39,7 +39,7 @@ __declspec(dllexport) void* WorkerInit() {
     ollama::Init("", cfg.ollamaEndpoint);
 
     // 3. TTS: 音声合成ワーカー起動 (言語は自動判定、エンジン選択はTranslationModeに委ねる)
-    tts::Init("auto", cfg.ttsVoicevoxStyleId);
+    tts::Init("auto", cfg.ttsVoicevoxStyleId, cfg.ttsVoicevoxJaStyleId);
 
     // 4. overlay: ImGui 遅延初期化登録 + 翻訳コールバック設定
     overlay::Init();
@@ -96,7 +96,7 @@ __declspec(dllexport) void* WorkerInitTest(const char* baseDir) {
     translate::Init(tcfg);
 
     ollama::Init("", cfg.ollamaEndpoint);
-    tts::Init("auto", cfg.ttsVoicevoxStyleId);
+    tts::Init("auto", cfg.ttsVoicevoxStyleId, cfg.ttsVoicevoxJaStyleId);
     overlay::Init();
 
     return reinterpret_cast<void*>(&overlay::OnPresent);

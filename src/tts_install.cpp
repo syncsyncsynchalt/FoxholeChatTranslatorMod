@@ -572,6 +572,11 @@ static bool VoicevoxInstalled(const std::string& ttsDir) {
     return true;
 }
 
+static bool Vvm15Installed(const std::string& ttsDir) {
+    std::string path = ttsDir + "voicevox\\models\\vvms\\15.vvm";
+    return GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
 // ============================================================
 // 各コンポーネントのインストール
 // ============================================================
@@ -725,6 +730,35 @@ static bool InstallVoicevox(const std::string& ttsDir, const std::string& tmpDir
     return ok;
 }
 
+// 15.vvm (青山龍星) を VOICEVOX/voicevox_vvm Release から直接ダウンロード
+// ダウンローダー経由では既存ディレクトリへの追加 DL に対応していないため直接取得する
+static bool InstallVvm15(const std::string& ttsDir, const std::string& tmpDir) {
+    SetVoicevoxStatus("青山龍星: 15.vvm を GitHub から取得中...");
+    auto filter = [](const std::string& n) { return n == "15.vvm"; };
+    std::string url;
+    if (!GetGitHubAssetUrl("VOICEVOX/voicevox_vvm", filter, url)) {
+        logging::Debug("[VOICEVOX] 15.vvm: GitHub Release にアセットが見つかりません");
+        return false;
+    }
+
+    std::string vvmsDir = ttsDir + "voicevox\\models\\vvms\\";
+    CreateDirectoryA(vvmsDir.c_str(), nullptr);
+    std::string tmpPath  = tmpDir + "\\15.vvm.tmp";
+    std::string destPath = vvmsDir + "15.vvm";
+
+    if (!HttpDownloadToFile(url.c_str(), tmpPath.c_str(), "15.vvm (青山龍星)")) {
+        logging::Debug("[VOICEVOX] 15.vvm: ダウンロード失敗");
+        return false;
+    }
+    if (!MoveFileExA(tmpPath.c_str(), destPath.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        CopyFileA(tmpPath.c_str(), destPath.c_str(), FALSE);
+        DeleteFileA(tmpPath.c_str());
+    }
+    bool ok = Vvm15Installed(ttsDir);
+    logging::Debug("[VOICEVOX] 15.vvm %s", ok ? "完了" : "失敗");
+    return ok;
+}
+
 // ============================================================
 // ワーカースレッド
 // ============================================================
@@ -758,6 +792,7 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
     bool fontOk   = FontInstalled(assetsDir);
     bool sherpaOk = SherpaInstalled(ttsDir);
     bool vvOk     = false;
+    bool vvm15Ok  = Vvm15Installed(ttsDir);
     bool modelOk[5] = {};
     for (int i = 0; i < kN; i++) modelOk[i] = ModelInstalled(modelsDir, kModels[i]);
 
@@ -802,9 +837,17 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
             logging::Debug("[TTS-Install] ステップ 4/4: VOICEVOX Core をインストール中...");
             vvOk = InstallVoicevox(ttsDir, tmpDir);
             if (!vvOk) logging::Debug("[VOICEVOX] インストール失敗、続行");
+            vvm15Ok = Vvm15Installed(ttsDir);  // InstallVoicevox が 15.vvm も一括 DL する
         } else {
             logging::Debug("[TTS-Install] ステップ 4/4: VOICEVOX Core - インストール済み");
         }
+    }
+
+    // ステップ 4+: 15.vvm (青山龍星) が未インストールなら追加ダウンロード
+    if (needsVoicevox && !vvm15Ok && !g_cancel.load()) {
+        logging::Debug("[TTS-Install] 15.vvm (青山龍星) を追加インストール中...");
+        vvm15Ok = InstallVvm15(ttsDir, tmpDir);
+        if (!vvm15Ok) logging::Debug("[VOICEVOX] 15.vvm 失敗、続行");
     }
 
     // インストール結果サマリー
@@ -816,8 +859,10 @@ static void Worker(std::string ttsDir, std::string ttsLang) {
         logging::Debug("[TTS-Install]   Sherpa [%-2s]     : %s",
                        kModels[i].lang, modelOk[i] ? "OK" : "失敗");
     }
-    if (needsVoicevox)
-        logging::Debug("[TTS-Install]   VOICEVOX Core   : %s", vvOk ? "OK" : "失敗");
+    if (needsVoicevox) {
+        logging::Debug("[TTS-Install]   VOICEVOX Core   : %s", vvOk   ? "OK" : "失敗");
+        logging::Debug("[TTS-Install]   15.vvm (青山龍星): %s", vvm15Ok ? "OK" : "失敗");
+    }
 
     RemoveDirRecursive(tmpDir.c_str());
     if (!g_cancel.load())
@@ -851,6 +896,8 @@ void tts_install::StartIfNeeded(const std::string& ttsDir, const std::string& tt
 
     bool needSherpa   = !SherpaInstalled(ttsDir);
     bool needVoicevox = !VoicevoxInstalled(ttsDir);
+    // 15.vvm (青山龍星) が欠けている場合は個別追加 DL (既存ユーザー対応)
+    bool needVvm15    = VoicevoxInstalled(ttsDir) && !Vvm15Installed(ttsDir);
     bool needModel    = false;
     std::string modelsDir = ttsDir + "models\\";
     for (const auto& m : kModels) {
@@ -863,10 +910,10 @@ void tts_install::StartIfNeeded(const std::string& ttsDir, const std::string& tt
     std::string assetsDir = AssetsDir(ttsDir);
     bool needFont = !assetsDir.empty() && !FontInstalled(assetsDir);
 
-    if (!needFont && !needSherpa && !needVoicevox && !needModel) return;
+    if (!needFont && !needSherpa && !needVoicevox && !needModel && !needVvm15) return;
 
-    logging::Debug("[TTS-Install] 不足コンポーネントを検出: font=%d sherpa=%d voicevox=%d model=%d",
-                   needFont, needSherpa, needVoicevox, needModel);
+    logging::Debug("[TTS-Install] 不足コンポーネントを検出: font=%d sherpa=%d voicevox=%d model=%d vvm15=%d",
+                   needFont, needSherpa, needVoicevox, needModel, needVvm15);
     g_running.store(true);
     g_thread = std::thread(Worker, ttsDir, ttsLang);
 }
