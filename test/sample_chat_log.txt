@@ -1,10 +1,45 @@
-[2026-05-27 10:00:01] [Team] ColonelMuster: Logi needed at Ogden Base ASAP! Smalls and heavy ammo are out!
-[2026-05-27 10:01:15] [Team] TankDriver42: 3 heavy tanks confirmed at Weathered Expanse, heading north. Need AT support now!
-[2026-05-27 10:02:30] [Team] IvanKorolev: Противник прорвал оборону на восточном фланге! Нужна срочная помощь!
-[2026-05-27 10:03:45] [Team] DmitriZhukov: Кто-нибудь привезите ресурсы на базу, запасы почти кончились!
-[2026-05-27 10:05:00] [Team] KimJunho: 전방 기지에 탄약이 부족합니다! 보급 트럭 빨리 와 주세요!
-[2026-05-27 10:06:20] [Team] ParkMinSeo: 적 보병 대규모 접근 중! Stonecradle 북쪽 방어선 지원 필요!
-[2026-05-27 10:07:35] [Team] WangFang: 前线补给告急！有没有运输队能送小口径弹药过来？
-[2026-05-27 10:08:50] [Team] LiuYang: 敌方坦克部队从东侧突破防线，需要反坦克火力立即支援！
-[2026-05-27 10:10:05] [Team] TanakaHiroshi: 補給が切れました！前線基地に小口径弾薬を届けてください！
-[2026-05-27 10:11:20] [Team] SuzukiRyo: 北側の防衛ラインが突破されました。全員フォールバックポジションへ撤退！
+[2026-05-27 08:00:01] [Local] ColonelMuster: at foxcatcher NOW AT mines
+[2026-05-27 08:05:12] [Local] TankDriver42: latch logi!! smalls n bmat gone
+[2026-05-27 08:10:34] [Local] WardenHQ: qrf wightwalk base is down!!
+[2026-05-27 08:15:47] [Team] LtBonecrusher: colonial BTs crows nest heading bridge AT ASAP!! rmat for atg if anyone has some
+[2026-05-27 08:20:59] [Team] LogiRunner99: SC buckler up but 300mm empty... logi ammo backline?? need 3-4 crates min pls
+[2026-05-27 08:25:18] [Team] FrontlineAce: QRF thru latch rn!! overlook bb line cracking need conc n bmat NOW
+[2026-05-27 08:30:02] [Radio] MortarMike: WEATHERED PUSH 6+ BTs + APC thru crows nest, AT QRF heavy logi all hands foxcatcher def line NOW repair stations empty BRING RMAT
+[2026-05-27 08:35:41] [Radio] CommanderJAX: fob necropolis fell lost 3 BTs and shirts, rally huntsfort rebuild line, logi bmat conc 20mm, SC shift fire frostmarch before they flank rear!!
+[2026-05-27 08:40:15] [Radio] LightfootLogi: war: wardens solas gorge -> white chapel, BB crumbling post cracking, cord SC still up but AT mines gone, need 3 logi trucks 7.62 + rmat fob 0200
+[2026-05-27 08:45:03] [Local] IvanKorolev: AT foxcatcher срочно!!
+[2026-05-27 08:50:22] [Local] DmitriZhukov: лоджи лэтч!! патроны bmat нет
+[2026-05-27 08:55:47] [Local] SergeiPetrov: qrf wightwalk базу роняют!!
+[2026-05-27 09:00:11] [Team] AlexNovik: BT колонисты crows nest к мосту AT нужен!! rmat для atg привезите плиз
+[2026-05-27 09:05:38] [Team] NikolaiVolkov: SC buckler работает но 300мм нет... кто лоджи амму бэклайн?? 3-4 ящика хотя бы
+[2026-05-27 09:10:54] [Team] YuriMelnikov: QRF через latch рн!! bunker line overlook надо conc bmat быстро
+[2026-05-27 09:15:07] [Radio] AntonBorisov: WEATHERED PUSH рн!! 6+ BT + APC через crows nest AT QRF тяжёлый лоджи НУЖНЫ все на линию foxcatcher ремонт пуст ВЕЗИТЕ RMAT
+[2026-05-27 09:20:29] [Radio] PavelSidorov: фоб necropolis пал 3 BT и рубашки потеряли, сбор huntsfort, лоджи bmat conc 20мм, SC перенести огонь frostmarch пока не зашли с тыла!!
+[2026-05-27 09:25:43] [Radio] VasiliZotov: варданы solas gorge -> white chapel, BB crumbling post трещит, cord SC жив но AT мины кончились, 3 лоджи 7.62 rmat фоб до 0200
+[2026-05-27 09:30:08] [Local] KimJunho: foxcatcher AT 지금 바로!!
+[2026-05-27 09:35:17] [Local] ParkMinSeo: latch 로지!! 탄약 bmat 없음
+[2026-05-27 09:40:33] [Local] ChoiSungHo: qrf wightwalk 기지 털리고 있어!!
+[2026-05-27 09:45:51] [Team] LeeJaeWon: 식민지 BT crows nest 다리로 오고있어 AT 빨리!! rmat 있으면 atg에 좀
+[2026-05-27 09:50:04] [Team] YunKyungHo: SC buckler 살아있는데 300mm 없어... 백라인 탄약 로지 가는사람?? 3-4 크레이트만
+[2026-05-27 09:55:26] [Team] JungDaeHyun: latch로 QRF 오고있어 rn!! overlook bb 라인 conc bmat 지금 당장
+[2026-05-27 10:00:39] [Radio] OhSeungWoo: WEATHERED 푸쉬 rn!! BT 6대+ APC crows nest 통과중 AT QRF 중보급 다 필요 foxcatcher 방어선 전원 집합!! 수리소 비어있음 RMAT 들고와
+[2026-05-27 10:05:52] [Radio] ShinHanSol: necropolis fob 뚫렸어 BT 3대 셔츠 다 날림, huntsfort 집결, 로지 bmat conc 20mm, SC frostmarch로 사격 전환 후방 안 뚫리게!!
+[2026-05-27 10:10:14] [Radio] BaekJiHoon: 전황: 워든 solas gorge 뚫어서 white chapel 쌓는중, BB crumbling post 무너지고있어, cord SC 살아있는데 AT 지뢰 다 소진, 로지 3대 7.62mm rmat fob 02시까지
+[2026-05-27 10:15:07] [Local] WangFang: foxcatcher 反坦 现在!!
+[2026-05-27 10:20:31] [Local] LiuYang: latch 补给!! 弹药bmat没了
+[2026-05-27 10:25:48] [Local] ChenWei: qrf wightwalk 基地要丢了!!
+[2026-05-27 10:30:02] [Team] ZhangMing: 殖民军BT crows nest冲桥了 要AT快!! 有rmat给atg带一点
+[2026-05-27 10:35:19] [Team] XuLi: SC buckler开着但300mm没了... 有人去后方跑弹药吗?? 3-4箱就够
+[2026-05-27 10:40:37] [Team] HeZiyang: 殖民军QRF过latch了!! overlook bb线要conc bmat快
+[2026-05-27 10:45:53] [Radio] WuJun: WEATHERED全面推了!! 6+BT+APC过crows nest 要AT QRF重补给 foxcatcher防线全员来!! 修理站空的 带RMAT来
+[2026-05-27 10:50:08] [Radio] LinHao: necropolis fob丢了 损失3辆BT和补给, huntsfort集结, 补给带bmat conc 20mm, SC转移炮火到frostmarch别让他们抄后路!!
+[2026-05-27 10:55:24] [Radio] SunRui: 战况: 瓦登solas gorge -> white chapel堆防线, BB crumbling post快崩了, cord SC还在但AT地雷耗完, 3辆补给车7.62 rmat fob 02:00前
+[2026-05-27 11:00:11] [Local] TanakaHiroshi: foxcatcher AT今すぐ!!
+[2026-05-27 11:05:29] [Local] SuzukiRyo: latchまでロジ!! 弾薬bmat切れ
+[2026-05-27 11:10:43] [Local] YamadaKen: qrf wightwalk 拠点やばい!!
+[2026-05-27 11:15:06] [Team] NakamuraYuta: コロニアルBT crows nest 橋に向かってる AT急いで!! rmatあったらatgに持ってきて
+[2026-05-27 11:20:38] [Team] SatoKenji: SC buckler動いてるけど300mm切れた... 弾薬バックラインロジ行ける人?? 3〜4クレートでいい
+[2026-05-27 11:25:52] [Team] ItoMasaki: latchからQRF来てる rn!! overlook bbラインconc bmat今すぐ
+[2026-05-27 11:30:17] [Radio] KobayashiHaru: WEATHERED全面プッシュ!! BT6両+APCがcrows nest通過中 AT QRF重ロジ全部必要 foxcatcher防衛ライン全員集合!! 修理ステ空なのでRMAT持ってきて
+[2026-05-27 11:35:44] [Radio] WatanabeKo: necropolis fob落とされた BT3両とシャツ全部ロスト huntsfort集合 ロジbmat conc 20mm SC frostmarchに砲撃転換 後ろ取られる前に!!
+[2026-05-27 11:40:59] [Radio] OtaNoboru: 戦況: wardenがsolas gorgeから突入しwhite chapel強化中, BBラインcrumbling postがやばい, cord SC生きてるけどATマイン枯渇, ロジ3台7.62 rmat fob 02:00まで

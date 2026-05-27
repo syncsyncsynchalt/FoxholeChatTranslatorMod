@@ -66,16 +66,66 @@ static HWND                    g_hwnd      = nullptr;
 // ============================================================
 
 static const struct { const char* sender; const char* message; } kTestMessages[] = {
-    { "ColonelMuster",   "Logi needed at Ogden Base ASAP! Smalls and heavy ammo are out!" },
-    { "TankDriver42",    "3 heavy tanks confirmed at Weathered Expanse, heading north. Need AT support now!" },
-    { "IvanKorolev",     "Противник прорвал оборону на восточном фланге! Нужна срочная помощь!" },
-    { "DmitriZhukov",    "Кто-нибудь привезите ресурсы на базу, запасы почти кончились!" },
-    { "KimJunho",        "전방 기지에 탄약이 부족합니다! 보급 트럭 빨리 와 주세요!" },
-    { "ParkMinSeo",      "적 보병 대규모 접근 중! Stonecradle 북쪽 방어선 지원 필요!" },
-    { "WangFang",        "前线补给告急！有没有运输队能送小口径弹药过来？" },
-    { "LiuYang",         "敌方坦克部队从东侧突破防线，需要反坦克火力立即支援！" },
-    { "TanakaHiroshi",   "補給が切れました！前線基地に小口径弾薬を届けてください！" },
-    { "SuzukiRyo",       "北側の防衛ラインが突破されました。全員フォールバックポジションへ撤退！" },
+    // ---- EN Short ----
+    { "ColonelMuster",   "at foxcatcher NOW AT mines" },
+    { "TankDriver42",    "latch logi!! smalls n bmat gone" },
+    { "WardenHQ",        "qrf wightwalk base is down!!" },
+    // ---- EN Medium ----
+    { "LtBonecrusher",   "colonial BTs crows nest heading bridge AT ASAP!! rmat for atg if anyone has some" },
+    { "LogiRunner99",    "SC buckler up but 300mm empty... logi ammo backline?? need 3-4 crates min pls" },
+    { "FrontlineAce",    "QRF thru latch rn!! overlook bb line cracking need conc n bmat NOW" },
+    // ---- EN Long ----
+    { "MortarMike",      "WEATHERED PUSH 6+ BTs + APC thru crows nest, AT QRF heavy logi all hands foxcatcher def line NOW repair stations empty BRING RMAT" },
+    { "CommanderJAX",    "fob necropolis fell lost 3 BTs and shirts, rally huntsfort rebuild line, logi bmat conc 20mm, SC shift fire frostmarch before they flank rear!!" },
+    { "LightfootLogi",   "war: wardens solas gorge -> white chapel, BB crumbling post cracking, cord SC still up but AT mines gone, need 3 logi trucks 7.62 + rmat fob 0200" },
+    // ---- RU Short ----
+    { "IvanKorolev",     "AT foxcatcher срочно!!" },
+    { "DmitriZhukov",    "лоджи лэтч!! патроны bmat нет" },
+    { "SergeiPetrov",    "qrf wightwalk базу роняют!!" },
+    // ---- RU Medium ----
+    { "AlexNovik",       "BT колонисты crows nest к мосту AT нужен!! rmat для atg привезите плиз" },
+    { "NikolaiVolkov",   "SC buckler работает но 300мм нет... кто лоджи амму бэклайн?? 3-4 ящика хотя бы" },
+    { "YuriMelnikov",    "QRF через latch рн!! bunker line overlook надо conc bmat быстро" },
+    // ---- RU Long ----
+    { "AntonBorisov",    "WEATHERED PUSH рн!! 6+ BT + APC через crows nest AT QRF тяжёлый лоджи НУЖНЫ все на линию foxcatcher ремонт пуст ВЕЗИТЕ RMAT" },
+    { "PavelSidorov",    "фоб necropolis пал 3 BT и рубашки потеряли, сбор huntsfort, лоджи bmat conc 20мм, SC перенести огонь frostmarch пока не зашли с тыла!!" },
+    { "VasiliZotov",     "варданы solas gorge -> white chapel, BB crumbling post трещит, cord SC жив но AT мины кончились, 3 лоджи 7.62 rmat фоб до 0200" },
+    // ---- KO Short ----
+    { "KimJunho",        "foxcatcher AT 지금 바로!!" },
+    { "ParkMinSeo",      "latch 로지!! 탄약 bmat 없음" },
+    { "ChoiSungHo",      "qrf wightwalk 기지 털리고 있어!!" },
+    // ---- KO Medium ----
+    { "LeeJaeWon",       "식민지 BT crows nest 다리로 오고있어 AT 빨리!! rmat 있으면 atg에 좀" },
+    { "YunKyungHo",      "SC buckler 살아있는데 300mm 없어... 백라인 탄약 로지 가는사람?? 3-4 크레이트만" },
+    { "JungDaeHyun",     "latch로 QRF 오고있어 rn!! overlook bb 라인 conc bmat 지금 당장" },
+    // ---- KO Long ----
+    { "OhSeungWoo",      "WEATHERED 푸쉬 rn!! BT 6대+ APC crows nest 통과중 AT QRF 중보급 다 필요 foxcatcher 방어선 전원 집합!! 수리소 비어있음 RMAT 들고와" },
+    { "ShinHanSol",      "necropolis fob 뚫렸어 BT 3대 셔츠 다 날림, huntsfort 집결, 로지 bmat conc 20mm, SC frostmarch로 사격 전환 후방 안 뚫리게!!" },
+    { "BaekJiHoon",      "전황: 워든 solas gorge 뚫어서 white chapel 쌓는중, BB crumbling post 무너지고있어, cord SC 살아있는데 AT 지뢰 다 소진, 로지 3대 7.62mm rmat fob 02시까지" },
+    // ---- ZH Short ----
+    { "WangFang",        "foxcatcher 反坦 现在!!" },
+    { "LiuYang",         "latch 补给!! 弹药bmat没了" },
+    { "ChenWei",         "qrf wightwalk 基地要丢了!!" },
+    // ---- ZH Medium ----
+    { "ZhangMing",       "殖民军BT crows nest冲桥了 要AT快!! 有rmat给atg带一点" },
+    { "XuLi",            "SC buckler开着但300mm没了... 有人去后方跑弹药吗?? 3-4箱就够" },
+    { "HeZiyang",        "殖民军QRF过latch了!! overlook bb线要conc bmat快" },
+    // ---- ZH Long ----
+    { "WuJun",           "WEATHERED全面推了!! 6+BT+APC过crows nest 要AT QRF重补给 foxcatcher防线全员来!! 修理站空的 带RMAT来" },
+    { "LinHao",          "necropolis fob丢了 损失3辆BT和补给, huntsfort集结, 补给带bmat conc 20mm, SC转移炮火到frostmarch别让他们抄后路!!" },
+    { "SunRui",          "战况: 瓦登solas gorge -> white chapel堆防线, BB crumbling post快崩了, cord SC还在但AT地雷耗完, 3辆补给车7.62 rmat fob 02:00前" },
+    // ---- JA Short ----
+    { "TanakaHiroshi",   "foxcatcher AT今すぐ!!" },
+    { "SuzukiRyo",       "latchまでロジ!! 弾薬bmat切れ" },
+    { "YamadaKen",       "qrf wightwalk 拠点やばい!!" },
+    // ---- JA Medium ----
+    { "NakamuraYuta",    "コロニアルBT crows nest 橋に向かってる AT急いで!! rmatあったらatgに持ってきて" },
+    { "SatoKenji",       "SC buckler動いてるけど300mm切れた... 弾薬バックラインロジ行ける人?? 3〜4クレートでいい" },
+    { "ItoMasaki",       "latchからQRF来てる rn!! overlook bbラインconc bmat今すぐ" },
+    // ---- JA Long ----
+    { "KobayashiHaru",   "WEATHERED全面プッシュ!! BT6両+APCがcrows nest通過中 AT QRF重ロジ全部必要 foxcatcher防衛ライン全員集合!! 修理ステ空なのでRMAT持ってきて" },
+    { "WatanabeKo",      "necropolis fob落とされた BT3両とシャツ全部ロスト huntsfort集合 ロジbmat conc 20mm SC frostmarchに砲撃転換 後ろ取られる前に!!" },
+    { "OtaNoboru",       "戦況: wardenがsolas gorgeから突入しwhite chapel強化中, BBラインcrumbling postがやばい, cord SC生きてるけどATマイン枯渇, ロジ3台7.62 rmat fob 02:00まで" },
 };
 static const int kTestMessageCount = sizeof(kTestMessages) / sizeof(kTestMessages[0]);
 static int g_msgIndex = 0;
