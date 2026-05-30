@@ -618,6 +618,17 @@ bool overlay::Init() {
     return true;
 }
 
+void overlay::OnResizeBuffers() {
+    if (!g_initialized) return;
+    // ResizeBuffers はバックバッファへの外部参照がゼロでなければ失敗する。
+    // g_rtv と g_cachedBackBuffer が参照を保持しているので解放する。
+    if (!g_rtv && !g_cachedBackBuffer) return; // 既に解放済み (WM_SIZE → ResizeBuffers の二重呼び出し)
+    ImGui_ImplDX11_InvalidateDeviceObjects();
+    if (g_rtv)             { g_rtv->Release();             g_rtv             = nullptr; }
+    if (g_cachedBackBuffer) { g_cachedBackBuffer->Release(); g_cachedBackBuffer = nullptr; }
+    logging::Debug("[Overlay] ResizeBuffers 前リソース解放完了");
+}
+
 void overlay::OnPresent(void* swapChainPtr) {
     auto* swapChain = static_cast<IDXGISwapChain*>(swapChainPtr);
 
@@ -636,6 +647,10 @@ void overlay::OnPresent(void* swapChainPtr) {
             if (g_cachedBackBuffer) { g_cachedBackBuffer->Release(); g_cachedBackBuffer = nullptr; }
             g_device->CreateRenderTargetView(backBuffer, nullptr, &g_rtv);
             g_cachedBackBuffer = backBuffer; // 参照カウントを保持してポインタ比較に使用
+            // ResizeBuffers 後の初回 Present: ImGui GPU リソースを再構築する
+            ImGui_ImplDX11_InvalidateDeviceObjects();
+            ImGui_ImplDX11_CreateDeviceObjects();
+            logging::Debug("[Overlay] バックバッファ変化検出 - ImGui デバイスリソース再初期化");
         } else {
             backBuffer->Release(); // 変化なし: 余分な参照を解放
         }

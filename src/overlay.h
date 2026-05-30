@@ -19,6 +19,10 @@ bool Init();
 // Present コールバック (version.dll のフックから呼ばれる)
 void OnPresent(void* swapChain);
 
+// ResizeBuffers 前コールバック (version.dll のフックから呼ばれる)
+// バックバッファ参照を全解放して ResizeBuffers が成功できるようにする
+void OnResizeBuffers();
+
 // WndProc コールバック (version.dll のサブクラスから呼ばれる)
 // ImGui が入力を消費した場合は非ゼロを返す
 LRESULT OnWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

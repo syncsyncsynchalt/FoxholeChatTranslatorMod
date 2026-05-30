@@ -172,8 +172,14 @@ static uintptr_t g_hookedPeAddr = 0;  // フックしたProcessEventのアドレ
 typedef HRESULT (WINAPI *PFN_Present)(IDXGISwapChain*, UINT, UINT);
 static PFN_Present g_originalPresent = nullptr;
 
+typedef HRESULT (WINAPI *PFN_ResizeBuffers)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+static PFN_ResizeBuffers g_originalResizeBuffers = nullptr;
+
 typedef void (*RenderCallbackFn)(void*);
 static volatile RenderCallbackFn g_renderCallback = nullptr;
+
+typedef void (*ResizeCallbackFn)();
+static volatile ResizeCallbackFn g_resizeCallback = nullptr;
 
 // WndProc サブクラス化 (マウス入力を ImGui に転送)
 typedef LRESULT (*WndProcCallbackFn)(HWND, UINT, WPARAM, LPARAM);
@@ -183,6 +189,15 @@ static HWND    g_gameHwnd = nullptr;
 static std::once_flag g_wndProcOnce;
 
 static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    // WM_SIZE: UE4 の WndProc より先にバックバッファ参照を解放する。
+    // こうすることで UE4 の ResizeBuffers 直前チェック (refs == 1) が通る。
+    // SIZE_MINIMIZED は SwapChain リサイズを伴わないため除外。
+    if (msg == WM_SIZE && wParam != SIZE_MINIMIZED) {
+        g_inflightHooks.fetch_add(1, std::memory_order_acquire);
+        ResizeCallbackFn rcb = g_resizeCallback;
+        if (rcb) rcb();
+        g_inflightHooks.fetch_sub(1, std::memory_order_release);
+    }
     g_inflightHooks.fetch_add(1, std::memory_order_acquire);
     WndProcCallbackFn cb = g_wndProcCallback;
     LRESULT result = 0;
@@ -216,6 +231,18 @@ static HRESULT WINAPI HookedPresent(IDXGISwapChain* swapChain, UINT syncInterval
     }
     g_inflightHooks.fetch_sub(1, std::memory_order_release);
     return g_originalPresent(swapChain, syncInterval, flags);
+}
+
+// ResizeBuffers フック: バックバッファ参照をリリースしてから通過させる
+// (g_rtv / g_cachedBackBuffer が残っていると ResizeBuffers が DXGI_ERROR_INVALID_CALL を返す)
+static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* swapChain, UINT bufferCount,
+    UINT width, UINT height, DXGI_FORMAT format, UINT flags)
+{
+    g_inflightHooks.fetch_add(1, std::memory_order_acquire);
+    ResizeCallbackFn cb = g_resizeCallback;
+    if (cb) cb();
+    g_inflightHooks.fetch_sub(1, std::memory_order_release);
+    return g_originalResizeBuffers(swapChain, bufferCount, width, height, format, flags);
 }
 
 // HookDXGIPresent() は LogLoader の後に定義 (前方参照回避)
@@ -365,9 +392,10 @@ static bool HookDXGIPresent() {
         return false;
     }
 
-    // SwapChain vtable から Present アドレス取得 (index 8)
+    // SwapChain vtable からアドレス取得: Present=index 8, ResizeBuffers=index 13
     void** vtable = *reinterpret_cast<void***>(dummySwapChain);
-    void* presentAddr = vtable[8];
+    void* presentAddr      = vtable[8];
+    void* resizeBuffersAddr = vtable[13];
 
     // ダミーリソース解放
     context->Release();
@@ -388,8 +416,22 @@ static bool HookDXGIPresent() {
         LogLoader("Present フック有効化失敗 (MH=%d)", st);
         return false;
     }
-
     LogLoader("Present フック成功 (addr=0x%p)", presentAddr);
+
+    // MinHook で ResizeBuffers をフック (ウィンドウリサイズ時のバックバッファ参照解放のため)
+    st = MH_CreateHook(resizeBuffersAddr, &HookedResizeBuffers,
+                       reinterpret_cast<void**>(&g_originalResizeBuffers));
+    if (st != MH_OK) {
+        LogLoader("ResizeBuffers フック作成失敗 (MH=%d)", st);
+        return false;
+    }
+    st = MH_EnableHook(resizeBuffersAddr);
+    if (st != MH_OK) {
+        LogLoader("ResizeBuffers フック有効化失敗 (MH=%d)", st);
+        return false;
+    }
+    LogLoader("ResizeBuffers フック成功 (addr=0x%p)", resizeBuffersAddr);
+
     return true;
 }
 
@@ -398,8 +440,9 @@ static void UnloadWorker() {
 
     // コールバックを先にクリア
     g_wndProcCallback = nullptr;
-    g_renderCallback = nullptr;
-    g_workerCallback = nullptr;
+    g_resizeCallback  = nullptr;
+    g_renderCallback  = nullptr;
+    g_workerCallback  = nullptr;
     // インフライト呼び出しが全て完了するまで待機（最大 1 秒）
     for (int i = 0; i < 100 && g_inflightHooks.load(std::memory_order_acquire) > 0; i++) {
         Sleep(10);
@@ -489,6 +532,18 @@ static bool LoadWorker() {
         if (wndProcCb) {
             g_wndProcCallback = reinterpret_cast<WndProcCallbackFn>(wndProcCb);
             LogLoader("WndProc コールバック設定完了");
+        }
+    }
+
+    // ResizeBuffers コールバックを取得
+    typedef void* (*PFN_GetResizeCallback)();
+    auto getResizeCb = reinterpret_cast<PFN_GetResizeCallback>(
+        GetProcAddress(g_hWorker, "WorkerGetResizeCallback"));
+    if (getResizeCb) {
+        void* resizeCb = getResizeCb();
+        if (resizeCb) {
+            g_resizeCallback = reinterpret_cast<ResizeCallbackFn>(resizeCb);
+            LogLoader("ResizeBuffers コールバック設定完了");
         }
     }
 

@@ -70,6 +70,10 @@ __declspec(dllexport) void* WorkerGetWndProcCallback() {
     return reinterpret_cast<void*>(&overlay::OnWndProc);
 }
 
+__declspec(dllexport) void* WorkerGetResizeCallback() {
+    return reinterpret_cast<void*>(&overlay::OnResizeBuffers);
+}
+
 // テストホスト専用: 翻訳・TTS パイプラインが処理中かどうかを返す (0=空き, 1=処理中)
 __declspec(dllexport) int WorkerIsBusy() {
     return (translate::IsBusy() || tts::IsBusy()) ? 1 : 0;
