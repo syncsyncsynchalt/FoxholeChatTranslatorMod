@@ -21,5 +21,7 @@ debug_log.txt
 __pycache__/
 *.pyc
 
-# Claude Code
-.claude/
+# Claude Code (設定ファイルは除外、memory/ はリポジトリで管理)
+.claude/*
+!.claude/memory/
+!.claude/memory/**

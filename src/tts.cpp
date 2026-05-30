@@ -487,7 +487,7 @@ static bool InitVoicevox(const std::string& ttsDir) {
     VoicevoxInitializeOptions initOpts = g_vvDefInitOpt ? g_vvDefInitOpt()
                                                         : VoicevoxInitializeOptions{1, 0};
     initOpts.acceleration_mode = 1; // CPU
-    initOpts.cpu_num_threads   = 2;
+    initOpts.cpu_num_threads   = 1;
     rc = g_vvSynthNew(g_vvOnnxruntime, g_vvOpenJtalk, initOpts, &g_vvSynthesizer);
     if (rc != VOICEVOX_RESULT_OK) {
         logging::Debug("[TTS-VV] Synthesizer 作成失敗 rc=%d", rc);
@@ -718,7 +718,7 @@ static SherpaOnnxOfflineTts* CreateSupertonicModel(const std::string& modelDir) 
     cfg.model.supertonic.tts_json           = jsn.c_str();
     cfg.model.supertonic.unicode_indexer    = ui.c_str();
     cfg.model.supertonic.voice_style        = vs.c_str();
-    cfg.model.num_threads   = 2;
+    cfg.model.num_threads   = 1;
     cfg.model.debug         = 0;
     cfg.model.provider      = "cpu";
     cfg.max_num_sentences   = 1;
@@ -787,7 +787,7 @@ static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     cfg.model.vits.noise_scale   = 0.667f;
     cfg.model.vits.noise_scale_w = 0.8f;
     cfg.model.vits.length_scale  = 1.0f;
-    cfg.model.num_threads        = 2;
+    cfg.model.num_threads        = 1;
     cfg.model.debug              = 0;
     cfg.model.provider           = "cpu";
     cfg.max_num_sentences        = 5;

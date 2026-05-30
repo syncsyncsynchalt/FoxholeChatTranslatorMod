@@ -202,10 +202,13 @@ static const char* TtsModeLabel(TtsMode m) {
 
 static void RenderFrame() {
     // フォントが未ロードの場合、300フレームごとにファイル出現を確認してホットロード
+    // 起動後 18000 フレーム（60FPS で約 5 分）を超えたらチェックを停止する
     if (g_cjkFont == nullptr) {
         static int s_fontCheckFrame = 0;
-        if (++s_fontCheckFrame >= 300) {
+        static int s_fontCheckTotal = 0;
+        if (s_fontCheckTotal < 18000 && ++s_fontCheckFrame >= 300) {
             s_fontCheckFrame = 0;
+            s_fontCheckTotal += 300;
             std::string fontPath = g_assetsDir + "NotoSansCJKjp-Regular.otf";
             if (GetFileAttributesA(fontPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
                 ImGuiIO& io = ImGui::GetIO();
@@ -263,7 +266,7 @@ static void RenderFrame() {
     float totalW = kPadX + toggleColW + kBtnWidth + kGap + s_textWidth + kPadX;
     float totalH = kPadY + lineHWS + lineHWS + kPadY;
 
-    g_textChanged.exchange(false);
+    bool changed = g_textChanged.exchange(false);
 
     // TTS + 翻訳パイプラインが空いたら pending キューの次メッセージを処理する
     // (描画スレッドで呼ぶが translate::Queue / tts::IsBusy はスレッドセーフ)
@@ -311,19 +314,21 @@ static void RenderFrame() {
                 g_scrollOrig  = 0.0f;
                 g_scrollTrans = 0.0f;
             }
+            g_textChanged.store(true);
             if (mode != TranslationMode::Off) {
                 translate::Queue("", "", g_demoMessages[g_demoIndex], mode, config::GetTtsMode());
             }
         }
     }
 
-    // エントリのコピーを取得
-    std::deque<MessageEntry> entries;
-    {
+    // エントリのコピーを取得（変化があったフレームのみ更新）
+    static std::deque<MessageEntry> s_cachedEntries;
+    if (changed || s_cachedEntries.empty()) {
         std::lock_guard<std::mutex> lock(g_textMutex);
-        entries = g_entries;
+        s_cachedEntries = g_entries;
+        if (s_cachedEntries.empty()) s_cachedEntries.push_back({"", "", "", false});
     }
-    if (entries.empty()) entries.push_back({"", "", "", false});
+    const std::deque<MessageEntry>& entries = s_cachedEntries;
 
     // 最新エントリの表示テキストを決定
     const MessageEntry& latest   = entries.back();

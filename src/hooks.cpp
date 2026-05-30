@@ -122,8 +122,19 @@ static void TryLazyGNamesResolve() {
 // チャット関数識別
 // ============================================================
 
+// 一度検出したチャット関数のポインタをキャッシュし、
+// ほぼ全ての ProcessEvent 呼び出しでメモリリードを省略する
+static void* s_chatFuncPtrs[CHAT_FUNC_COUNT] = {};
+
 static int IdentifyChatFunc(void* function) {
     if (!function || !g_chatCIsReady) return -1;
+
+    // キャッシュ済みアドレスと高速比較（L1 ヒット想定、1ns 以下）
+    for (int i = 0; i < CHAT_FUNC_COUNT; i++) {
+        if (s_chatFuncPtrs[i] && s_chatFuncPtrs[i] == function) return i;
+    }
+
+    // 未キャッシュ: FName CI を読んで照合し、一致したらキャッシュ登録
     __try {
         uintptr_t funcAddr = reinterpret_cast<uintptr_t>(function);
         if (funcAddr < 0x10000) return -1;
@@ -134,6 +145,7 @@ static int IdentifyChatFunc(void* function) {
             if (g_chatFuncCIs[i] >= 0 && funcCI == g_chatFuncCIs[i]) {
                 uint32_t flags = *reinterpret_cast<uint32_t*>(funcAddr + 0x98);
                 if (!(flags & 0x40)) return -1;
+                s_chatFuncPtrs[i] = function;
                 return i;
             }
         }

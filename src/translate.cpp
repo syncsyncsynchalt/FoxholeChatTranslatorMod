@@ -498,6 +498,7 @@ static void TrimTrailing(std::string& s) {
 // ============================================================
 
 static void WorkerThread() {
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
     logging::Debug("[Translate] ワーカースレッド開始");
     while (true) {
         QueueItem item;
