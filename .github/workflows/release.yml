@@ -35,9 +35,11 @@ jobs:
           Copy-Item "config.ini"                        $outDir
           Copy-Item "term_protection.txt"               $outDir
 
-          # インストーラー / アンインストーラー
-          Copy-Item "install.bat"    $outDir
-          Copy-Item "uninstall.bat"  $outDir
+          # インストーラー / アンインストーラー / MOD トグル
+          Copy-Item "install.bat"      $outDir
+          Copy-Item "uninstall.bat"    $outDir
+          Copy-Item "toggle_mod.bat"   $outDir
+          Copy-Item "tts_readings.txt" $outDir
 
           # アセット (フォントはインストーラーが実行時にダウンロード)
           New-Item -ItemType Directory -Path "$outDir\assets" | Out-Null
