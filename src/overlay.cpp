@@ -559,31 +559,43 @@ bool overlay::Init() {
     g_assetsDir = dir + "assets\\";
 
     translate::SetResultCallback([](const translate::TranslateResult& r) {
-        {
-            std::lock_guard<std::mutex> lock(g_textMutex);
-            // sender + original で対応エントリを後ろから検索して更新
-            for (auto it = g_entries.rbegin(); it != g_entries.rend(); ++it) {
-                if (it->translating && it->sender == r.sender && it->original == r.original) {
-                    it->translated  = r.ok ? r.translated : r.original;
-                    it->translating = false;
-                    // 最新エントリが更新されたらスクロールをリセット
-                    if (it == g_entries.rbegin()) {
-                        g_scrollOrig  = 0.0f;
-                        g_scrollTrans = 0.0f;
+        // 表示更新ロジックをラムダとして定義
+        // TTS オン: 合成完了コールバックで呼び出し → 表示と発話開始を同時に行う
+        // TTS オフ: 翻訳完了直後に呼び出し (従来動作)
+        std::string channel = r.channel, sender = r.sender,
+                    original = r.original, translated = r.translated;
+        bool ok = r.ok;
+
+        auto doDisplay = [=]() {
+            {
+                std::lock_guard<std::mutex> lock(g_textMutex);
+                for (auto it = g_entries.rbegin(); it != g_entries.rend(); ++it) {
+                    if (it->translating && it->sender == sender && it->original == original) {
+                        it->translated  = ok ? translated : original;
+                        it->translating = false;
+                        if (it == g_entries.rbegin()) {
+                            g_scrollOrig  = 0.0f;
+                            g_scrollTrans = 0.0f;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-        }
-        g_textChanged.store(true);
-        logging::Translation(r.channel.c_str(), r.sender.c_str(),
-                             r.original.c_str(), r.translated.c_str());
+            g_textChanged.store(true);
+            logging::Translation(channel.c_str(), sender.c_str(),
+                                 original.c_str(), translated.c_str());
+        };
 
         if (r.ttsMode != TtsMode::Off) {
             // 翻訳失敗 (Ollama 接続不可) のエラー文字列は読み上げない
             bool useTranslated = (r.ttsMode == TtsMode::Translated) && r.ok;
-            const char* ttsText = useTranslated ? r.translated.c_str() : r.original.c_str();
-            tts::Speak(ttsText, r.sender.empty() ? nullptr : r.sender.c_str());
+            std::string ttsText = useTranslated ? r.translated : r.original;
+            // doDisplay は合成完了・再生直前 (synthGuard.fire()) で呼ばれる
+            tts::Speak(ttsText.c_str(),
+                       sender.empty() ? nullptr : sender.c_str(),
+                       std::move(doDisplay));
+        } else {
+            doDisplay(); // TTS オフ: 翻訳完了直後に即時表示
         }
     });
 

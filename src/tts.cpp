@@ -819,7 +819,8 @@ static SherpaOnnxOfflineTts* GetModel(Lang lang) {
 // ============================================================
 
 struct TtsRequest {
-    std::string text;
+    std::string           text;
+    std::function<void()> onSynthesisReady; // 合成完了・再生開始直前コールバック
 };
 
 static constexpr size_t MAX_TTS_QUEUE_SIZE = 2;
@@ -880,6 +881,16 @@ static void TtsWorker() {
         g_ttsStop.store(false);
         logging::Debug("[TTS] 処理開始: bytes=%zu text=%.60s",
                        req.text.size(), req.text.c_str());
+
+        // 合成完了コールバックを確実に1回だけ呼ぶ RAII ガード
+        // 合成成功 → fire() で明示呼び出し後に再生開始
+        // 合成失敗 → continue でデストラクタが自動呼び出し (表示が止まったまま残らない)
+        struct SynthReadyGuard {
+            std::function<void()> fn;
+            bool fired = false;
+            void fire() { if (!fired && fn) { fired = true; fn(); } }
+            ~SynthReadyGuard() { fire(); }
+        } synthGuard{std::move(req.onSynthesisReady)};
 
         // 言語判定
         Lang lang = Lang::EN;
@@ -948,6 +959,7 @@ static void TtsWorker() {
             sourceVoice->SubmitSourceBuffer(&buf);
             sourceVoice->SetVolume(config::Get().ttsVolume);
             sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
+            synthGuard.fire(); // 合成完了: オーバーレイ表示更新と再生開始を同期
             sourceVoice->Start(0);
             logging::Debug("[TTS-VV] 再生開始: %u bytes", dataSize);
 
@@ -1057,6 +1069,7 @@ static void TtsWorker() {
         sourceVoice->SubmitSourceBuffer(&buf);
         sourceVoice->SetVolume(config::Get().ttsVolume);
         sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
+        synthGuard.fire(); // 合成完了: オーバーレイ表示更新と再生開始を同期
         sourceVoice->Start(0);
 
         for (;;) {
@@ -1117,7 +1130,8 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevox
     g_ttsThread = std::thread(TtsWorker);
 }
 
-void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
+void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/,
+                std::function<void()> onSynthesisReady) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
     logging::Debug("[TTS] Speak: bytes=%zu text=%.60s", strlen(textUtf8), textUtf8);
     {
@@ -1126,7 +1140,7 @@ void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/) {
             logging::Debug("[TTS] キュー満杯: 最古を破棄");
             g_ttsQueue.pop();
         }
-        g_ttsQueue.push({textUtf8});
+        g_ttsQueue.push({textUtf8, std::move(onSynthesisReady)});
     }
     g_ttsCv.notify_one();
 }

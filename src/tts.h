@@ -4,6 +4,7 @@
 // ============================================================
 
 #include <cstdint>
+#include <functional>
 
 namespace tts {
 
@@ -13,7 +14,10 @@ void Init(const char* language = "auto", uint32_t voicevoxStyleId = 3, uint32_t 
 
 // テキストを非同期で読み上げ (言語は自動判定)
 // sender が非NULLの場合、送信者名から決定論的に声色を選択する
-void Speak(const char* textUtf8, const char* senderUtf8 = nullptr);
+// onSynthesisReady: 合成完了・再生開始直前に呼ばれるコールバック (nullptr 可)
+//   合成失敗時もデストラクタ経由で必ず1回呼ばれる (表示が止まったまま残らないよう保証)
+void Speak(const char* textUtf8, const char* senderUtf8 = nullptr,
+           std::function<void()> onSynthesisReady = nullptr);
 
 // TTS キューが処理中または再生中かどうかを返す (overlay_test 送信タイミング制御用)
 bool IsBusy();
