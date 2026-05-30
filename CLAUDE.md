@@ -105,7 +105,7 @@ ProcessEvent → hooks::OnProcessEvent
 | Preset | model | num_ctx | num_thread | temperature | num_predict |
 |--------|-------|--------:|-----------:|------------:|------------:|
 | Low | gemma3:1b | 128 | 2 | 0.1 | 120 |
-| Medium | gemma3:4b | 256 | 0 | 0.1 | 120 |
+| Medium | phi4-mini | 256 | 0 | 0.1 | 120 |
 | High | gemma3:4b | 512 | 0 | 0.1 | 120 |
 
 `num_thread=0` = 全 CPU コア使用。
