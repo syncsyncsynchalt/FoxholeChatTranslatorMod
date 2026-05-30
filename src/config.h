@@ -27,6 +27,7 @@ enum class TtsMode {
 struct Config {
     // [General]
     bool        enableConsole    = true;
+    int         initDelayMs      = 5000;  // UE4 初期化待機 (ms)
 
     // [Translation]
     std::string ollamaEndpoint   = "http://localhost:11434/api/generate";

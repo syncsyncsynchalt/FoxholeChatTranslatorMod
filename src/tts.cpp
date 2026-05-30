@@ -361,18 +361,11 @@ static OpenJtalkRc*               g_vvOpenJtalk   = nullptr;
 static VoicevoxSynthesizer*       g_vvSynthesizer = nullptr;
 
 static bool LoadSherpaLib(const std::string& ttsDir) {
-    // パッケージによって sherpa-onnx.dll か sherpa-onnx-c-api.dll の場合がある
-    const char* candidates[] = { "sherpa-onnx.dll", "sherpa-onnx-c-api.dll" };
-    std::string dllPath;
-    for (auto* name : candidates) {
-        dllPath = ttsDir + name;
-        g_sherpaLib = LoadLibraryExA(dllPath.c_str(), nullptr,
-            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-        if (g_sherpaLib) break;
-        logging::Debug("[TTS] %s ロード失敗 (err=%lu)", name, GetLastError());
-    }
+    std::string dllPath = ttsDir + "sherpa-onnx-c-api.dll";
+    g_sherpaLib = LoadLibraryExA(dllPath.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     if (!g_sherpaLib) {
-        logging::Debug("[TTS] sherpa-onnx DLL が見つかりません: %s", ttsDir.c_str());
+        logging::Debug("[TTS] sherpa-onnx-c-api.dll ロード失敗 (err=%lu): %s", GetLastError(), ttsDir.c_str());
         return false;
     }
 
@@ -388,7 +381,7 @@ static bool LoadSherpaLib(const std::string& ttsDir) {
         return false;
     }
 
-    logging::Debug("[TTS] sherpa-onnx.dll ロード完了");
+    logging::Debug("[TTS] sherpa-onnx-c-api.dll ロード完了");
     return true;
 }
 
@@ -852,6 +845,11 @@ static void TtsWorker() {
 
     logging::Debug("[TTS] ワーカー起動");
 
+    // Init() から移動: ゲーム起動後にローダーロック競合なしでロード
+    if (!g_sherpaLib) LoadSherpaLib(g_ttsDir);
+    if (!g_vvReady)   InitVoicevox(g_ttsDir);
+    tts_install::StartIfNeeded(g_ttsDir, g_ttsLanguage);
+
     while (g_ttsRunning.load()) {
         TtsRequest req;
         {
@@ -1115,17 +1113,7 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevox
         baseDir.resize(baseDir.size() - (sizeof(kSuffix) - 1));
     LoadTtsReadings(baseDir + "tts_readings.txt");
 
-    bool sherpaOk = LoadSherpaLib(g_ttsDir);
-    InitVoicevox(g_ttsDir);
-
-    // 不足コンポーネントをバックグラウンドで自動インストール
-    tts_install::StartIfNeeded(g_ttsDir, g_ttsLanguage);
-
-    if (!sherpaOk && !g_vvReady) {
-        logging::Debug("[TTS] TTS エンジン未検出 - インストール完了後に自動ロード");
-        // fall through: スレッドを起動して hot-reload ループに任せる
-    }
-
+    // DLL ロードは TtsWorker 内で行う（ゲーム起動のローダーロック競合を避けるため）
     g_ttsRunning.store(true);
     g_ttsThread = std::thread(TtsWorker);
 }

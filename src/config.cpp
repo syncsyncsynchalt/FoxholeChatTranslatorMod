@@ -40,8 +40,9 @@ void config::Load(const char* baseDir) {
     std::string dir = baseDir ? baseDir : "";
     std::string configPath = dir + "config.ini";
 
-    g_config.enableConsole    = GetPrivateProfileIntA("General", "EnableConsole", 1, configPath.c_str()) != 0;
-    g_config.demoMode         = GetPrivateProfileIntA("General", "DemoMode",      1, configPath.c_str()) != 0;
+    g_config.enableConsole    = GetPrivateProfileIntA("General", "EnableConsole", 1,    configPath.c_str()) != 0;
+    g_config.initDelayMs      = GetPrivateProfileIntA("General", "InitDelayMs",  5000, configPath.c_str());
+    g_config.demoMode         = GetPrivateProfileIntA("General", "DemoMode",     1,    configPath.c_str()) != 0;
 
     g_config.ollamaEndpoint   = ReadIniStr(configPath.c_str(), "Translation", "OllamaEndpoint",   "http://localhost:11435/api/generate");
     g_config.performancePreset = ReadIniStr(configPath.c_str(), "Translation", "PerformancePreset", "Medium");

@@ -713,11 +713,10 @@ void ollama::Init(const std::string& ollamaDir, const std::string& endpoint) {
     g_restartAttempt.store(0);
 
     if (g_managed) {
-        logging::Debug("[Ollama] ローカルエンドポイント: 自動管理モード");
-        if (!EnsureRunning()) {
-            logging::Debug("[Ollama] 初期化失敗 - 自動リトライを開始");
-            g_restartRequested.store(true);
-        }
+        // 同期的な EnsureRunning() は行わず HealthWorker に委譲する
+        // （ゲーム起動中に最大 30 秒ブロックするのを防ぐため）
+        logging::Debug("[Ollama] ローカルエンドポイント: HealthWorker に起動を委譲");
+        g_restartRequested.store(true);
     } else {
         logging::Debug("[Ollama] リモートエンドポイント: 接続のみモード");
     }
