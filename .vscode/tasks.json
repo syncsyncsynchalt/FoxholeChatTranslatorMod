@@ -77,6 +77,22 @@
       "problemMatcher": "$msCompile"
     },
     {
+      "label": "Toggle Mod (Enable/Disable)",
+      "type": "shell",
+      "command": "cmd",
+      "args": ["/c", "toggle_mod.bat"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Uninstall",
       "type": "shell",
       "command": "cmd",
