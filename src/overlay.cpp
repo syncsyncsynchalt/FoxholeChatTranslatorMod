@@ -61,6 +61,11 @@ static std::mutex               g_textMutex;
 static std::deque<MessageEntry> g_entries;
 static const size_t             kMaxEntries = 5;
 
+// TTS 再生中に届いたメッセージを一時保留するキュー (g_textMutex で保護)
+struct PendingMsg { std::string sender; std::string message; };
+static std::deque<PendingMsg> g_pendingMessages;
+static const size_t kMaxPending = 8;
+
 static float g_scrollOrig  = 0.0f; // 最新エントリの原文スクロール
 static float g_scrollTrans = 0.0f; // 最新エントリの訳文スクロール
 
@@ -259,6 +264,37 @@ static void RenderFrame() {
     float totalH = kPadY + lineHWS + lineHWS + kPadY;
 
     g_textChanged.exchange(false);
+
+    // TTS + 翻訳パイプラインが空いたら pending キューの次メッセージを処理する
+    // (描画スレッドで呼ぶが translate::Queue / tts::IsBusy はスレッドセーフ)
+    if (config::GetTtsMode() != TtsMode::Off && !translate::IsBusy() && !tts::IsBusy()) {
+        PendingMsg next;
+        bool hasPending = false;
+        {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            if (!g_pendingMessages.empty()) {
+                next = std::move(g_pendingMessages.front());
+                g_pendingMessages.pop_front();
+                hasPending = true;
+            }
+        }
+        if (hasPending) {
+            TranslationMode mode = config::GetTranslationMode();
+            {
+                std::lock_guard<std::mutex> lock(g_textMutex);
+                if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+                g_entries.push_back({next.sender, next.message, "", mode != TranslationMode::Off,
+                                     std::chrono::steady_clock::now()});
+                g_scrollOrig  = 0.0f;
+                g_scrollTrans = 0.0f;
+            }
+            g_textChanged.store(true);
+            if (mode != TranslationMode::Off) {
+                translate::Queue("", next.sender, next.message, mode, config::GetTtsMode());
+            }
+            logging::Debug("[Overlay] pending -> 処理: %s", next.message.c_str());
+        }
+    }
 
     // デモモード: タイマー駆動でメッセージを切り替え
     if (config::Get().demoMode) {
@@ -629,6 +665,19 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
             logging::Debug("[Overlay] 1単語のためスキップ: %s", trimmed.c_str());
             return;
         }
+    }
+
+    // TTS オンかつ翻訳/TTS パイプライン処理中は pending バッファへ退避し、
+    // パイプラインが空いたタイミング (RenderFrame) で順番に処理する
+    if (config::GetTtsMode() != TtsMode::Off &&
+        (translate::IsBusy() || tts::IsBusy())) {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        if (g_pendingMessages.size() >= kMaxPending)
+            g_pendingMessages.pop_front();
+        g_pendingMessages.push_back({sender, message});
+        logging::Debug("[Overlay] TTS 再生中につき pending (%zu件): %s",
+                       g_pendingMessages.size(), message.c_str());
+        return;
     }
 
     TranslationMode mode = config::GetTranslationMode();
