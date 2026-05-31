@@ -35,12 +35,14 @@ petrol i
 QRF
 SPG
 GBs?
+gunboats? i
 AA
 BTs?
 APC
 APCs?
 LTs?
 HTs?
+halftracks? i
 HTDs?
 WTDs?
 LUV
@@ -90,6 +92,10 @@ WC
 Partisans? i
 Satchels? i
 Hexes? i
+
+# マップリージョン略称
+KC
+Marban i
 
 # マップリージョン名 (全 56 hex)
 # "The X" 系は "The X" 形式と "X" 単体の両方を収録 (The Gutter / The Fingers / The Moors は誤マッチ回避のため全文形式のみ)
