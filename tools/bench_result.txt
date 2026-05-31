@@ -1,0 +1,307 @@
+
+============================================================
+Model: phi4-mini:latest  num_ctx=256
+============================================================
+
+  [current prompt]
+    [ 1] 6.0s  49tok/s  26chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: 我々は前線に即座にAT砲3門と野戦砲2門が必要です。
+    [ 2] 2.7s  49tok/s  23chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: 敵の戦車が北から押し寄せている、即時支援要請！
+    [ 3] 3.0s  40tok/s  39chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: ストックピールは弾薬とBMATが不足しているため、補給をリクエストしています。
+    [ 4] 3.1s  42tok/s  43chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: 全ての建設班、ロック・モースに移動し、新しい前進基地を構築することが命じられています。
+    [ 5] 2.8s  42tok/s  25chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: 線を保持しろ！彼らが橋を渡させないようにしておけ！
+    [ 6] 2.7s  36tok/s  17chars
+         EN: Good fight guys, that was intense
+         JA: いい戦いだよ、かなり激しかったね。
+    [ 7] 3.0s  41tok/s  35chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: 誰か拾ってくれますか？境界基地でトラックがないので立ち往生しています。
+    [ 8] 3.1s  40tok/s  45chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: 丘の上にいるスナipersを注意してください、彼はそこにキャンプしてきた時間が２０分です。
+    [ 9] 2.8s  38tok/s  20chars
+         EN: We captured the town hall, moving to the next objective
+         JA: 町役場を捕獲し、次の目標に移動しました。
+    [10] 2.9s  41tok/s  28chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: 南のトレンチに医療兵を要請します、複数の負傷者がいます。
+    [11] 2.8s  38tok/s  26chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: ログインが入り、ホームベースへの配達を行っています。
+    [12] 2.8s  35tok/s  19chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: 敵の歩兵、森におよそ10-15人ほど。
+    [13] 2.8s  39tok/s  21chars
+         EN: GG, well played everyone
+         JA: GG、皆さんのプレイをうまくやりましたね！
+    [14] 2.9s  39tok/s  31chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: 誰かガスマスクを持っていますか？ここでガスにされているんです。
+    [15] 2.7s  36tok/s  12chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: 撤退！後方防衛線に戻る！
+
+  [concise prompt]
+    [ 1] 3.0s  41tok/s  23chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: 前線に急速にATガン3台と野砲2門が必要です。
+    [ 2] 3.0s  38tok/s  27chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: 北からの敵戦車が押し寄せている、即座に支援が必要です！
+    [ 3] 3.0s  41tok/s  34chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: ストックピールは弾薬と銃剣が不足しているため、補給を依頼しています。
+    [ 4] 2.9s  41tok/s  29chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: 全ての建設者、ロック・モースに新しい前線基地を構築中です。
+    [ 5] 2.6s  34tok/s  10chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: 橋を渡るのを止めろ！
+    [ 6] 2.7s  39tok/s  16chars
+         EN: Good fight guys, that was intense
+         JA: いい戦いだ、かなり激しかったよ。
+    [ 7] 3.0s  37tok/s  32chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: 誰か拾ってくれますか？境界基地でトラックがないので困っています。
+    [ 8] 3.0s  41tok/s  43chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: 丘の上にいるスナipersを見ておいてください、彼はここで20分間キャンプしています。
+    [ 9] 2.8s  40tok/s  20chars
+         EN: We captured the town hall, moving to the next objective
+         JA: 町役場を捕獲し、次の目標に移動しました。
+    [10] 3.0s  41tok/s  31chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: 南のトレンチに医療兵を急派する必要がある、複数の負傷者がいる。
+    [11] 2.8s  39tok/s  21chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: ロジは到着し、ホームベースへの配達を行う。
+    [12] 2.7s  39tok/s  18chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: 敵の歩兵は森に約10～15人います。
+    [13] 2.8s  39tok/s  17chars
+         EN: GG, well played everyone
+         JA: グッドゲーム、皆さんも頑張ったよ！
+    [14] 2.9s  36tok/s  29chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: ガスマスクはありますか？ここでガスにさらされているんです。
+    [15] 2.7s  40tok/s  16chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: 撤退！予備線に戻るよう命令だよ。
+
+============================================================
+Model: llama3.2:3b  num_ctx=256
+============================================================
+
+  [current prompt]
+    [ 1] 5.8s  61tok/s  29chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: 私たちの前線にすぐに3挺のATガンと2挺の野砲を必要です。
+    [ 2] 2.6s  59tok/s  27chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: 敵の戦車が北から押し進んでおり、即座に支援が必要です。
+    [ 3] 2.9s  47tok/s  31chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: 兵器庫は銃とBMATの供給が不足しているため、補充を求めている
+    [ 4] 2.7s  48tok/s  24chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: みんなの建物作りをロッチモースに、前進基地を作る
+    [ 5] 2.8s  45tok/s  29chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: お守りをとってください！橋を渡ることを許さないでください。
+    [ 6] 2.6s  33tok/s  9chars
+         EN: Good fight guys, that was intense
+         JA: すごい戦い、激しい
+    [ 7] 3.0s  45tok/s  40chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: 誰か私を拾ってください。境界基地に止まっています。トラックがなくて困っています。
+    [ 8] 2.9s  48tok/s  38chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: 山の上のスナイパーに注意してください。彼は20分間そこにいることがあります。
+    [ 9] 2.7s  42tok/s  17chars
+         EN: We captured the town hall, moving to the next objective
+         JA: まちの役所を占領し、次の目標に進む
+    [10] 2.7s  49tok/s  20chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: 南の堀口で医療員が必要です、多数の負傷者
+    [11] 2.7s  45tok/s  24chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: ロジスティック部隊が移動中、配送を本拠地に届ける
+    [12] 2.7s  42tok/s  18chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: 敵の歩兵が森林にいた、約10〜15名
+    [13] 2.6s  42tok/s  20chars
+         EN: GG, well played everyone
+         JA: GG、みんなの勝ち負けを楽しんでください
+    [14] 2.7s  45tok/s  27chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: 誰かガスマスクを持っている？ここではガスを吸われている
+    [15] 2.5s  43tok/s  10chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: 後退！補給線に戻る。
+
+  [concise prompt]
+    [ 1] 2.8s  53tok/s  117chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: We urgently require three anti-tank guns and two field artillery pieces to be de
+    [ 2] 2.6s  47tok/s  79chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: North is being attacked by enemy tanks, we must provide assistance immediately.
+    [ 3] 2.7s  45tok/s  68chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: We're almost out of rifles and BMATs, can we get some more supplies?
+    [ 4] 2.6s  43tok/s  52chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: We are constructing a new forward base at Loch Mors.
+    [ 5] 2.5s  40tok/s  31chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: Defend the bridge at all costs!
+    [ 6] 2.6s  32tok/s  12chars
+         EN: Good fight guys, that was intense
+         JA: 戦いは激しいものだった。
+    [ 7] 2.8s  42tok/s  89chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: Someone please come and rescue me, as I am stranded at the border base without a
+    [ 8] 2.7s  43tok/s  87chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: Be cautious of the sniper stationed on the hill, who has remained there for 20 m
+    [ 9] 2.7s  41tok/s  77chars
+         EN: We captured the town hall, moving to the next objective
+         JA: We took control of the town hall and are now heading towards the next target.
+    [10] 2.8s  48tok/s  123chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: We urgently need medical personnel to be sent to the southern trench immediately
+    [11] 2.6s  43tok/s  75chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: Enemy logistics are approaching and will be arriving at their headquarters.
+    [12] 2.7s  46tok/s  69chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: There are approximately 10 to 15 enemy soldiers hiding in the forest.
+    [13] 2.4s  41tok/s  21chars
+         EN: GG, well played everyone
+         JA: Everyone played well.
+    [14] 2.9s  43tok/s  84chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: Is there anyone who has a gas mask, because I'm getting sick from the gas over h
+    [15] 2.5s  36tok/s  48chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: Fall back immediately to the defensive position.
+
+============================================================
+Model: qwen2.5:3b  num_ctx=256
+============================================================
+
+  [current prompt]
+    [ 1] 5.3s  61tok/s  41chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: 我们需要3門AT砲と2門fieldartyillery前方に即時派遣してください。
+    [ 2] 2.6s  60tok/s  19chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: 北から戦車が進撃中、即応支援必要です！
+    [ 3] 2.7s  53tok/s  31chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: 弾薬庫はライフルとB-MATが不足しており、補給を要求します。
+    [ 4] 2.8s  46tok/s  30chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: すべての建設者、ローグ・モアスへ、新しい前線基地を建設します
+    [ 5] 2.7s  43tok/s  19chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: 陣を固めろ！彼らが橋を渡らないように！
+    [ 6] 2.6s  39tok/s  23chars
+         EN: Good fight guys, that was intense
+         JA: 良い戦い guys, それは激しいものでしたね
+    [ 7] 2.7s  43tok/s  30chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: 誰か来迎してくれる？トラックがないので境界基地で詰まっている
+    [ 8] 2.7s  44tok/s  24chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: 注意、山にいる Sniper は20分待機中です
+    [ 9] 2.6s  37tok/s  23chars
+         EN: We captured the town hall, moving to the next objective
+         JA: 我们佔領了Town Hall，移向下一个目标。
+    [10] 2.6s  40tok/s  36chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: 医者が必要、現在南部壕で_multiple casualty sがある。
+    [11] 2.6s  39tok/s  22chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: 物流が運びを入れ、基地に戻る準備をしています
+    [12] 2.6s  42tok/s  21chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: 森の中の敵 Infantry約10～15人
+    [13] 2.6s  37tok/s  14chars
+         EN: GG, well played everyone
+         JA: GG, みんなでよくやったね
+    [14] 2.7s  42tok/s  27chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: 何人かガスマスクありますか？ここでガス被弾しています。
+    [15] 2.6s  43tok/s  16chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: 撤退！後方線に退避してください！
+
+  [concise prompt]
+    [ 1] 2.8s  48tok/s  25chars
+         EN: We need 3 AT guns and 2 field artillery at the front ASAP
+         JA: 現在前方で3門のAT砲と2門の野战炮緊急需要です。
+    [ 2] 2.7s  43tok/s  19chars
+         EN: Enemy tanks pushing from the north, need immediate support!
+         JA: 北から戦車が進出中、即応支援必要です！
+    [ 3] 2.7s  48tok/s  32chars
+         EN: Stockpile is running low on rifles and bmats, requesting res
+         JA: マシンガンとビマーのストックが尽きており、補給を要請しています。
+    [ 4] 2.9s  50tok/s  40chars
+         EN: All builders to Loch Mors, we're building a new forward base
+         JA: 全工 builders 群は シル・モールで 新しい 前方 根拠地 を建設中です
+    [ 5] 2.6s  36tok/s  17chars
+         EN: Hold the line! Don't let them cross the bridge!
+         JA: 橋を越されないようにラインを守れ！
+    [ 6] 2.7s  40tok/s  26chars
+         EN: Good fight guys, that was intense
+         JA: guys、いい戦いでしたね、それは激しかったです 。
+    [ 7] 2.8s  48tok/s  34chars
+         EN: Can someone pick me up? I'm stuck at the border base with no
+         JA: 誰か来てくれません？私は路線基地でトラックがないので詰まっています。
+    [ 8] 2.7s  44tok/s  25chars
+         EN: Watch out for the sniper on the hill, he's been camping ther
+         JA: 注意、山にいる Sniper は20分待機中です。
+    [ 9] 2.6s  44tok/s  18chars
+         EN: We captured the town hall, moving to the next objective
+         JA: 町長楼を奪取、次の目標に向かいます。
+    [10] 2.6s  46tok/s  38chars
+         EN: Need medics at the southern trench NOW, multiple casualties
+         JA: 緊急、南部壕で_multiple casualty s_の医療支援が必要です
+    [11] 2.7s  45tok/s  19chars
+         EN: Logi run incoming, making a delivery to home base
+         JA: ロギーの攻撃が入る、基地に戻す準備を。
+    [12] 3.0s  48tok/s  55chars
+         EN: Enemy infantry in the forest, about 10-15 soldiers
+         JA: 森で約10～15人の Infantry 正面に、森林で約10～15人規模の Infantry ような状況です。
+    [13] 2.5s  36tok/s  17chars
+         EN: GG, well played everyone
+         JA: みんなで素晴らしい戦いをしましたね
+    [14] 2.7s  40tok/s  23chars
+         EN: Anyone have a gas mask? Getting gassed out here
+         JA: 誰かガスマスクあります？ここはガスでやられそう
+    [15] 2.6s  43tok/s  14chars
+         EN: Retreat! Fall back to the reserve line!
+         JA: 撤退！後方線に退避するのだ！
+
+
+============================================================
+SUMMARY
+============================================================
+Model                  Prompt      Avg(s)  Med(s)   tok/s  Avg len
+------------------------------------------------------------------
+phi4-mini:latest       current       3.08    2.84      40     27.3
+phi4-mini:latest       concise       2.85    2.91      39     24.4
+llama3.2:3b            current       2.92    2.72      46     24.2
+llama3.2:3b            concise       2.67    2.69      43     68.8
+qwen2.5:3b             current       2.82    2.64      45     25.1
+qwen2.5:3b             concise       2.71    2.69      44     26.8

@@ -1,0 +1,369 @@
+
+============================================================
+Preset: Low  model=gemma3:1b
+============================================================
+  [Low/EN/Short] 4.61s (cold)
+    src: Need ammo now!
+    dst: Need some bullets, please.
+  [Low/EN/Short] 2.50s 
+    src: GG, well played!
+    dst: 頑張って、よくやったね！
+  [Low/EN/Short] 2.46s 
+    src: Enemy at the gate!
+    dst: Enemy’s coming!
+  [Low/EN/Medium] 2.77s 
+    src: Enemy tanks pushing from the north, need immediate support!
+    dst: Enemy tanks are coming from the north, we need help fast!
+  [Low/EN/Medium] 2.75s 
+    src: Stockpile is running low on rifles and bmats, need resupply.
+    dst: 弾庫に武器が減ってきてるから、補充が必要だよ。
+  [Low/EN/Medium] 2.69s 
+    src: Hold the line, don't let them cross the bridge!
+    dst: Stay strong, don’t let them get past the crossing.
+  [Low/EN/Long] 2.75s 
+    src: We need 3 AT guns and 2 field artillery at the front ASAP.
+    dst: Need some quick AT and field artillery firepower ASAP, okay?
+  [Low/EN/Long] 2.81s 
+    src: Watch out for the sniper on the hill, he's been camping ther
+    dst: Beware the sniper – he’s been setting up a base for a while.
+  [Low/EN/Long] 2.87s 
+    src: Can someone pick me up? I'm stuck at the border base with no
+    dst: やない、誰か来てくれる？　境界基地に一人でいるんだ。
+  [Low/RU/Short] 2.54s 
+    src: Нужны патроны!
+    dst: Need some ammo!
+  [Low/RU/Short] 2.72s 
+    src: Хорошая игра, молодцы!
+    dst: Good game, guys!
+  [Low/RU/Short] 2.61s 
+    src: Враг у ворот!
+    dst: Enemy at the gate!
+  [Low/RU/Medium] 2.65s 
+    src: Вражеские танки с севера, нужна немедленная поддержка!
+    dst: Enemy tanks from the north need immediate assistance!
+  [Low/RU/Medium] 2.72s 
+    src: Запасы оружия и материалов на исходе, нужно пополнение.
+    dst: Ammo and materials are running low, we need more.
+  [Low/RU/Medium] 2.68s 
+    src: Держите позицию, не давайте им перейти мост!
+    dst: Don’t let them cross the bridge!
+  [Low/RU/Long] 2.78s 
+    src: Нам нужны три противотанковых орудия и два полевых орудия на
+    dst: Let’s move some tanks and some artillery forward, please!
+  [Low/RU/Long] 2.76s 
+    src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+    dst: Wait, there’s a sniper on the hill, he’s been sitting there 
+  [Low/RU/Long] 2.69s 
+    src: Кто-нибудь может меня подобрать? Я застрял на пограничной ба
+    dst: Help me out, anyone? Stuck at the border base without a car.
+  [Low/ZH/Short] 2.62s 
+    src: 需要弹药！
+    dst: Need ammo!
+  [Low/ZH/Short] 2.67s 
+    src: 打得好！
+    dst: Let’s go!
+  [Low/ZH/Short] 2.65s 
+    src: 敌人到了！
+    dst: Enemy’s here!
+  [Low/ZH/Medium] 2.68s 
+    src: 敌方坦克从北面推进，需要立即支援！
+    dst: Enemy tanks are advancing from the north, so we need to help
+  [Low/ZH/Medium] 2.70s 
+    src: 步枪和建材库存告急，请求补给。
+    dst: Gun and building supplies are running low, need some help!
+  [Low/ZH/Medium] 2.60s 
+    src: 守住阵地，不要让他们过桥！
+    dst: Stay strong, don’t let them cross the bridge!
+  [Low/ZH/Long] 2.69s 
+    src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+    dst: Let’s move some tanks and mortars to the front right immedia
+  [Low/ZH/Long] 2.77s 
+    src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+    dst: The sniper is still hiding in that spot, about an hour.
+  [Low/ZH/Long] 2.84s 
+    src: 有人能来接我吗？我被困在边境基地，没有卡车。
+    dst: Can someone pick me up? I’m stuck at the border base, no tru
+  [Low/KO/Short] 2.50s 
+    src: 탄약 필요!
+    dst: Ammo needed!
+  [Low/KO/Short] 2.57s 
+    src: 잘했어요!
+    dst: Good job!
+  [Low/KO/Short] 2.46s 
+    src: 적이 왔어!
+    dst: Enemy’s here!
+  [Low/KO/Medium] 2.59s 
+    src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+    dst: Let’s the north guys are coming, we need to give them some q
+  [Low/KO/Medium] 2.63s 
+    src: 소총과 자재가 부족해, 보급이 필요해.
+    dst: Gun and supplies are low, we need supplies.
+  [Low/KO/Medium] 2.74s 
+    src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+    dst: Keep watch, crossing isn’t allowed!
+  [Low/KO/Long] 2.64s 
+    src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+    dst: Need immediate AT and field support, man.
+  [Low/KO/Long] 2.69s 
+    src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+    dst: Beware the sniper on the hill – he’s been lurking there for 
+  [Low/KO/Long] 2.80s 
+    src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+    dst: Hey, who’s coming with me to the border station? Stuck in th
+
+============================================================
+Preset: Medium  model=phi4-mini:latest
+============================================================
+  [Medium/EN/Short] 10.98s (cold)
+    src: Need ammo now!
+    dst: 弾薬が必要です！
+  [Medium/EN/Short] 2.66s 
+    src: GG, well played!
+    dst: 頑張ったね！素晴らしいゲームだったよ。
+  [Medium/EN/Short] 2.55s 
+    src: Enemy at the gate!
+    dst: 敵が門前にいる！
+  [Medium/EN/Medium] 2.94s 
+    src: Enemy tanks pushing from the north, need immediate support!
+    dst: 北からの敵戦車が押し寄せている、すぐに支援が必要！
+  [Medium/EN/Medium] 2.95s 
+    src: Stockpile is running low on rifles and bmats, need resupply.
+    dst: 弾薬が不足しているので、銃とBMATの補給をお願いしたい。
+  [Medium/EN/Medium] 2.63s 
+    src: Hold the line, don't let them cross the bridge!
+    dst: 橋を渡るのを止めろ！
+  [Medium/EN/Long] 3.04s 
+    src: We need 3 AT guns and 2 field artillery at the front ASAP.
+    dst: 前線にAT砲3台と野戦砲2門を急いで送ってください。
+  [Medium/EN/Long] 3.05s 
+    src: Watch out for the sniper on the hill, he's been camping ther
+    dst: 丘の上にいるスナipersを見ておいてね、彼はここで20分間キャンプしてるよ。
+  [Medium/EN/Long] 2.85s 
+    src: Can someone pick me up? I'm stuck at the border base with no
+    dst: 誰か拾ってくれない？国境基地でトラックがなくて困っています。
+  [Medium/RU/Short] 2.49s 
+    src: Нужны патроны!
+    dst: 弾薬が必要です！
+  [Medium/RU/Short] 2.75s 
+    src: Хорошая игра, молодцы!
+    dst: いいゲームだね、頑張っているな！
+  [Medium/RU/Short] 2.67s 
+    src: Враг у ворот!
+    dst: 敵が門前にいるよ！
+  [Medium/RU/Medium] 2.94s 
+    src: Вражеские танки с севера, нужна немедленная поддержка!
+    dst: 北からの敵戦車が来ている、急いで援助を要請します！
+  [Medium/RU/Medium] 2.86s 
+    src: Запасы оружия и материалов на исходе, нужно пополнение.
+    dst: 弾薬と材料が尽きている、補充が必要です。
+  [Medium/RU/Medium] 2.68s 
+    src: Держите позицию, не давайте им перейти мост!
+    dst: 橋を渡るのを防ぎましょう！
+  [Medium/RU/Long] 2.94s 
+    src: Нам нужны три противотанковых орудия и два полевых орудия на
+    dst: 前線に対戦車砲3台と野戦砲2台が必要です。
+  [Medium/RU/Long] 2.88s 
+    src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+    dst: 注意、丘のスナipersが20分間同じ場所に座っている。
+  [Medium/RU/Long] 3.01s 
+    src: Кто-нибудь может меня подобрать? Я застрял на пограничной ба
+    dst: 誰かが私を拾ってくれる？私は国境基地で車なしに立ち往生しています。
+  [Medium/ZH/Short] 2.67s 
+    src: 需要弹药！
+    dst: 弾薬が必要です！
+  [Medium/ZH/Short] 2.63s 
+    src: 打得好！
+    dst: うまくやったね！
+  [Medium/ZH/Short] 2.58s 
+    src: 敌人到了！
+    dst: 敵が来たぞ！
+  [Medium/ZH/Medium] 2.93s 
+    src: 敌方坦克从北面推进，需要立即支援！
+    dst: 敵のタンクが北から進んでいるので、すぐに助けてください！
+  [Medium/ZH/Medium] 2.91s 
+    src: 步枪和建材库存告急，请求补给。
+    dst: 弾薬と建設材料が不足しているので、補給をお願いしたいんだ。
+  [Medium/ZH/Medium] 2.83s 
+    src: 守住阵地，不要让他们过桥！
+    dst: 防御位置を固めて、橋渡しを許さないでください。
+  [Medium/ZH/Long] 3.16s 
+    src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+    dst: 我々は即座に前線に3門の対戦車砲と2門の野砲を配置する必要があります。
+  [Medium/ZH/Long] 2.90s 
+    src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+    dst: 上の高地にいる狙撃兵がそこに20分間潜んでる気配だよ。
+  [Medium/ZH/Long] 3.06s 
+    src: 有人能来接我吗？我被困在边境基地，没有卡车。
+    dst: 誰かが来てくれる？辺境基地で車なしに閉じ込められているんだよ。
+  [Medium/KO/Short] 2.60s 
+    src: 탄약 필요!
+    dst: 弾薬が必要です！
+  [Medium/KO/Short] 2.61s 
+    src: 잘했어요!
+    dst: うまくやったね！
+  [Medium/KO/Short] 2.59s 
+    src: 적이 왔어!
+    dst: 敵が来たよ！
+  [Medium/KO/Medium] 2.97s 
+    src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+    dst: 北から敵のタンクが迫ってきているんだ、すぐに支援が必要！
+  [Medium/KO/Medium] 2.88s 
+    src: 소총과 자재가 부족해, 보급이 필요해.
+    dst: 弾薬と物資が不足しているので、補給が必要です。
+  [Medium/KO/Medium] 2.84s 
+    src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+    dst: 防御位置を守るのは大事だが、橋を渡ってはいけない！
+  [Medium/KO/Long] 2.82s 
+    src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+    dst: 前線にAT弾3発と野戦砲2門が急需です。
+  [Medium/KO/Long] 2.94s 
+    src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+    dst: 丘の上にいる敵を注意して、彼は約20分間そこに隠れている。
+  [Medium/KO/Long] 3.11s 
+    src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+    dst: 誰かが私を解放してくれる？トラックなしで国境の検問所に閉じ込められている。
+
+============================================================
+Preset: High  model=gemma3:4b
+============================================================
+  [High/EN/Short] 8.18s (cold)
+    src: Need ammo now!
+    dst: 弾切れだ！
+  [High/EN/Short] 2.94s 
+    src: GG, well played!
+    dst: よくやった、お疲れ様！
+  [High/EN/Short] 3.00s 
+    src: Enemy at the gate!
+    dst: 敵が門前に！ (Teki ga monmae ni!)
+  [High/EN/Medium] 3.28s 
+    src: Enemy tanks pushing from the north, need immediate support!
+    dst: 敵の戦車が北から押し寄せてる、すぐに援護が必要だ！
+  [High/EN/Medium] 3.32s 
+    src: Stockpile is running low on rifles and bmats, need resupply.
+    dst: 弾薬と防弾チョッキが底をつきそう、補給が必要だ。
+  [High/EN/Medium] 2.88s 
+    src: Hold the line, don't let them cross the bridge!
+    dst: 橋を渡らせないで、しっかり守ってくれ！
+  [High/EN/Long] 3.35s 
+    src: We need 3 AT guns and 2 field artillery at the front ASAP.
+    dst: 前線にすぐに3門の自走砲と2門の野砲が必要だよ。
+  [High/EN/Long] 3.40s 
+    src: Watch out for the sniper on the hill, he's been camping ther
+    dst: あの丘の狙撃手、20分もそこに張り付いてるから気をつけて。
+  [High/EN/Long] 3.41s 
+    src: Can someone pick me up? I'm stuck at the border base with no
+    dst: 誰か私をピックアップしてくれない？境界基地に車がないから詰まってる。
+  [High/RU/Short] 2.78s 
+    src: Нужны патроны!
+    dst: 弾切れだ！
+  [High/RU/Short] 2.94s 
+    src: Хорошая игра, молодцы!
+    dst: いいゲームだったね、すごい！
+  [High/RU/Short] 3.10s 
+    src: Враг у ворот!
+    dst: 敵が目の前だ！ (Teki ga me no mae da!)
+  [High/RU/Medium] 3.20s 
+    src: Вражеские танки с севера, нужна немедленная поддержка!
+    dst: 敵の戦車が北から来てる、すぐに援護して！
+  [High/RU/Medium] 3.10s 
+    src: Запасы оружия и материалов на исходе, нужно пополнение.
+    dst: 物資が底をつきかけてる、補充が必要だ。
+  [High/RU/Medium] 3.00s 
+    src: Держите позицию, не давайте им перейти мост!
+    dst: 橋を渡らせないで、陣を維持しろ！
+  [High/RU/Long] 3.28s 
+    src: Нам нужны три противотанковых орудия и два полевых орудия на
+    dst: 前線に対戦車砲３門と野砲２門を、すぐにでもください。
+  [High/RU/Long] 3.31s 
+    src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+    dst: スナイパーが丘にいるぞ、もう20分もずっとそこにいる。
+  [High/RU/Long] 3.22s 
+    src: Кто-нибудь может меня подобрать? Я застрял на пограничной ба
+    dst: 誰か迎えに来てくれない？ 境界基地で車がないから困ってる。
+  [High/ZH/Short] 2.73s 
+    src: 需要弹药！
+    dst: 弾が足りない！
+  [High/ZH/Short] 2.76s 
+    src: 打得好！
+    dst: いいショットだ！
+  [High/ZH/Short] 2.87s 
+    src: 敌人到了！
+    dst: 敵が来てる！
+  [High/ZH/Medium] 3.05s 
+    src: 敌方坦克从北面推进，需要立即支援！
+    dst: 敵が北から攻めてる、すぐ援護して！
+  [High/ZH/Medium] 3.09s 
+    src: 步枪和建材库存告急，请求补给。
+    dst: 弾と材料が足りない、支援を頼む。
+  [High/ZH/Medium] 2.89s 
+    src: 守住阵地，不要让他们过桥！
+    dst: 橋を渡らせないでくれ！
+  [High/ZH/Long] 3.27s 
+    src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+    dst: 前線にすぐに3門の自走砲と2門の野砲を配置しろ。
+  [High/ZH/Long] 3.22s 
+    src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+    dst: 狙撃手さんが山の上で二十分も潜んでるよ。
+  [High/ZH/Long] 3.37s 
+    src: 有人能来接我吗？我被困在边境基地，没有卡车。
+    dst: 誰か迎えに来てくれない？ 辺境基地に閉じ込められて、トラックがないんだ。
+  [High/KO/Short] 2.76s 
+    src: 탄약 필요!
+    dst: 弾をくれ！
+  [High/KO/Short] 2.77s 
+    src: 잘했어요!
+    dst: いい仕事だったね！
+  [High/KO/Short] 2.70s 
+    src: 적이 왔어!
+    dst: 敵が来た！
+  [High/KO/Medium] 3.30s 
+    src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+    dst: 敵の戦車が北から押し寄せてるから、すぐに援護して！
+  [High/KO/Medium] 3.00s 
+    src: 소총과 자재가 부족해, 보급이 필요해.
+    dst: 弾と材料が足りないから、補給が必要だ。
+  [High/KO/Medium] 3.00s 
+    src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+    dst: 陣を固めて、橋を渡らせないように！
+  [High/KO/Long] 2.99s 
+    src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+    dst: すぐにAT砲と野砲を3門ずつください。
+  [High/KO/Long] 3.17s 
+    src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+    dst: その山の上には、20分も潜んでる狙撃手を警戒しろ。
+  [High/KO/Long] 3.40s 
+    src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+    dst: 誰か俺を連れ出してくれない？トラックがないので国境基地に閉じ込められてる。
+
+
+============================================================
+SUMMARY — 中央値レイテンシ (s), ウォームキャッシュ
+============================================================
+
+--- EN ---
+プリセット          Short    Medium      Long
+----------------------------------------
+Low            2.48s     2.75s     2.81s
+Medium         2.61s     2.94s     3.04s
+High           2.97s     3.28s     3.40s
+
+--- RU ---
+プリセット          Short    Medium      Long
+----------------------------------------
+Low            2.61s     2.68s     2.76s
+Medium         2.67s     2.86s     2.94s
+High           2.94s     3.10s     3.28s
+
+--- ZH ---
+プリセット          Short    Medium      Long
+----------------------------------------
+Low            2.65s     2.68s     2.77s
+Medium         2.63s     2.91s     3.06s
+High           2.76s     3.05s     3.27s
+
+--- KO ---
+プリセット          Short    Medium      Long
+----------------------------------------
+Low            2.50s     2.63s     2.69s
+Medium         2.60s     2.88s     2.94s
+High           2.76s     3.00s     3.17s

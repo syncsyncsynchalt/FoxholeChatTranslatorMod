@@ -1,4 +1,8 @@
-# Ollama ベンチマーク結果 — プリセット比較 (2026-05-24)
+# Ollama ベンチマーク結果
+
+最終更新: 2026-06-01
+
+---
 
 ## 1. 実行環境
 
@@ -8,144 +12,131 @@
 | RAM | 15.4 GB |
 | GPU | NVIDIA GeForce RTX 3050 Ti Laptop GPU (4GB VRAM) |
 | OS | Windows 11 |
-| Ollama | 0.24.0 (GPU 対応ビルド、CUDA v12) |
-| 測定ツール | `translate_test.exe --benchmark` (速度) / 実ゲームセッション (品質) |
+| Ollama | 0.24.0 (CUDA v12) |
+| ベンチツール | `tools/bench_translate.py` (2026-06-01) |
+
+---
 
 ## 2. プリセット定義
 
-| プリセット | モデル | num_ctx | num_thread | temperature | num_predict |
-|-----------|--------|--------:|-----------:|------------:|------------:|
-| **Low** | gemma3:1b | 128 | 2 | 0.1 | 120 |
-| **Medium** | gemma3:4b | 256 | 0 (全コア) | 0.1 | 120 |
-| **High** | gemma3:4b | 512 | 0 (全コア) | 0.1 | 120 |
+| プリセット | モデル | サイズ | num_ctx | num_thread | temperature | num_predict |
+|-----------|--------|-------:|--------:|-----------:|------------:|------------:|
+| **Low** | gemma3:1b | 815 MB | 128 | 2 | 0.1 | 120 |
+| **Medium** | phi4-mini | 2.5 GB | 512 | 0 (全コア) | 0.1 | 120 |
+| **High** | gemma3:4b | 3.3 GB | 512 | 0 (全コア) | 0.1 | 120 |
 
-## 3. 速度比較 (ウォームキャッシュ平均、run 2–5)
+**翻訳プロンプト (JA モード):**
 
-**英語 (EN)**
+```
+[system] You are a Foxhole war-game chat translator.
+         Keep these game-specific terms exactly as-is: <マッチした保護語>.
+[prompt] Translate the following war-game chat into natural, casual Japanese.
+         Be concise — one short sentence. Paraphrase freely; keep key meaning.
+         Output ONLY the translated text.
+```
 
-| プリセット | Short(ms) | Medium(ms) | Long(ms) | tok/s |
-|-----------|----------:|-----------:|---------:|------:|
-| Low    |   451 |   511 |   759 |  90.8 |
-| Medium |   546 |   936 | 1,583 |  28.0 |
-| High   |   594 |   925 | 1,641 |  26.9 |
+system フィールドは保護語がゼロでも常時設定する。保護語がない場合は 2 文目を省略。
 
-**ロシア語 (RU)**
+---
 
-| プリセット | Short(ms) | Medium(ms) | Long(ms) | tok/s |
-|-----------|----------:|-----------:|---------:|------:|
-| Low    |   372 |   525 |   683 | 100.3 |
-| Medium |   601 |   983 | 1,622 |  26.8 |
-| High   |   589 | 1,017 | 1,614 |  26.9 |
+## 3. 速度比較
 
-**中国語 (ZH)**
+各言語 × 入力長 10 サンプルの中央値 (s)。ウォームキャッシュ (初回モデルロードを除外)。  
+Short: 短文 (〜5 語)、Medium: 通常文 (〜10 語)、Long: 長文 (15 語以上)。
 
-| プリセット | Short(ms) | Medium(ms) | Long(ms) | tok/s |
-|-----------|----------:|-----------:|---------:|------:|
-| Low    |   449 |   499 |   763 |  88.5 |
-| Medium |   638 |   992 | 1,915 |  26.7 |
-| High   |   633 | 1,017 | 1,939 |  26.4 |
+**EN → JA**
 
-**韓国語 (KO)**
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low    | 2.67 | 2.71 | 2.76 |
+| Medium | 2.70 | 2.86 | 3.08 |
+| High   | 2.90 | 3.08 | 3.34 |
 
-| プリセット | Short(ms) | Medium(ms) | Long(ms) | tok/s |
-|-----------|----------:|-----------:|---------:|------:|
-| Low    |   423 |   561 |   787 |  85.6 |
-| Medium |   603 |   930 | 1,676 |  26.8 |
-| High   |   586 |   930 | 1,699 |  26.9 |
+**RU → JA**
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low    | 2.61 | 2.71 | 2.78 |
+| Medium | 2.61 | 2.78 | 3.09 |
+| High   | 2.83 | 3.04 | 3.28 |
+
+**ZH → JA**
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low    | 2.63 | 2.73 | 2.77 |
+| Medium | 2.63 | 2.88 | 3.10 |
+| High   | 2.87 | 3.07 | 3.30 |
+
+**KO → JA**
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low    | 2.63 | 2.72 | 2.76 |
+| Medium | 2.66 | 2.82 | 3.01 |
+| High   | 2.84 | 3.03 | 3.28 |
+
+初回リクエスト (モデルロード込み): Low ~4.2 s、Medium ~9.7 s、High ~8.3 s。
+
+---
 
 ## 4. 翻訳品質比較
 
-◎=自然、○=意味は通じる、△=不自然・一部誤訳、✗=誤訳・未翻訳。
+◎=自然な日本語、○=意味は通じる、△=不自然・一部誤訳、✗=誤訳・英語出力
 
-### 英語 (EN) — プリセット比較 (合成ベンチマーク, run 1)
+例文は実際の translation_log.csv (2026-06-01) から採取したゲーム内チャットログ。
 
-| 原文 | Low | Medium | High |
-|------|-----|--------|------|
-| need ammo | 弾薬が欲しいです。〜のだ。△ | 弾が必要だのだ。◎ | 弾切れだのだ。○ |
-| build the gates back up we need defenses now | 門を再建して、防衛が必要だ。○ | 門を再構築しろ、今すぐ防御が必要だのだ。◎ | 門を再構築しろ、今すぐに防御が必要だのだ。◎ |
-| hey guys we need more people at the front line… | 友達、前線にさらに人数が必要だ。敵は押し寄せてきているし、物資が少なくなってきたんだ。○ | おいみんな、前線に人員が必要だ、敵が激しく押し込んでいるし、物資も底をつきかけているのだ。◎ | おいみんな、前線に人員が必要だ、敵が容赦なく攻めていて、物資が底をつきかけているのだ。◎ |
+### EN→JA — Short (〜5語)
 
-### 英語 (EN) — フィールドデータ (Medium プリセット実測, 2026-05-24)
+| # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
+|---|------|:---------------|:------------------|:----------------|
+| 1 | ah fixed now | Fix it, please. ✗ | 今、修理しました。 ○ | 問題ないよ。 ○ |
+| 2 | NEED MORTARS TO MARBAN | Let's go, Mortars! ✗ | 必要な迫撃砲を持っているか確認する。 △ | ミサイルを投げて、敵陣を制圧したい。 ✗ |
+| 3 | GUN IS DEADDDDDDD | Gun's gone, man! ✗ | ガンは死んだよ！ ◎ | 砲撃が切れた！ ◎ |
+| 4 | 4 PIECES DEAD | やあ、みんな、4人の仲間が死んだ。 ○ | 死体が4つ出てきた。 △ | 四体死んだ。 ◎ |
+| 5 | 15 mins til planes | 飛行機、15分だよ。 ◎ | 飛行機が出発準備完了です。 △ | 飛行機が15分で来るよ。 ◎ |
+| 6 | ur not holding KC | You're not holding any crazy stuff, okay? ✗ | KCを保持していないよ。 ◎ | KCをキープしてないな。 ◎ |
+| 7 | GO BOYS GO | Let's go, boys, let's go! ✗ | ガンマンになれ！ ✗ | レッツ行こう！ △ |
+| 8 | nah game not dead | Game still running, no, not dead. ✗ | ゲームはまだ終わっていないよ。 ◎ | まだゲームは動いてるよ。 ◎ |
+| 9 | peko loves charlie players | ペコはチャリープレイヤーが好きだよ。 ◎ | ペコがチャーリーのプレイヤーを好きだよ。 ◎ | ピーコはチャーリープレイヤーが好きだね。 ○ |
+| 10 | even just a tiny bit | Please provide the chat you'd like me to translate! ✗ | 「ほんの少しでも」 ◎ | ちょっとでもいいよ。 ◎ |
 
-| 原文 | 翻訳結果 | 評価 | 備考 |
-|------|----------|------|------|
-| hows the fuel situation in speaking woods | スピーキングウッズの燃料状況はどうなっているのか？ | ◎ | |
-| WE ARE THE SOLE TALOS HOLDING THE FRONT | 我らは唯一のタロスであり、前線を握っているのだ。 | ◎ | |
-| need callums cape to prepare for filament to die please get cvs to th, hush has no bmats to spare for it. <3 :) | カラムスのカペが必要だ、フィラメントが死ぬのに対処するためだ、CVSにTHへ持ってきてもらうのだ、ハッシュはBMATを割く余裕がないのだ。<3 :) | ◎ | ゲーム略語混在でも文意保持 |
-| Bluefin hungers in Ashtown, needs all explosions (and the weapons for them) and shirts | 青フィンはアストーンで飢えているのだ、すべての爆発（そしてそれを作るための武器）とシャツが必要だのだ。 | ◎ | |
-| The merger will take place on Monday, May 25th in preparation for the war start on LIVE shard on Tuesday, May 26th at 1PM ET. Servers may be offline for an extended period of time on May 25th. | 月曜日、5月25日に、戦争開始に向けたライブシャードでの準備として、5月26日火曜日の13時ESTに戦争が始まるのだな。5月25日には、サーバーが長時間ダウンする可能性があるのだな。 | ◎ | 長文・日時情報を正確に保持 |
-| why cant I shoot my rocket? I think its bugged | ロケットが撃てない理由がわからない。バグってるんじゃないかと思うのだ。 | ◎ | |
-| guys our push is dying cuz our logi is being cut | みんな、私たちのプッシュが死んでいるのは、私たちのlogiが切り刻まれているからだな。 | ○ | 保護語 logi が維持された |
-| warden tanks pushing callahans gate | 警備隊の戦車がキャラーハンズのゲートを押し進めているのだ。 | ○ | 保護語失落→再翻訳。warden は消えたが文意は通じる |
-| huge warden tankline pushing cpass border | 巨大な warden タ ンクラインが Cパス境界を押し進むのだ。 | △ | 保護語復元は成功。「タ ンク」にトークン分割由来の余分スペース |
-| isnt that just war end then we have resistance phase for couple days | まさか、それだけ戦争で終わるのか、数日間の抵抗勢力があるのだか。 | △ | "resistance phase" → 「抵抗勢力」と意味ずれ |
+Low は 10 件中 7 件で英語出力。文脈のない短文 ("even just a tiny bit") ではプロンプトそのものを返すケースも。Medium・High は概ね安定するが、"GO BOYS GO" は全プリセットで誤訳傾向 (Medium: 意味不明、High: カタカナ英語混在)。"NEED MORTARS TO MARBAN" は地名 MARBAN を全プリセットが固有名詞と認識できず誤訳 → `term_protection.txt` での保護を推奨。
 
-### ロシア語 (RU) — プリセット比較 (合成ベンチマーク, run 1)
+### EN→JA — Medium (〜10語)
 
-| 原文 | Low | Medium | High |
-|------|-----|--------|------|
-| нужны патроны | Need cartridges. ✗ | 弾が必要だのだ。◎ | 弾が必要だのだ。◎ |
-| постройте ворота снова… | 作り直してくれ、今、防衛が必要だ。〜のだ △ | もう一度要塞を建ててください、今すぐ防衛が必要なのだ。○ | もう一度要塞を建ててください、今すぐ防衛が必要なのだ。○ |
-| всем отрядам отступить… | 皆さんから撤退点へ敵が突破して、私たちの方向に進んでいます。急いで撤退する必要があります。△ | 全隊員、集結地点へ退却せよ。敵は防衛線を突破し、我々の方向へ進んでいるのだ。◎ | 全隊員、集結地点へ退却せよ。敵は防衛線を突破し、我々の方向へ進んでいるのだ。◎ |
+| # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
+|---|------|:---------------|:------------------|:----------------|
+| 1 | be sure to build defenses as well. | しっかり防衛線を築きなさい。 ◎ | 防御も確実に構築してください。 ◎ | 陣地をしっかり築いてね。 ◎ |
+| 2 | i know thats why im annoyed lol | マジで、 annoyed なのよ。 △ | わかってるんだけど、それでイライラしているよ。 ◎ | マジで、それ知ってるからイライラしてるんだよ。 ◎ |
+| 3 | how would you even make water wet? | どうやって水に水をつけられるの？ ○ | 水を濡らすのはどうやってするんだろう？ ◎ | マジで、水はどうやって濡らすの？ ◎ |
+| 4 | why arent we taking the scurry gold? | どうして金稼ぎのゴミを置いてないの？ ✗ | なぜスクリューロイヤルゴールドを取っていないの？ △ | 金は取れないの？ ○ |
+| 5 | there's at least 9 wardens up north and 20+ collies | There are a lot of guards up north, and a bunch of dogs too. ✗ | 北には少なくとも９人のウォードナーがいて、２０以上のコリーもいる。 ◎ | 北には少なくとも9人の警備兵と、20人以上いるっぽい。 ○ |
+| 6 | i have aluminum dropping at north scrap in great march! | Aluminum's falling in the north scrap in the march. ✗ | 北部のグレートマーチでアルミニウムが落ちているよ！ ◎ | アルミが北スクラップで大行進中！ △ |
+| 7 | W devs for fixing the small train bug | Train bug fix is coming soon. ✗ | 小さな列車のバグを修正するために開発者たちがいるよ。 △ | バグの小さな電車を直してくれ、開発さん。 △ |
+| 8 | so how's the Saltbrussy front? Ya'll grabbed it yet? | Saltbrussy is still a mess, everyone's got it. ✗ | サルトブリッジの前線はどう？まだ奪取した？ ◎ | ソルトブリッシー前線はどう？まだ取れてる？ ◎ |
+| 9 | losing one slot for a 7,92 is not worth it imo | ちょっと、7,92の失ったスロットは、あんまり価値がないと思うんだ。 ◎ | スロットを1つ失っても、7.92mmは価値がないと思う。 ◎ | 7,92で1スロットを落とすのは、価値がないと思う。 ◎ |
+| 10 | any active fronts im lazy and dont wanna use live maps | やたらと活動しないから、マップを使わないよ。 ✗ | アクティブな戦線があるけど、気分が悪くてリアルタイムの地図を使わないんだ。 △ | 戦闘ラインに疲れた、マップも使いたくない。 ◎ |
 
-### ロシア語 (RU) — フィールドデータ (Medium プリセット実測, 2026-05-24)
+Low は 10 件中 4 件で英語出力。特にゲーム固有名詞 (wardens, collies, Saltbrussy) を含む文で失敗。Medium は全件日本語出力、地名・固有名詞の保持も良好。High は "i have aluminum dropping at north scrap in **great march**!" を "大行進中" と誤訳するなど地名の動詞化ミスが発生。"W devs" (= いい開発者) の意味は全プリセット未捕捉。
 
-| 原文 | 翻訳結果 | 評価 | 備考 |
-|------|----------|------|------|
-| в регионе моста Reaching River нехвватает реактивных гранат Ignifist 30 | モスト川の地域で、イグニス30型ミサイン弾が不足しているのだ。 | ○ | "Ignifist" → 「イグニス」音訳。typo (нехвватает) も正常処理 |
-| В регионе моста Reaching River нехватает патрон 44. калибра | レイクリング橋の地域で44口径弾薬が不足しているのだ。 | ○ | "Reaching River" の訳が前文と揺れ (「モスト川」→「レイクリング橋」) |
-| так привези их туда | それ、そっちに運んでくれのだ | ◎ | |
-| где сборочний цех для сегментов корабля??? | 船のセグメント用製造所はどこにあるのかね？ | ◎ | |
-| одно другому не мешает | 邪魔にはならないのだ | ○ | |
-| рядом с сухими доками | 乾のドカで近くにあるのだ | △ | 「ドック」→「ドカ」と音が崩れた |
-| я не логист, я пихота | 俺はロジストじゃない、俺はピコタのだ。 | △ | пихота (歩兵) が「ピコタ」と音訳のまま未訳 |
-| кто подскажет | 敵の配置を確認しろのだ。 | ✗ | 直前 "где сборочний цех" とのコンテキスト混入による完全誤訳 |
+### EN→JA — Long (15語以上)
 
-### 中国語 (ZH)
+| # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
+|---|------|:---------------|:------------------|:----------------|
+| 1 | one time I drove a bike at the wardens and they just all surrendered immediately out of sheer fear | えー、Wardenって、Bikesでぶっ壊して、すぐに降りました。 △ | 一度、警備員に自転車で突っ込んだら全員がただ怖さから降伏した。 ◎ | 一度、警備兵に自転車で突っ込んで、怖くてすぐに降参させたよ。 ◎ |
+| 2 | if your field is dropping aluminum let us know so we can melt it down quick! | アルミ片落とし、早く溶けたら教えてね！ △ | もしフィールドにアルミニウムが落ちているなら教えてください。急いで溶かしましょう！ ◎ | アルミが落ちてたら教えて！早く溶かしてね！ ◎ |
+| 3 | 10% chance 90% fail, they will have t2 in a couple hours, have to wait for gunboat | "Gotta wait, they're gonna have T2 in a couple hours..." ✗ | 約1割のチャンスで、残りは失敗する。数時間以内にt2が来るので、待つしかない。 ○ | ほぼ確実に失敗するけど、2時間ほどでT2が来るから、ガントリー待ちになるね。 ◎ |
+| 4 | Returning Veteran looking for people to play the game with .. new bros welcome to hang out too | Let's play some Foxhole, new friends, welcome! ✗ | 復帰兵士がゲームをする仲間を探している。新しい友達も歓迎！ ◎ | ベテランのやつが、一緒に遊んでくれる人を探してるよ、新規さんも大歓迎！ ◎ |
+| 5 | I hate to be the barer of bad news but Able wardens are the same | "I'm really bummed about the bad news, but the Wardens are awful." ✗ | いいなで、残念ながらアブレのウォーデンは同じだよ。 △ | アビリティの警備隊も同じく、残念です。 △ |
+| 6 | is it me or is tech going very fast this war. i feel like i blinked once and were almost to having halftracks | 技術がめっちゃくちゃになったね、まるで速攻で終わるみたいだ。 △ | 技術が本当に速く進んでいるように思える。ほぼ半トラックまで到達したかのようだった。 ◎ | 技術が急に進んでる気がするけど、気づけば半トラックも出てきちゃってる。 ◎ |
+| 7 | any heros want to help bring supplies to blackwatch so we can build it up? | みんな、Blackwatchに物資を届けて、勢力を増やすのに協力してくれ。 ○ | ヘロイズ、ブラックウォッチに物資を届けてくれる人がいますか？建設のために。 ◎ | 誰かヒーローがブラックウォッチに物資を運ぶのを手伝ってくれない？ ◎ |
+| 8 | not sure if PIFF is around this war, but Tammi and I are here to give updates | Tammi and I are here to tell you about the game. ✗ | PIFF ここにいるか不明ですが、タミと私は状況の更新をします。 ◎ | PIFF がいるかどうかわからないけど、タミと私は状況を報告します。 ◎ |
+| 9 | I have a Warden RPG gun boat that needs a owner. Already stocked with 30mm and RPGs | 俺の Warden 船にオーナーを探してるんだ。30mmとRPGが揃ってるよ。 ◎ | 私のウォーデンRPGガンボートは所有者が必要です。既に30mmとロケット推進弾を装備しています。 ◎ | 要人待ちのウォーデンRPGのボートで、30mmとRPGが積まれてるよ。 ○ |
+| 10 | HEYA! I am currently free to help out any players with questions regarding anything from, naval, logi, planes, tanks, and so on! | やあ、今、どんな質問でも聞いてるよ！ ◎ | こんにちは！現在、艦隊、物流、飛行機、戦車などの質問に対応する準備ができています。どうぞお気軽に聞いてくださいね！ ◎ | 何か質問があれば、いつでも手伝うよ！ ◎ |
 
-> 今回セッション (2026-05-24) で有意な中国語チャットなし。以下は合成ベンチマーク例。
+Low は 10 件中 4 件で英語出力。Medium・High は全件日本語で品質も良好。"Able wardens" (固有チーム名) は全プリセット共通で誤解釈 → 保護語登録推奨。"gunboat" の訳 (Medium: 省略、High: "ガントリー") はいずれも不正確だが文全体の意味は伝わる。
 
-| 原文 | Low | Medium | High |
-|------|-----|--------|------|
-| 需要弹药 | 需要弾薬です。〜のだ。△ | 弾薬が必要だのだ。◎ | 弾薬が必要だのだ。◎ |
-| 重建防线，我们需要立即防御 | 再構築防線を、直ちに防御する必要がある。〜のだ。△ | 防衛線を再構築し、即ち、防御する必要があるのだ。○ | 防衛線を再構築し、即ち、防御する必要があるのだ。○ |
-| 各位注意前线需要更多兵力… | 各位注意，前线需要更多兵力…（中国語のまま）✗ | 各位注意、前線には兵力が必要で、敵軍が猛烈な攻撃を加えています。補給がすでに深刻な状況で、すぐに支援をお願いしますのだ。◎ | 各位注意、前線には兵力が必要で、敵軍が猛烈な攻撃を加えています。補給がすでに深刻な状況で、すぐに支援をお願いしますのだ。◎ |
+---
 
-### 韓国語 (KO)
-
-> 今回セッション (2026-05-24) で韓国語チャットなし。以下は合成ベンチマーク例。
-
-| 原文 | Low | Medium | High |
-|------|-----|--------|------|
-| 탄약 필요 | 弾薬が必要だ。○ | 弾が必要だのだ。◎ | 弾が必要だのだ。◎ |
-| 적이 밀고 있습니다… | 敵が侵入を試みているので、防衛線を強化してください。○ | 敵が押し進んでいるのだ、防御線を強化するのだ。◎ | 敵が押し進んでいるのだ、防御線を強化するのだ。◎ |
-| 여러분 전선에… | 皆さん、戦線にさらに多くの兵士が必要です。敵が強く攻勢をかけていて、物資が不足しています。今すぐ支援が必要です。〜のだ ○ | 皆さん、前線にさらに多くの兵力が必要だのだ。敵が激しく押し込んでいる上に、補給が不足しているのだ。今すぐ支援が必要だのだ。◎ | 皆さん、前線にさらに多くの兵力が必要だのだ。敵が激しく押し込んでいる上に、補給が不足しているのだ。今すぐ支援が必要だのだ。◎ |
-
-## 5. 考察
-
-### 速度
-
-- Low は全言語・全テキスト長で最速。Long テキストで Medium/High の約 2 倍速い。
-- Medium と High の速度差は僅か (±5%)。num_ctx 256→512 でも GPU では速度劣化なし。
-- tok/s: Low が ~85–100 tok/s、Medium/High が ~27 tok/s。
-- ZH の Long は Medium/High で 1,900ms 超と他言語 (EN: 1,583ms、RU: 1,620ms) より遅い。出力トークン数が多いため。
-
-### 品質
-
-- **品質順: Medium ≥ High >> Low。** Medium と High は実質同一。
-- **Low の問題:**
-  - RU Short: 英語のまま出力 (gemma3:1b の多言語能力不足)
-  - ZH Long: 中国語のまま出力 (✗)
-  - Short/Medium 全般: Zundamon 指示を「〜のだ。」として末尾に直接付加するケースあり
-- **Medium フィールド評価 (2026-05-24 実測):**
-  - EN 10 件: ◎×6、○×2、△×2。略語・固有名詞が混在する戦闘用語でも概ね正確
-  - RU 8 件: ◎×2、○×3、△×2、✗×1。短い口語文で音訳崩れが発生しやすい
-  - 保護語失落は 3 件発生。2パス再翻訳で文意は保持されるが保護語が消えるケースあり
-  - コンテキスト混入誤訳 (RU「кто подскажет」→「敵の配置を確認しろ」) は num_ctx=256 の小ウィンドウが原因の可能性あり
-  - 「タ ンク」のような余分スペースは gemma3:4b のカタカナトークン分割の既知挙動
-
-## 6. 生データ
-
-`benchmark_presets.csv` (プロジェクトルート) に全 180 リクエストの詳細を記録 (速度ベンチマーク分)。
-
-再計測: `translate_test.exe --benchmark --output benchmark_presets.csv`
+生データ: `tools/bench_result_new.txt`
