@@ -1,34 +1,30 @@
 #pragma once
 // ============================================================
-// log.h - 共有ログシステム
-// デバッグログとチャットログの書き出しを一元管理
+// log.h - ログシステム（ダブルバッファ + バックグラウンドスレッド）
+// ゲームスレッドはキューに積むだけ。I/O は専用スレッドが担う。
 // ============================================================
 
 #include <cstdarg>
 
 namespace logging {
 
-// 初期化 (ログファイルのディレクトリを設定)
-// baseDir: 末尾に '\\' を含むディレクトリパス
+// 初期化。ログスレッドを起動する。
+// baseDir: 末尾 '\\' 付きディレクトリパス
 void Init(const char* baseDir, bool enableConsole);
 
-// シャットダウン (ファイルハンドルを閉じる)
+// シャットダウン。ログスレッドを停止しキューの残りをドレインする。
 void Shutdown();
 
-// デバッグログ出力 (debug_log.txt + コンソール)
+// デバッグログ (debug_log.txt + コンソール)。非ブロッキング。
 void Debug(const char* fmt, ...);
 
-// 進捗表示 (コンソールのみ、\r で同一行を上書き。ファイルには記録しない)
+// 進捗表示 (コンソール \r インプレースのみ)。インストール専用。
 void Progress(const char* fmt, ...);
 
-// チャットログ出力 (chat_log.txt)
-// logFilePath が空の場合は baseDir/chat_log.txt に出力
+// チャットログ (chat_log.txt)。非ブロッキング。
 void Chat(const char* channel, const char* sender, const char* message);
 
-// チャットログの出力先パスを設定
-void SetChatLogPath(const char* path);
-
-// 翻訳ペアログ出力 (translation_log.csv)
+// 翻訳ペアログ (translation_log.csv)。非ブロッキング。
 void Translation(const char* channel, const char* sender,
                  const char* original, const char* translated);
 
