@@ -318,15 +318,14 @@ static std::string RestoreTerms(std::string translated, const ReplacementMap& re
 // 翻訳コア
 // ============================================================
 
-// マッチした語だけを列挙した system プロンプトを組み立てる
+// system プロンプトを組み立てる (固有名詞があれば追記)
 static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
-    if (replacements.empty()) return "";
-    std::string s =
-        "You are a Foxhole game chat translator."
-        " NEVER translate these game-specific terms — keep them exactly as-is: ";
+    std::string s = "You are a Foxhole war-game chat translator.";
+    if (replacements.empty()) return s;
+    s += " Keep these game-specific terms exactly as-is: ";
     for (size_t i = 0; i < replacements.size(); ++i) {
         if (i > 0) s += ", ";
-        s += replacements[i].second;  // 実際にマッチした原語
+        s += replacements[i].second;
     }
     return s + ".";
 }
@@ -334,33 +333,34 @@ static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
 static std::string BuildPrompt(TranslationMode mode) {
     switch (mode) {
     case TranslationMode::JA:
-        return "Translate the following war game chat message into Japanese accurately."
-               " Keep the original meaning."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into natural, casual Japanese."
+               " Be concise — one short sentence. Paraphrase freely; keep key meaning."
+               " Output ONLY the translated text.";
     case TranslationMode::JAZ:
-        return "Translate the following war game chat message into Japanese."
+        return "Translate the following war-game chat into Japanese."
                " Use Zundamon's speech style: end sentences with なのだ or のだ occasionally."
-               " Keep it concise and natural."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+               " Be concise. Paraphrase freely."
+               " Output ONLY the translated text.";
     case TranslationMode::EN:
-        return "Translate the following war game chat message into English accurately."
-               " Keep the original meaning."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into concise, casual English."
+               " One short sentence. Paraphrase freely; keep key meaning."
+               " Output ONLY the translated text.";
     case TranslationMode::RU:
-        return "Translate the following war game chat message into Russian accurately."
-               " Keep the original meaning."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into natural, concise Russian."
+               " One short sentence. Paraphrase freely; keep key meaning."
+               " Output ONLY the translated text.";
     case TranslationMode::ZH:
-        return "Translate the following war game chat message into Chinese (Simplified) accurately."
-               " Keep the original meaning."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into concise Simplified Chinese."
+               " One short sentence. Paraphrase freely; keep key meaning."
+               " Output ONLY the translated text.";
     case TranslationMode::KO:
-        return "Translate the following war game chat message into Korean accurately."
-               " Keep the original meaning."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into natural, concise Korean."
+               " One short sentence. Paraphrase freely; keep key meaning."
+               " Output ONLY the translated text.";
     default:
-        return "Translate the following war game chat message into Japanese accurately."
-               " Output ONLY the translated text. No explanations, no extra sentences.";
+        return "Translate the following war-game chat into natural, casual Japanese."
+               " Be concise — one short sentence."
+               " Output ONLY the translated text.";
     }
 }
 
@@ -381,10 +381,10 @@ static std::string BuildRequestBody(const std::string& text, const std::string& 
     nlohmann::json req{
         {"model",   g_model},
         {"prompt",  prompt},
+        {"system",  systemPrompt},
         {"stream",  false},
         {"options", opts}
     };
-    if (!systemPrompt.empty()) req["system"] = systemPrompt;
     return req.dump();
 }
 
@@ -697,7 +697,7 @@ static void ApplyPreset(const std::string& preset) {
         g_temperature = 0.1f;
     } else if (preset == "Medium") {
         g_model       = "phi4-mini";
-        g_numCtx      = 256;
+        g_numCtx      = 512;
         g_numThread   = 0;
         g_temperature = 0.1f;
     } else { // Low
