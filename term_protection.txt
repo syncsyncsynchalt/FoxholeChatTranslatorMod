@@ -8,6 +8,9 @@
 # 例:
 #   Wardens? i   → warden / Warden / wardens / Wardens にマッチ
 #   QRF          → QRF のみにマッチ (大文字限定)
+#
+# 注意: \b は ECMAScript regex の仕様上、非 ASCII 文字 (ó, Ó 等) の
+#       直前では機能しない。そのような語は ASCII 代替も併記すること。
 
 # ファクション名・派閥ニックネーム
 Wardens? i
@@ -47,6 +50,10 @@ HTDs?
 WTDs?
 LUV
 MPT
+CV
+
+# 建設・補給略語
+FOB
 
 # 武器固有コードネーム (チャットに頻出する固有名)
 Bonesaw i
@@ -59,6 +66,25 @@ Bomastone i
 Tremola i
 Carnyx i
 Nukes? i
+
+# 車両シャシー・固有名称
+# Warden
+Devitt i
+Silverhand i
+Flood i
+Gallagher i
+Niska i
+Cullen i
+# Colonial
+Spatha i
+Falchion i
+Bardiche i
+Ranseur i
+Nemesis i
+Talos i
+Ballista i
+Scorpion i
+Ares i
 
 # 構造物・施設略語
 BBs?
@@ -99,6 +125,7 @@ Marban i
 
 # マップリージョン名 (全 56 hex)
 # "The X" 系は "The X" 形式と "X" 単体の両方を収録 (The Gutter / The Fingers / The Moors は誤マッチ回避のため全文形式のみ)
+# 注意: アクセント付き文字 (ó, Ó 等) を含む名称は ASCII 代替を併記
 Acrithia i
 Allod's Bight i
 Ash Fields i
@@ -118,12 +145,14 @@ Kalokai i
 King's Cage i
 Kuura Strand i
 Loch Mór i
+Loch Mor i
 Lykos Isle i
 Marban Hollow i
 Morgen's Crossing i
 Nevish Line i
 Olavi's Wake i
 Ónyx i
+Onyx i
 Origin i
 Palantine Berm i
 Pari Peak i
