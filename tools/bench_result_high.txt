@@ -1,0 +1,1309 @@
+[  1/360] Low/EN/Short 5.12s ✓ [cold]
+  src: ah fixed now
+  dst: 今、修正完了です。
+[  2/360] Low/EN/Short 2.53s ✓
+  src: NEED MORTARS TO MARBAN
+  dst: 今、マランを必要としている。
+[  3/360] Low/EN/Short 2.51s ✗
+  src: GUN IS DEADDDDDDD
+  dst: Gun is dead.
+[  4/360] Low/EN/Short 2.65s ✓
+  src: 4 PIECES DEAD
+  dst: ４人死んだ。
+[  5/360] Low/EN/Short 2.72s ✓
+  src: 15 mins til planes
+  dst: 15 分の時、飛行機が待っています。
+[  6/360] Low/EN/Short 2.64s ✓
+  src: ur not holding KC
+  dst: 君がKCを抱えてないんだ。
+[  7/360] Low/EN/Short 2.63s ✗
+  src: GO BOYS GO
+  dst: Let’s go, boys!
+[  8/360] Low/EN/Short 2.78s ✓
+  src: nah game not dead
+  dst: ゲームはまだ動いてない。
+[  9/360] Low/EN/Short 2.61s ✓
+  src: peko loves charlie players
+  dst: ペコはチャリープレイヤーが好きです。
+[ 10/360] Low/EN/Short 2.58s ✓
+  src: even just a tiny bit
+  dst: 戦いましょう。
+[ 11/360] Low/EN/Medium 2.58s ✓
+  src: be sure to build defenses as well.
+  dst: 防御を築くんだ。
+[ 12/360] Low/EN/Medium 2.70s ✓
+  src: i know thats why im annoyed lol
+  dst: つらいのに、なぜ怒ってるんだ？
+[ 13/360] Low/EN/Medium 2.68s ✓
+  src: how would you even make water wet?
+  dst: 水は乾かないようにどうすればいいの？
+[ 14/360] Low/EN/Medium 2.73s ✓
+  src: why arent we taking the scurry gold?
+  dst: なぜ、この金稼ぎのくずを奪ってないんだ？
+[ 15/360] Low/EN/Medium 2.70s ✓
+  src: there's at least 9 wardens up north and 20+ collies
+  dst: 北の方で9人以上の Wardenがいます。
+[ 16/360] Low/EN/Medium 2.70s ✓
+  src: i have aluminum dropping at north scrap in great march!
+  dst: 私は北のスクラップでアルミニウムを落とす。
+[ 17/360] Low/EN/Medium 2.68s ✓
+  src: W devs for fixing the small train bug
+  dst: 開発者、小さな列車の問題を修正してください。
+[ 18/360] Low/EN/Medium 2.76s ✓
+  src: so how's the Saltbrussy front? Ya'll grabbed it yet?
+  dst: 塩尻の戦い、どうなったの？　まだ掴んだ？
+[ 19/360] Low/EN/Medium 2.65s ✓
+  src: losing one slot for a 7,92 is not worth it imo
+  dst: それはちょっと、惜しいよ。
+[ 20/360] Low/EN/Medium 2.67s ✓
+  src: any active fronts im lazy and dont wanna use live maps
+  dst: 遅いので、何も使わないよ。
+[ 21/360] Low/EN/Long 2.87s ✓
+  src: one time I drove a bike at the wardens and they just all sur
+  dst: 自転車で走って、ワンドラーがすぐに全て降伏した。
+[ 22/360] Low/EN/Long 2.70s ✓
+  src: if your field is dropping aluminum let us know so we can mel
+  dst: アルミの降下を知れば、すぐに溶けるぞ。
+[ 23/360] Low/EN/Long 2.90s ✗
+  src: 10% chance 90% fail, they will have t2 in a couple hours, ha
+  dst: 90% fail, they’ll have a T2 in a couple hours, wait for a gu
+[ 24/360] Low/EN/Long 2.78s ✓
+  src: Returning Veteran looking for people to play the game with .
+  dst: 新しい仲間を待ってるよ、戦い方を知りたい人を探してるよ。
+[ 25/360] Low/EN/Long 2.82s ✓
+  src: I hate to be the barer of bad news but Able wardens are the 
+  dst: 私は悪い知らせを伝えるのが嫌だけど、アブル・連邦兵は同じです。
+[ 26/360] Low/EN/Long 2.81s ✓
+  src: is it me or is tech going very fast this war. i feel like i 
+  dst: 技術はすごく早く進んでるね、まるで blinked 一度でほぼ終わったみたいだ。
+[ 27/360] Low/EN/Long 2.77s ✗
+  src: any heros want to help bring supplies to blackwatch so we ca
+  dst: 兵士们想帮忙运送物资给黑瓦特，让我们加起来。
+[ 28/360] Low/EN/Long 2.83s ✓
+  src: not sure if PIFF is around this war, but Tammi and I are her
+  dst: ピフは今この戦争にいるけど、タミと俺はアップデートするよ。
+[ 29/360] Low/EN/Long 2.84s ✓
+  src: I have a Warden RPG gun boat that needs a owner. Already sto
+  dst: 私は Wardenの艦艇の所有者を探しています。すでに30mmとRPGを30個持っています。
+[ 30/360] Low/EN/Long 2.71s ✓
+  src: HEYA! I am currently free to help out any players with quest
+  dst: やあ、質問に答えるのに自由だよ！
+[ 31/360] Low/RU/Short 2.58s ✗
+  src: Нужны патроны!
+  dst: Need some bullets!
+[ 32/360] Low/RU/Short 2.71s ✓
+  src: Хорошая игра!
+  dst: 良いゲームだよ！
+[ 33/360] Low/RU/Short 2.59s ✗
+  src: Враг у ворот!
+  dst: Enemy at the gate!
+[ 34/360] Low/RU/Short 2.63s ✗
+  src: Отступаем!
+  dst: Let’s go!
+[ 35/360] Low/RU/Short 2.58s ✓
+  src: Смотри фланги!
+  dst: 見て、フラグ！
+[ 36/360] Low/RU/Short 2.60s ✗
+  src: Лоджи здесь.
+  dst: Лоджи здесь.
+[ 37/360] Low/RU/Short 2.57s ✓
+  src: Вперёд!
+  dst: आगेへ！
+[ 38/360] Low/RU/Short 2.59s ✗
+  src: Нужен медик!
+  dst: Need a medic!
+[ 39/360] Low/RU/Short 2.63s ✗
+  src: Держи позицию!
+  dst: Keep your position!
+[ 40/360] Low/RU/Short 2.61s ✗
+  src: Молодцы, всем.
+  dst: Good, everyone.
+[ 41/360] Low/RU/Medium 2.70s ✗
+  src: Вражеские танки с севера, нужна немедленная поддержка!
+  dst: Enemy tanks from the north need immediate support.
+[ 42/360] Low/RU/Medium 2.82s ✓
+  src: Запасы оружия и материалов на исходе, нужно пополнение.
+  dst: 武器と材料の在庫が底をつける、補充が必要だ。
+[ 43/360] Low/RU/Medium 2.64s ✓
+  src: Держите позицию, не давайте им перейти мост!
+  dst: 止めて、橋渡させないで！
+[ 44/360] Low/RU/Medium 2.79s ✓
+  src: Все водители лоджи срочно на основную базу.
+  dst: ドライバー、ロジの運転を急いで、メインの基地へ。
+[ 45/360] Low/RU/Medium 2.59s ✓
+  src: Нам нужны строители на форпосте прямо сейчас.
+  dst: 今すぐ建設者が必要だよ。
+[ 46/360] Low/RU/Medium 2.77s ✗
+  src: В лесу замечена вражеская пехота, около 10 человек.
+  dst: 敵兵士在森林里，大约10人。
+[ 47/360] Low/RU/Medium 2.78s ✓
+  src: Кто может привезти грузовик на базу альфа?
+  dst: 誰かアルファの基地にトラックを運ぶ手伝ってもらえますか？
+[ 48/360] Low/RU/Medium 2.60s ✗
+  src: Ратуша под сильным ударом, нужна помощь!
+  dst: Fighting hard, need help!
+[ 49/360] Low/RU/Medium 2.79s ✗
+  src: Давим на восток, прикройте огнём.
+  dst: Let’s go east, cover the fire.
+[ 50/360] Low/RU/Medium 2.77s ✗
+  src: Есть лишние стройматериалы? Строим бункер здесь.
+  dst: Есть лишние стройматериалы? Строим бункер здесь.
+[ 51/360] Low/RU/Long 2.77s ✗
+  src: Нам нужны три противотанковых орудия и два полевых орудия на
+  dst: Need three anti-tank guns and two field guns on the front li
+[ 52/360] Low/RU/Long 2.82s ✓
+  src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+  dst: 注意、山に射撃手がいる、もう20分ずっと同じ場所に座っている。
+[ 53/360] Low/RU/Long 2.80s ✓
+  src: Кто-нибудь может меня подобрать? Застрял на пограничной базе
+  dst: 誰か助けてくれる人を見つけたいんだ。辺境の基地に車がない。
+[ 54/360] Low/RU/Long 2.84s ✗
+  src: Запасы критически низкие, нам срочно нужны рейсы лоджи к обо
+  dst: запасы критически низкие, нам срочно нужны рейсы лоджи к обо
+[ 55/360] Low/RU/Long 2.81s ✗
+  src: Враг сильно давит на правый фланг, нужна вся доступная пехот
+  dst: Enemy is heavily pressuring the right flank, need all availa
+[ 56/360] Low/RU/Long 2.73s ✗
+  src: Гарнизон вот-вот падёт, запрашиваю немедленное подкрепление 
+  dst: 兵舎要撤，急需立刻支援和装备。
+[ 57/360] Low/RU/Long 2.79s ✗
+  src: Через 10 минут придёт колонна снабжения, расчистите дорогу к
+  dst: 10 分后，运输队将到达，清理道路，前往主基地。
+[ 58/360] Low/RU/Long 2.75s ✓
+  src: Строю большой бункер на северном гексе, приходите помогать, 
+  dst: 作ってる 큰 방어 시설, 건설자들 와주세요.
+[ 59/360] Low/RU/Long 2.75s ✗
+  src: Все варденцы давите на север, пока колониальные отвлечены на
+  dst: Warden们压迫着北，而殖民地则分散到南边。
+[ 60/360] Low/RU/Long 2.75s ✗
+  src: Потеряли ратушу, отступаем ко вторичной линии обороны у мост
+  dst: Lost my shield, retreating to the second defensive line by t
+[ 61/360] Low/ZH/Short 2.56s ✓
+  src: 需要弹药！
+  dst: 弾薬が必要だ。
+[ 62/360] Low/ZH/Short 2.75s ✗
+  src: 打得好！
+  dst: Let’s go!
+[ 63/360] Low/ZH/Short 2.61s ✓
+  src: 敌人到了！
+  dst: 敵は来た！
+[ 64/360] Low/ZH/Short 2.56s ✗
+  src: 撤退！
+  dst: 退却！
+[ 65/360] Low/ZH/Short 2.67s ✗
+  src: 注意侧翼！
+  dst: 注意側翼！
+[ 66/360] Low/ZH/Short 2.74s ✗
+  src: 补给到了。
+  dst: Supplies are arriving.
+[ 67/360] Low/ZH/Short 2.51s ✓
+  src: 冲！
+  dst: 急げ！
+[ 68/360] Low/ZH/Short 2.68s ✗
+  src: 需要医疗！
+  dst: Need medical!
+[ 69/360] Low/ZH/Short 2.61s ✓
+  src: 守住阵地！
+  dst: 守るんだ！
+[ 70/360] Low/ZH/Short 2.62s ✓
+  src: 大家辛苦了。
+  dst: みんな、大変だ。
+[ 71/360] Low/ZH/Medium 2.80s ✓
+  src: 敌方坦克从北面推进，需要立即支援！
+  dst: 敵チームの戦車が北から押し寄せてくるので、すぐに支援が必要だ。
+[ 72/360] Low/ZH/Medium 2.75s ✓
+  src: 步枪和建材库存告急，请求补给。
+  dst: 銃と建材が急いでなくなるので、補給を頼む。
+[ 73/360] Low/ZH/Medium 2.71s ✗
+  src: 守住阵地，不要让他们过桥！
+  dst: Keep the line! Don’t let them cross the bridge!
+[ 74/360] Low/ZH/Medium 2.64s ✗
+  src: 所有补给车司机立即返回主基地。
+  dst: 給丁车司机立刻返回主基地。
+[ 75/360] Low/ZH/Medium 2.83s ✓
+  src: 我们需要建造者马上去前线基地。
+  dst: 私たちは戦士がすぐに前線基地に駆けに行くべきです。
+[ 76/360] Low/ZH/Medium 2.79s ✓
+  src: 在附近森林发现敌方步兵，约10人。
+  dst: 近くの森で敵兵士が見つかり、10人いる。
+[ 77/360] Low/ZH/Medium 2.72s ✓
+  src: 有人能把卡车开到阿尔法基地吗？
+  dst: 車をアルファ基地まで運んでくれる人、いますか？
+[ 78/360] Low/ZH/Medium 2.78s ✗
+  src: 市政厅正在遭受猛烈攻击，需要支援！
+  dst: Wardens are under attack, need help!
+[ 79/360] Low/ZH/Medium 2.66s ✗
+  src: 我们在向东推进，请提供火力掩护。
+  dst: 向東進軍，请提供火力支援。
+[ 80/360] Low/ZH/Medium 2.79s ✗
+  src: 有多余的建材吗？我们在这里建地堡。
+  dst: 建材多吗？我们在这里建地堡。
+[ 81/360] Low/ZH/Long 2.84s ✓
+  src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+  dst: 今すぐ前線に三門反坦克砲と二門野戦砲を配置する必要がある。
+[ 82/360] Low/ZH/Long 2.75s ✓
+  src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+  dst: 狙撃手は山の上で20分間潜んでいる。
+[ 83/360] Low/ZH/Long 2.90s ✗
+  src: 有人能来接我吗？我被困在边境基地，没有卡车。
+  dst: 誰能来接我吗？我被困在边境基地，没有卡车。
+[ 84/360] Low/ZH/Long 2.74s ✗
+  src: 库存严重不足，我们需要立即向两个狐穴运送补给。
+  dst: Supply is running low, we need to quickly transport supplies
+[ 85/360] Low/ZH/Long 2.84s ✓
+  src: 敌人正在猛烈攻击我们的右翼，需要所有可用步兵增援。
+  dst: 敵は右翼に猛烈な攻撃を仕掛けていて、すべての可用兵士を増援する必要がある。
+[ 86/360] Low/ZH/Long 2.74s ✗
+  src: 驻军即将失守，请求立即增援和补给。
+  dst: 将要失守的驻军请求立即增援和补给。
+[ 87/360] Low/ZH/Long 2.79s ✓
+  src: 十分钟后补给车队到来，请清理通往主基地的道路。
+  dst: 十分鐘後、補給車隊が到着するので、主基地的道順を整理してください。
+[ 88/360] Low/ZH/Long 2.75s ✓
+  src: 我正在北部六边形建造大型地堡基地，建造者们来帮忙。
+  dst: 私は北部の六角形に巨大な要塞基地を建設しています。
+[ 89/360] Low/ZH/Long 2.77s ✗
+  src: 所有督卫军向北推进，趁殖民军在南线被牵制时行动。
+  dst: Warden forces advance north, moving while colonists are bein
+[ 90/360] Low/ZH/Long 2.82s ✓
+  src: 我们失去了市政厅，正在撤退到桥边的次级防线。
+  dst: 私たちは市庁舎を失い、橋の斜面にある次善の防御線に撤退しています。
+[ 91/360] Low/KO/Short 2.56s ✓
+  src: 탄약 필요!
+  dst: 弾薬が必要だ。
+[ 92/360] Low/KO/Short 2.63s ✓
+  src: 잘했어요!
+  dst: 頑張ったよ！
+[ 93/360] Low/KO/Short 2.60s ✓
+  src: 적이 왔어!
+  dst: 敵が来たぞ！
+[ 94/360] Low/KO/Short 2.55s ✗
+  src: 후퇴!
+  dst: 退却！
+[ 95/360] Low/KO/Short 2.62s ✗
+  src: 측면 주시!
+  dst: Listen carefully!
+[ 96/360] Low/KO/Short 2.61s ✗
+  src: 보급 왔어.
+  dst: Supply arrived.
+[ 97/360] Low/KO/Short 2.58s ✗
+  src: 돌격!
+  dst: Let’s go!
+[ 98/360] Low/KO/Short 2.62s ✗
+  src: 의무병 필요!
+  dst: Need a medic!
+[ 99/360] Low/KO/Short 2.65s ✗
+  src: 진지 사수!
+  dst: Let’s go, Warden!
+[100/360] Low/KO/Short 2.50s ✓
+  src: 수고했어요.
+  dst: 頑張ってね。
+[101/360] Low/KO/Medium 2.81s ✓
+  src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+  dst: 北から敵戦車が押し寄せてるから、すぐに支援が必要だ！
+[102/360] Low/KO/Medium 2.71s ✓
+  src: 소총과 자재가 부족해, 보급이 필요해.
+  dst: 弾と弾薬が足りないから、物資が必要だ。
+[103/360] Low/KO/Medium 2.65s ✗
+  src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+  dst: Keep watch, crossing the path isn’t allowed!
+[104/360] Low/KO/Medium 2.63s ✗
+  src: 모든 보급차 운전수는 즉시 본진으로 돌아와.
+  dst: Supply runners must immediately return to base.
+[105/360] Low/KO/Medium 2.67s ✓
+  src: 전방 기지에 건설자들이 지금 당장 필요해.
+  dst: 建設者たちが今すぐ戦場にいる。
+[106/360] Low/KO/Medium 2.87s ✓
+  src: 근처 숲에서 적 보병 발견, 약 10명.
+  dst: 近くの森で敵歩兵を見つけた、10人だよ。
+[107/360] Low/KO/Medium 2.66s ✓
+  src: 누가 알파 기지로 트럭 가져다 줄 수 있어?
+  dst: 誰がアルファ基地にトラックを持ってくる？
+[108/360] Low/KO/Medium 2.63s ✗
+  src: 시청이 맹공격을 받고 있어, 도움이 필요해!
+  dst: Warden is under heavy attack, need help!
+[109/360] Low/KO/Medium 2.68s ✗
+  src: 동쪽으로 밀고 있어, 화력 지원해줘.
+  dst: Eastward, pushing, please give me some firepower support.
+[110/360] Low/KO/Medium 2.69s ✓
+  src: 여분 건설재 있어? 여기서 벙커 짓고 있어.
+  dst: 何建てる？ ここで벙カー作ってる 거야?
+[111/360] Low/KO/Long 2.76s ✗
+  src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+  dst: 兵士가 3문과 2문이 즉시 필요해요.
+[112/360] Low/KO/Long 2.79s ✓
+  src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+  dst: 敵の射撃注意、彼は20分間、そこから隠れているんだ。
+[113/360] Low/KO/Long 2.82s ✓
+  src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+  dst: 誰か私を連れてきてくれる？トラックを使わずに国境の地にいるんだ。
+[114/360] Low/KO/Long 2.72s ✗
+  src: 보급이 심각하게 부족해, 두 참호로 즉시 보급 운송이 필요해.
+  dst: Supply is seriously lacking, we need to move the troops imme
+[115/360] Low/KO/Long 2.79s ✓
+  src: 적이 오른쪽 측면을 강하게 밀고 있어, 가용한 모든 보병이 증원해야 해.
+  dst: 敵が右側を強く押し付けていて、兵士が援護が必要だ。
+[116/360] Low/KO/Long 2.77s ✓
+  src: 수비대가 곧 함락될 것 같아, 즉각적인 지원과 보급을 요청해.
+  dst: 守備隊がすぐに崩される予感がするから、すぐに支援と物資を要求する。
+[117/360] Low/KO/Long 2.83s ✓
+  src: 10분 후 보급 차량이 오니, 본진 가는 길 정리해 줘.
+  dst: 10分後、輸送車が到着したら、本陣へ向かう道順を教えて。
+[118/360] Low/KO/Long 2.85s ✓
+  src: 북쪽 헥스에 대형 벙커 기지 짓고 있어, 건설자들 와서 도와줘.
+  dst: 北のヘックスに大規模なシェルター基地を建設中、建設者たちが来て手伝ってくれる。
+[119/360] Low/KO/Long 2.72s ✗
+  src: 모든 수호자들은 식민지군이 남쪽 전선에서 분산된 동안 북쪽을 밀어.
+  dst: Wardens are pushing the Colonials south from the north front
+[120/360] Low/KO/Long 2.85s ✓
+  src: 시청을 잃었어, 다리 근처 2차 방어선으로 후퇴하고 있어.
+  dst: 敵の시청을 잃었어, 다리 근처 방어선으로 후퇴하고 있어.
+[121/360] Medium/EN/Short 11.79s ✓ [cold]
+  src: ah fixed now
+  dst: 修理済みです。
+[122/360] Medium/EN/Short 3.16s ✓
+  src: NEED MORTARS TO MARBAN
+  dst: 必要な迫撃砲を持っている人がいない。
+[123/360] Medium/EN/Short 2.85s ✓
+  src: GUN IS DEADDDDDDD
+  dst: ガンは死んだよ。
+[124/360] Medium/EN/Short 2.93s ✓
+  src: 4 PIECES DEAD
+  dst: 4個の兵器が死亡しました。
+[125/360] Medium/EN/Short 3.05s ✓
+  src: 15 mins til planes
+  dst: 15分以内に飛行機が到着します。
+[126/360] Medium/EN/Short 3.43s ✓
+  src: ur not holding KC
+  dst: あなたはKCを保持していません。
+[127/360] Medium/EN/Short 2.91s ✓
+  src: GO BOYS GO
+  dst: ガンバッテリー GO BOYS GO
+[128/360] Medium/EN/Short 2.95s ✓
+  src: nah game not dead
+  dst: ゲームはまだ終わっていない。
+[129/360] Medium/EN/Short 3.03s ✓
+  src: peko loves charlie players
+  dst: ペコはチャーリープレイヤーが大好きです。
+[130/360] Medium/EN/Short 3.43s ✓
+  src: even just a tiny bit
+  dst: ちょっとでも少しだけ。
+[131/360] Medium/EN/Medium 3.00s ✓
+  src: be sure to build defenses as well.
+  dst: 確かに防御も建てるよ。
+[132/360] Medium/EN/Medium 3.39s ✓
+  src: i know thats why im annoyed lol
+  dst: わかってるんだけどな、ちょっとイライラしているよlol
+[133/360] Medium/EN/Medium 3.13s ✓
+  src: how would you even make water wet?
+  dst: 水を濡らすなんてどうやってするの？
+[134/360] Medium/EN/Medium 3.15s ✓
+  src: why arent we taking the scurry gold?
+  dst: なぜスクリューゴールドを取っていないの？
+[135/360] Medium/EN/Medium 3.90s ✓
+  src: there's at least 9 wardens up north and 20+ collies
+  dst: 北には少なくとも9人のウォーデンがいて、20人以上のコリンズがいる。
+[136/360] Medium/EN/Medium 3.64s ✓
+  src: i have aluminum dropping at north scrap in great march!
+  dst: 北のスラッジでアルミニウムが落ちているよ！Great Marchです。
+[137/360] Medium/EN/Medium 3.05s ✓
+  src: W devs for fixing the small train bug
+  dst: ゲームの修正に対するW devs。
+[138/360] Medium/EN/Medium 3.30s ✓
+  src: so how's the Saltbrussy front? Ya'll grabbed it yet?
+  dst: ソルトブリッジの前線はどう？まだ奪った？
+[139/360] Medium/EN/Medium 3.83s ✓
+  src: losing one slot for a 7,92 is not worth it imo
+  dst: 失敗する1つのスロットを交換しても、7.92は価値がないと思う。
+[140/360] Medium/EN/Medium 3.93s ✓
+  src: any active fronts im lazy and dont wanna use live maps
+  dst: 活動中の戦線は、私は怠け者であり、リアルマップを使わないことにした。
+[141/360] Medium/EN/Long 4.17s ✓
+  src: one time I drove a bike at the wardens and they just all sur
+  dst: 一度、私は自転車でワーデンを見て彼らがすぐに降伏したのはただの恐怖だった。
+[142/360] Medium/EN/Long 4.67s ✓
+  src: if your field is dropping aluminum let us know so we can mel
+  dst: もしあなたのフィールドがアルミニウムを落としているなら、私たちに知らせてください。急いで溶かすことができます！
+[143/360] Medium/EN/Long 4.54s ✓
+  src: 10% chance 90% fail, they will have t2 in a couple hours, ha
+  dst: 彼らは90％失敗する可能性があり、数時間以内にt2を持つことになるので、待機しなければならない。
+[144/360] Medium/EN/Long 4.02s ✓
+  src: Returning Veteran looking for people to play the game with .
+  dst: 復帰したベテランがゲームをする仲間を探している... 新しい友達も歓迎します。
+[145/360] Medium/EN/Long 3.66s ✓
+  src: I hate to be the barer of bad news but Able wardens are the 
+  dst: 嫌がなければ、アブレのウォーデンは同じだよ。
+[146/360] Medium/EN/Long 4.60s ✓
+  src: is it me or is tech going very fast this war. i feel like i 
+  dst: この戦争で技術が非常に速く進んでいるようだ。1回目の見た目からほぼ半トラックまでになったみたいだ。
+[147/360] Medium/EN/Long 3.15s ✓
+  src: any heros want to help bring supplies to blackwatch so we ca
+  dst: ブラックウォッチに物資を運ぶ英雄がいますか？
+[148/360] Medium/EN/Long 3.54s ✓
+  src: not sure if PIFF is around this war, but Tammi and I are her
+  dst: ピフはここにいるか不明ですが、タミと私は更新を提供します。
+[149/360] Medium/EN/Long 4.49s ✓
+  src: I have a Warden RPG gun boat that needs a owner. Already sto
+  dst: 私はWardenのRPGガンボートを持っていて、所有者が必要です。すでに30mmとRPGが満載されています。
+[150/360] Medium/EN/Long 4.12s ✓
+  src: HEYA! I am currently free to help out any players with quest
+  dst: こんにちは！現在、船舶から補給までのすべてについて質問に答える準備ができています。15分以内です。
+[151/360] Medium/RU/Short 2.83s ✓
+  src: Нужны патроны!
+  dst: 弾薬が必要です！
+[152/360] Medium/RU/Short 3.47s ✓
+  src: Хорошая игра!
+  dst: 素晴らしいゲームです！
+[153/360] Medium/RU/Short 3.40s ✓
+  src: Враг у ворот!
+  dst: 敵が門前にいる！
+[154/360] Medium/RU/Short 3.11s ✓
+  src: Отступаем!
+  dst: 撤退します！
+[155/360] Medium/RU/Short 2.81s ✓
+  src: Смотри фланги!
+  dst: フランクを見てください！
+[156/360] Medium/RU/Short 3.41s ✓
+  src: Лоджи здесь.
+  dst: ここに宿舎があります。
+[157/360] Medium/RU/Short 3.30s ✓
+  src: Вперёд!
+  dst: 前進だ！
+[158/360] Medium/RU/Short 3.43s ✓
+  src: Нужен медик!
+  dst: 医者が必要です！
+[159/360] Medium/RU/Short 3.57s ✓
+  src: Держи позицию!
+  dst: 立て直してくれ！
+[160/360] Medium/RU/Short 3.57s ✓
+  src: Молодцы, всем.
+  dst: 頑張って、みんな！
+[161/360] Medium/RU/Medium 3.55s ✓
+  src: Вражеские танки с севера, нужна немедленная поддержка!
+  dst: 北からの敵戦車が来ている、急いで支援を要する！
+[162/360] Medium/RU/Medium 3.15s ✓
+  src: Запасы оружия и материалов на исходе, нужно пополнение.
+  dst: 武器と材料が尽きた、補充する必要があります。
+[163/360] Medium/RU/Medium 3.32s ✓
+  src: Держите позицию, не давайте им перейти мост!
+  dst: 橋を渡るのを許さないで、位置を保つよ。
+[164/360] Medium/RU/Medium 3.46s ✓
+  src: Все водители лоджи срочно на основную базу.
+  dst: すべての船長が急いで本部に戻る必要があります。
+[165/360] Medium/RU/Medium 3.33s ✓
+  src: Нам нужны строители на форпосте прямо сейчас.
+  dst: 建設員が必要です。直ちにフォートへ行きましょう。
+[166/360] Medium/RU/Medium 3.32s ✓
+  src: В лесу замечена вражеская пехота, около 10 человек.
+  dst: 森で敵の歩兵が約10人いると見つかった。
+[167/360] Medium/RU/Medium 3.35s ✓
+  src: Кто может привезти грузовик на базу альфа?
+  dst: 誰かが基地αのトラックを運ぶことができますか？
+[168/360] Medium/RU/Medium 3.52s ✓
+  src: Ратуша под сильным ударом, нужна помощь!
+  dst: 戦闘中の都市に大きな損害を受けた。助けが必要です！
+[169/360] Medium/RU/Medium 3.14s ✓
+  src: Давим на восток, прикройте огнём.
+  dst: 東へ移動し、火を使ってカバーしてください。
+[170/360] Medium/RU/Medium 3.44s ✓
+  src: Есть лишние стройматериалы? Строим бункер здесь.
+  dst: ありますか余剰な建材？ここでバンカーを作っています。
+[171/360] Medium/RU/Long 3.80s ✓
+  src: Нам нужны три противотанковых орудия и два полевых орудия на
+  dst: 前線に3挺対戦車砲と2門の野砲を急いで必要です。
+[172/360] Medium/RU/Long 3.75s ✓
+  src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+  dst: 注意、丘のスナipersはすでに20分間同じ場所に座っている。
+[173/360] Medium/RU/Long 3.62s ✓
+  src: Кто-нибудь может меня подобрать? Застрял на пограничной базе
+  dst: 誰かが拾ってくれる？境界基地に車なしで迷子になった。
+[174/360] Medium/RU/Long 4.29s ✓
+  src: Запасы критически низкие, нам срочно нужны рейсы лоджи к обо
+  dst: 資源が非常に少なく、急いでロッジ船を両方のリスノームへ送る必要があります。
+[175/360] Medium/RU/Long 4.85s ✓
+  src: Враг сильно давит на правый фланг, нужна вся доступная пехот
+  dst: 右側のフランクに敵が強く圧力をかけている。必要な歩兵で補強することができる全員出動してほしい。
+[176/360] Medium/RU/Long 4.03s ✓
+  src: Гарнизон вот-вот падёт, запрашиваю немедленное подкрепление 
+  dst: ガリソンはすぐに陥落するぞ、急な補強と装備を要請します。
+[177/360] Medium/RU/Long 4.23s ✓
+  src: Через 10 минут придёт колонна снабжения, расчистите дорогу к
+  dst: 10分以内に補給列が到着します。道を清掃してください、主要基地へ行くためです。
+[178/360] Medium/RU/Long 4.34s ✓
+  src: Строю большой бункер на северном гексе, приходите помогать, 
+  dst: 大きなバンカーを北のゲクスに建てる中、助けてくれる人たちが来てほしい。
+[179/360] Medium/RU/Long 4.47s ✓
+  src: Все варденцы давите на север, пока колониальные отвлечены на
+  dst: 全てのヴァーダンが北を押し進める一方で、コロニアルは南側に忙殺されている。
+[180/360] Medium/RU/Long 3.54s ✓
+  src: Потеряли ратушу, отступаем ко вторичной линии обороны у мост
+  dst: 市庁舎を失ったので、橋の第二防衛線に撤退する。
+[181/360] Medium/ZH/Short 3.49s ✓
+  src: 需要弹药！
+  dst: 弾薬が必要です！
+[182/360] Medium/ZH/Short 3.34s ✓
+  src: 打得好！
+  dst: 勝利だね！
+[183/360] Medium/ZH/Short 3.27s ✓
+  src: 敌人到了！
+  dst: 敵が来た！
+[184/360] Medium/ZH/Short 3.21s ✓
+  src: 撤退！
+  dst: 引き返すぞ！
+[185/360] Medium/ZH/Short 3.61s ✓
+  src: 注意侧翼！
+  dst: 側面に気を付けなさい！
+[186/360] Medium/ZH/Short 3.33s ✓
+  src: 补给到了。
+  dst: 補給到達しました。
+[187/360] Medium/ZH/Short 2.77s ✓
+  src: 冲！
+  dst: 突進だよ！
+[188/360] Medium/ZH/Short 3.26s ✓
+  src: 需要医疗！
+  dst: 医療が必要です。
+[189/360] Medium/ZH/Short 3.70s ✓
+  src: 守住阵地！
+  dst: 防御位置を固めてください。
+[190/360] Medium/ZH/Short 3.74s ✓
+  src: 大家辛苦了。
+  dst: 皆さん疲れてるみたいだね。
+[191/360] Medium/ZH/Medium 3.64s ✓
+  src: 敌方坦克从北面推进，需要立即支援！
+  dst: 敵のタンクが北から進んでいる、すぐに助けてね！
+[192/360] Medium/ZH/Medium 3.62s ✓
+  src: 步枪和建材库存告急，请求补给。
+  dst: 歩兵と建材の備蓄が底をついていますので、補給をお願いします。
+[193/360] Medium/ZH/Medium 3.36s ✓
+  src: 守住阵地，不要让他们过桥！
+  dst: 防御位置を固めて、橋を渡らせないでください。
+[194/360] Medium/ZH/Medium 3.90s ✓
+  src: 所有补给车司机立即返回主基地。
+  dst: すべての補給車運転手は即座に本部へ戻るよう命じられた。
+[195/360] Medium/ZH/Medium 3.32s ✓
+  src: 我们需要建造者马上去前线基地。
+  dst: すぐに建築家を前線基地へ送ってください。
+[196/360] Medium/ZH/Medium 3.21s ✓
+  src: 在附近森林发现敌方步兵，约10人。
+  dst: 近くの森で敵歩兵を発見、約10名です。
+[197/360] Medium/ZH/Medium 3.07s ✓
+  src: 有人能把卡车开到阿尔法基地吗？
+  dst: アルファ基地に車を運ぶ人はいますか？
+[198/360] Medium/ZH/Medium 3.66s ✓
+  src: 市政厅正在遭受猛烈攻击，需要支援！
+  dst: 市庁舎は激しい攻撃を受けている。助けが必要です！
+[199/360] Medium/ZH/Medium 3.11s ✓
+  src: 我们在向东推进，请提供火力掩护。
+  dst: 東進中、砲撃のカバーをお願いします。
+[200/360] Medium/ZH/Medium 3.44s ✓
+  src: 有多余的建材吗？我们在这里建地堡。
+  dst: はい、たくさんの材料があります。ここで地堡を作りますよ。
+[201/360] Medium/ZH/Long 4.06s ✓
+  src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+  dst: 我々は即座に前線で3門の対戦車砲と2門の野砲を配置する必要があります。
+[202/360] Medium/ZH/Long 3.92s ✓
+  src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+  dst: その上の狙撃兵に気を付けて、彼は20分間そこに潜んでいるよ。
+[203/360] Medium/ZH/Long 3.42s ✓
+  src: 有人能来接我吗？我被困在边境基地，没有卡车。
+  dst: 誰かが来てくれる？辺境基地にいて、車はないんだ。
+[204/360] Medium/ZH/Long 3.70s ✓
+  src: 库存严重不足，我们需要立即向两个狐穴运送补给。
+  dst: 物資が大変不足しているので、すぐに2つの狐穴へ補給を運ぶ必要があります。
+[205/360] Medium/ZH/Long 3.73s ✓
+  src: 敌人正在猛烈攻击我们的右翼，需要所有可用步兵增援。
+  dst: 敵は我々の右翼を猛攻撃している、全ての歩兵で増援する必要がある。
+[206/360] Medium/ZH/Long 3.82s ✓
+  src: 驻军即将失守，请求立即增援和补给。
+  dst: 駐屯軍がすぐに陥落するぞ、急な増援と補給を要請します！
+[207/360] Medium/ZH/Long 3.60s ✓
+  src: 十分钟后补给车队到来，请清理通往主基地的道路。
+  dst: 10分後補給車隊が到着するので、主要基地への道を掃除してください。
+[208/360] Medium/ZH/Long 4.12s ✓
+  src: 我正在北部六边形建造大型地堡基地，建造者们来帮忙。
+  dst: 私は北の6角形で大規模な防御施設を構築中、助けてくれる仲間たちがいます。
+[209/360] Medium/ZH/Long 4.08s ✓
+  src: 所有督卫军向北推进，趁殖民军在南线被牵制时行动。
+  dst: 全てのウォーデン軍は北に進み、植民軍が南線で縛られている間に行動する。
+[210/360] Medium/ZH/Long 3.76s ✓
+  src: 我们失去了市政厅，正在撤退到桥边的次级防线。
+  dst: 都市庁舎を失い、橋辺の二次防線に撤退中です。
+[211/360] Medium/KO/Short 3.38s ✓
+  src: 탄약 필요!
+  dst: タムラキが必要です！
+[212/360] Medium/KO/Short 3.17s ✓
+  src: 잘했어요!
+  dst: 素晴らしい！
+[213/360] Medium/KO/Short 3.39s ✓
+  src: 적이 왔어!
+  dst: 敵が来たよ！
+[214/360] Medium/KO/Short 3.05s ✓
+  src: 후퇴!
+  dst: 後退しろ！
+[215/360] Medium/KO/Short 3.29s ✓
+  src: 측면 주시!
+  dst: 視界を保て！
+[216/360] Medium/KO/Short 3.45s ✗
+  src: 보급 왔어.
+  dst: 配備完了。
+[217/360] Medium/KO/Short 3.00s ✗
+  src: 돌격!
+  dst: 突撃！
+[218/360] Medium/KO/Short 3.67s ✓
+  src: 의무병 필요!
+  dst: 必要な兵士を呼んでいます！
+[219/360] Medium/KO/Short 3.31s ✓
+  src: 진지 사수!
+  dst: 進撃しろ！
+[220/360] Medium/KO/Short 3.32s ✓
+  src: 수고했어요.
+  dst: 疲れました。
+[221/360] Medium/KO/Medium 3.71s ✓
+  src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+  dst: 北側で敵のタンクが進んできたので、すぐに支援を要請しています！
+[222/360] Medium/KO/Medium 3.47s ✓
+  src: 소총과 자재가 부족해, 보급이 필요해.
+  dst: 弾薬と資材が不足しているので、補給が必要です。
+[223/360] Medium/KO/Medium 3.22s ✓
+  src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+  dst: 守備をしろ、渡河は許さない！
+[224/360] Medium/KO/Medium 3.45s ✓
+  src: 모든 보급차 운전수는 즉시 본진으로 돌아와.
+  dst: すべてのアップグレード車両を即座に本部へ戻る。
+[225/360] Medium/KO/Medium 3.29s ✓
+  src: 전방 기지에 건설자들이 지금 당장 필요해.
+  dst: 建設者たちは今すぐ前線基地に必要です。
+[226/360] Medium/KO/Medium 3.47s ✓
+  src: 근처 숲에서 적 보병 발견, 약 10명.
+  dst: 近くの森で敵兵士を見つけた、約10人。
+[227/360] Medium/KO/Medium 3.43s ✓
+  src: 누가 알파 기지로 트럭 가져다 줄 수 있어?
+  dst: 誰かアルファ基地にトラックを運ぶ手伝いができる？
+[228/360] Medium/KO/Medium 3.83s ✓
+  src: 시청이 맹공격을 받고 있어, 도움이 필요해!
+  dst: 視聴室が猛攻撃を受けているんだ、助けてもらえない？
+[229/360] Medium/KO/Medium 3.39s ✓
+  src: 동쪽으로 밀고 있어, 화력 지원해줘.
+  dst: 東側に押し込んでいるよ、火力支援してくれ。
+[230/360] Medium/KO/Medium 3.27s ✓
+  src: 여분 건설재 있어? 여기서 벙커 짓고 있어.
+  dst: 建設資材がある？ここでブレイクしているよ。
+[231/360] Medium/KO/Long 3.46s ✓
+  src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+  dst: 前線にAT弾3発と野戦砲2門が必要です。
+[232/360] Medium/KO/Long 4.00s ✓
+  src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+  dst: 丘の上にいる狙撃手を見張って、彼はそこに20分間隠れている。
+[233/360] Medium/KO/Long 3.96s ✓
+  src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+  dst: 誰かが私を助けてくれる？トラックなしで国境基地に閉じ込められている。
+[234/360] Medium/KO/Long 4.54s ✓
+  src: 보급이 심각하게 부족해, 두 참호로 즉시 보급 운송이 필요해.
+  dst: ボギングが非常に不足しているため、直ちに二つの真剣なボギング輸送を必要としています。
+[235/360] Medium/KO/Long 3.87s ✓
+  src: 적이 오른쪽 측면을 강하게 밀고 있어, 가용한 모든 보병이 증원해야 해.
+  dst: 右側を強く押しているので、すべての歩兵が増援する必要があります。
+[236/360] Medium/KO/Long 4.16s ✓
+  src: 수비대가 곧 함락될 것 같아, 즉각적인 지원과 보급을 요청해.
+  dst: 守備隊がすぐに陥落するようだ、即座の支援と補給を要請します。
+[237/360] Medium/KO/Long 3.85s ✓
+  src: 10분 후 보급 차량이 오니, 본진 가는 길 정리해 줘.
+  dst: 10分後に補給車が来たら、本陣へ向かう道を整えよう。
+[238/360] Medium/KO/Long 4.58s ✓
+  src: 북쪽 헥스에 대형 벙커 기지 짓고 있어, 건설자들 와서 도와줘.
+  dst: 北部のヘクスに大規模なバンカーを建設中です。建築家と協力して助けてください。
+[239/360] Medium/KO/Long 4.10s ✓
+  src: 모든 수호자들은 식민지군이 남쪽 전선에서 분산된 동안 북쪽을 밀어.
+  dst: すべての守護者たちは南側で分散している間、北部を圧倒する。
+[240/360] Medium/KO/Long 3.60s ✓
+  src: 시청을 잃었어, 다리 근처 2차 방어선으로 후퇴하고 있어.
+  dst: 視聴を失った、近くの橋で2次防衛線に後退中。
+[241/360] High/EN/Short 8.77s ✓ [cold]
+  src: ah fixed now
+  dst: これで直ったよ。
+[242/360] High/EN/Short 3.18s ✓
+  src: NEED MORTARS TO MARBAN
+  dst: ミサイルを投下して、敵陣を制圧したいんだ。
+[243/360] High/EN/Short 2.88s ✓
+  src: GUN IS DEADDDDDDD
+  dst: 銃が壊滅的な状態だ。
+[244/360] High/EN/Short 2.91s ✓
+  src: 4 PIECES DEAD
+  dst: 4ピースが壊滅した。
+[245/360] High/EN/Short 3.09s ✓
+  src: 15 mins til planes
+  dst: あと15分で飛行機が来ますね。
+[246/360] High/EN/Short 2.90s ✓
+  src: ur not holding KC
+  dst: KCを握ってないな。
+[247/360] High/EN/Short 2.87s ✓
+  src: GO BOYS GO
+  dst: boys、頑張って！
+[248/360] High/EN/Short 2.96s ✓
+  src: nah game not dead
+  dst: ゲームはまだ死んでないな。
+[249/360] High/EN/Short 3.02s ✓
+  src: peko loves charlie players
+  dst: ペコはチャーリープレイヤーが好きだね。
+[250/360] High/EN/Short 2.87s ✓
+  src: even just a tiny bit
+  dst: ほんの少しでもいいよ。
+[251/360] High/EN/Medium 3.24s ✓
+  src: be sure to build defenses as well.
+  dst: 防衛線を張るように、しっかり要塞を建ててくれ。
+[252/360] High/EN/Medium 3.15s ✓
+  src: i know thats why im annoyed lol
+  dst: わかったから、マジでイライラしてるんだもんね lol
+[253/360] High/EN/Medium 3.11s ✓
+  src: how would you even make water wet?
+  dst: どうして水が濡れるのか、理解できないね？
+[254/360] High/EN/Medium 3.01s ✓
+  src: why arent we taking the scurry gold?
+  dst: なんでスクリーゴールド取ってないんですか？
+[255/360] High/EN/Medium 3.26s ✓
+  src: there's at least 9 wardens up north and 20+ collies
+  dst: 北には少なくとも9人のウォーデンと20人以上のコリーがいる。
+[256/360] High/EN/Medium 3.08s ✓
+  src: i have aluminum dropping at north scrap in great march!
+  dst: 北スクラップでアルミが大量に落ちてるぞ！
+[257/360] High/EN/Medium 3.03s ✓
+  src: W devs for fixing the small train bug
+  dst: W devs、小さな列車バグの修正ありがとうございます。
+[258/360] High/EN/Medium 3.25s ✓
+  src: so how's the Saltbrussy front? Ya'll grabbed it yet?
+  dst: ソルトブリッシー前線はどうですか？まだ取れてるんですか？
+[259/360] High/EN/Medium 3.24s ✓
+  src: losing one slot for a 7,92 is not worth it imo
+  dst: 7,92を落とすのは、明らかに価値がないと思うよ。
+[260/360] High/EN/Medium 3.27s ✓
+  src: any active fronts im lazy and dont wanna use live maps
+  dst: アクティブな戦線は面倒で、ライブマップも使いたくないんだ。
+[261/360] High/EN/Long 3.41s ✓
+  src: one time I drove a bike at the wardens and they just all sur
+  dst: 一度、衛兵にバイクで突っ込んで、怖くてすぐに全て降参したんだ。
+[262/360] High/EN/Long 3.24s ✓
+  src: if your field is dropping aluminum let us know so we can mel
+  dst: アルミが落ちてるとしたら教えてください、早く溶かして使います！
+[263/360] High/EN/Long 3.98s ✓
+  src: 10% chance 90% fail, they will have t2 in a couple hours, ha
+  dst: 二桁の確率で9割も失敗するだろうし、2時間もしないうちにT2が来ることになるから、駆逐艦を待つ必要があるね。
+[264/360] High/EN/Long 3.24s ✓
+  src: Returning Veteran looking for people to play the game with .
+  dst: ベテランが帰ってきましたので、一緒にゲームをする仲間を探しています。
+[265/360] High/EN/Long 3.18s ✓
+  src: I hate to be the barer of bad news but Able wardens are the 
+  dst: アブラー・ウォーデンもまた、また残念な知らせですね。
+[266/360] High/EN/Long 3.68s ✓
+  src: is it me or is tech going very fast this war. i feel like i 
+  dst: 技術がこの戦争で急激に速い気がするけど、瞬く間にハーフトラックが手に入っちゃったね。
+[267/360] High/EN/Long 3.27s ✓
+  src: any heros want to help bring supplies to blackwatch so we ca
+  dst: ヒーローさん、ブラックウォッチに物資を運ぶのを手伝いませんか？
+[268/360] High/EN/Long 3.30s ✓
+  src: not sure if PIFF is around this war, but Tammi and I are her
+  dst: PIFFが来るかどうかわかりませんが、Tammiと私は状況を報告します。
+[269/360] High/EN/Long 3.55s ✓
+  src: I have a Warden RPG gun boat that needs a owner. Already sto
+  dst: WardenのRPG駆逐艦がまだオーナーがいなくて、30mmとRPGで積まれてるよ。
+[270/360] High/EN/Long 3.65s ✓
+  src: HEYA! I am currently free to help out any players with quest
+  dst: やあ！何か質問があれば、空、艦船、物資、戦車など、何でも手伝うよ！
+[271/360] High/RU/Short 2.81s ✓
+  src: Нужны патроны!
+  dst: 弾切れだ！
+[272/360] High/RU/Short 2.79s ✓
+  src: Хорошая игра!
+  dst: いいゲームだったね！
+[273/360] High/RU/Short 2.87s ✓
+  src: Враг у ворот!
+  dst: 敵が門前にいる！
+[274/360] High/RU/Short 2.78s ✓
+  src: Отступаем!
+  dst: 後退だ！
+[275/360] High/RU/Short 2.94s ✓
+  src: Смотри фланги!
+  dst: 敵の側面を警戒しろ！
+[276/360] High/RU/Short 2.87s ✓
+  src: Лоджи здесь.
+  dst: ロジがこちらです。
+[277/360] High/RU/Short 2.69s ✓
+  src: Вперёд!
+  dst: すすめ！
+[278/360] High/RU/Short 2.79s ✓
+  src: Нужен медик!
+  dst: 医者が必要だ！
+[279/360] High/RU/Short 2.74s ✓
+  src: Держи позицию!
+  dst: ポジションキープ！
+[280/360] High/RU/Short 2.80s ✓
+  src: Молодцы, всем.
+  dst: よくやったみんなさん。
+[281/360] High/RU/Medium 3.28s ✓
+  src: Вражеские танки с севера, нужна немедленная поддержка!
+  dst: 敵の戦車が北から来ているので、すぐに援護してくれ！
+[282/360] High/RU/Medium 3.21s ✓
+  src: Запасы оружия и материалов на исходе, нужно пополнение.
+  dst: 武器と物資が底をつきかけているので、補充が必要だ。
+[283/360] High/RU/Medium 3.00s ✓
+  src: Держите позицию, не давайте им перейти мост!
+  dst: 橋を渡さないように、ポジションを維持して！
+[284/360] High/RU/Medium 3.16s ✓
+  src: Все водители лоджи срочно на основную базу.
+  dst: ロッジの運転手さんたち、すぐにメインベースへ。
+[285/360] High/RU/Medium 3.18s ✓
+  src: Нам нужны строители на форпосте прямо сейчас.
+  dst: 今、要するにフォートレスで建設隊が欲しいんだ。
+[286/360] High/RU/Medium 3.05s ✓
+  src: В лесу замечена вражеская пехота, около 10 человек.
+  dst: 森に敵歩兵が10人くらい見られました。
+[287/360] High/RU/Medium 3.12s ✓
+  src: Кто может привезти грузовик на базу альфа?
+  dst: 誰かアルファ基地にトラックを持ってきてもらえますか？
+[288/360] High/RU/Medium 3.16s ✓
+  src: Ратуша под сильным ударом, нужна помощь!
+  dst: 市庁舎に激しい攻撃を受けているので、助けて！
+[289/360] High/RU/Medium 3.11s ✓
+  src: Давим на восток, прикройте огнём.
+  dst: 東に進んで、銃撃で援護してくれ。
+[290/360] High/RU/Medium 3.03s ✓
+  src: Есть лишние стройматериалы? Строим бункер здесь.
+  dst: 余った資材ない？ここで要塞作るよ。
+[291/360] High/RU/Long 3.41s ✓
+  src: Нам нужны три противотанковых орудия и два полевых орудия на
+  dst: 前線に迫撃砲３門と歩兵砲２門を急ぎで必要です。
+[292/360] High/RU/Long 3.14s ✓
+  src: Осторожно, на холме снайпер, он уже двадцать минут сидит на 
+  dst: 山の上にはスナイパーが20分ほど座っているぞ。
+[293/360] High/RU/Long 3.28s ✓
+  src: Кто-нибудь может меня подобрать? Застрял на пограничной базе
+  dst: 誰か迎えに来てくれませんか？国境基地で車がないので困っています。
+[294/360] High/RU/Long 3.52s ✓
+  src: Запасы критически низкие, нам срочно нужны рейсы лоджи к обо
+  dst: 在庫が dangerously 低いので、急いでライオンの穴に荷物を運ぶ飛行機を頼んでください。
+[295/360] High/RU/Long 3.36s ✓
+  src: Враг сильно давит на правый фланг, нужна вся доступная пехот
+  dst: 右翼に敵が強く攻めてるので、全歩を援護に送る必要があります。
+[296/360] High/RU/Long 3.55s ✓
+  src: Гарнизон вот-вот падёт, запрашиваю немедленное подкрепление 
+  dst: 要するに、要塞が陥る寸前なので、すぐに援軍と物資を頼むよ。
+[297/360] High/RU/Long 3.39s ✓
+  src: Через 10 минут придёт колонна снабжения, расчистите дорогу к
+  dst: 10分後に物資輸送隊が到着するので、メインベースへの道を空けてください。
+[298/360] High/RU/Long 3.51s ✓
+  src: Строю большой бункер на северном гексе, приходите помогать, 
+  dst: 北のヘックスに大きな要塞を建ててるから、手伝いに来てくれ、建設員！
+[299/360] High/RU/Long 3.13s ✓
+  src: Все варденцы давите на север, пока колониальные отвлечены на
+  dst: 北の敵を、南の動きでつついて潰せ。
+[300/360] High/RU/Long 3.31s ✓
+  src: Потеряли ратушу, отступаем ко вторичной линии обороны у мост
+  dst: 市街地を失い、橋の二重防御線へ後退します。
+[301/360] High/ZH/Short 2.72s ✓
+  src: 需要弹药！
+  dst: 弾切れだ！
+[302/360] High/ZH/Short 2.74s ✓
+  src: 打得好！
+  dst: よくやったね！
+[303/360] High/ZH/Short 2.92s ✓
+  src: 敌人到了！
+  dst: 敵が来ちゃった！
+[304/360] High/ZH/Short 2.76s ✓
+  src: 撤退！
+  dst: 退いて！
+[305/360] High/ZH/Short 2.95s ✓
+  src: 注意侧翼！
+  dst: 敵が側翼に迫っているぞ！
+[306/360] High/ZH/Short 2.90s ✓
+  src: 补给到了。
+  dst: 物資が届いたよ。
+[307/360] High/ZH/Short 2.75s ✓
+  src: 冲！
+  dst: 突撃だ！
+[308/360] High/ZH/Short 2.80s ✓
+  src: 需要医疗！
+  dst: 医療が必要だ！
+[309/360] High/ZH/Short 2.97s ✓
+  src: 守住阵地！
+  dst: 陣を固めて守り抜きましょう！
+[310/360] High/ZH/Short 2.92s ✓
+  src: 大家辛苦了。
+  dst: みんな、本当にお疲れ様です。
+[311/360] High/ZH/Medium 3.36s ✓
+  src: 敌方坦克从北面推进，需要立即支援！
+  dst: 敵が北から戦車で押し寄せてるから、すぐに援護してくれ！
+[312/360] High/ZH/Medium 3.41s ✓
+  src: 步枪和建材库存告急，请求补给。
+  dst: 銃器と建材の在庫が底をつきつつあるので、補給を頼みます。
+[313/360] High/ZH/Medium 3.14s ✓
+  src: 守住阵地，不要让他们过桥！
+  dst: 橋を渡らせないで、陣地を守りなさい！
+[314/360] High/ZH/Medium 3.14s ✓
+  src: 所有补给车司机立即返回主基地。
+  dst: 補給車の運転手はすぐにメイン基地に戻ってくれ。
+[315/360] High/ZH/Medium 2.97s ✓
+  src: 我们需要建造者马上去前线基地。
+  dst: 前線基地へ、すぐに建設しましょう。
+[316/360] High/ZH/Medium 3.18s ✓
+  src: 在附近森林发现敌方步兵，约10人。
+  dst: 近くの森に敵歩兵が10人くらい見られました。
+[317/360] High/ZH/Medium 3.12s ✓
+  src: 有人能把卡车开到阿尔法基地吗？
+  dst: アルファ基地までトラックを運んでくれる人いますか？
+[318/360] High/ZH/Medium 3.32s ✓
+  src: 市政厅正在遭受猛烈攻击，需要支援！
+  dst: 市庁舎に激しい攻撃が集中しているので、助けを求めています。
+[319/360] High/ZH/Medium 3.07s ✓
+  src: 我们在向东推进，请提供火力掩护。
+  dst: 東に進んでるから、火力支援をお願いします。
+[320/360] High/ZH/Medium 3.20s ✓
+  src: 有多余的建材吗？我们在这里建地堡。
+  dst: 余った資材があれば、ここで要塞を建てようぜ。
+[321/360] High/ZH/Long 3.47s ✓
+  src: 我们需要在前线立即部署三门反坦克炮和两门野战炮。
+  dst: 前線に即座に3門の自走砲と2門の野砲を配置しろ。
+[322/360] High/ZH/Long 3.22s ✓
+  src: 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。
+  dst: 山の上狙撃手、もう二十分も潜んでるよ。
+[323/360] High/ZH/Long 3.14s ✓
+  src: 有人能来接我吗？我被困在边境基地，没有卡车。
+  dst: 誰か辺境基地に迎えに来てくれませんか？
+[324/360] High/ZH/Long 3.24s ✓
+  src: 库存严重不足，我们需要立即向两个狐穴运送补给。
+  dst: 品切れが深刻なので、すぐに両方の穴に物資を運ぶ必要があります。
+[325/360] High/ZH/Long 3.53s ✓
+  src: 敌人正在猛烈攻击我们的右翼，需要所有可用步兵增援。
+  dst: 敵が右翼を激しく攻撃してきているので、使える歩兵を全員で応援してくれ。
+[326/360] High/ZH/Long 2.99s ✓
+  src: 驻军即将失守，请求立即增援和补给。
+  dst: すぐに援護と物資を送ってくれ！
+[327/360] High/ZH/Long 3.36s ✓
+  src: 十分钟后补给车队到来，请清理通往主基地的道路。
+  dst: あと15分で補給車隊が到着するので、メイン基地への道を片付けてください。
+[328/360] High/ZH/Long 3.52s ✓
+  src: 我正在北部六边形建造大型地堡基地，建造者们来帮忙。
+  dst: 北部六辺で大規模な要塞を建てているので、建設隊の人たち、手伝いに来てください。
+[329/360] High/ZH/Long 3.42s ✓
+  src: 所有督卫军向北推进，趁殖民军在南线被牵制时行动。
+  dst: 衛軍は北に進み、殖民軍が南線で動きづらいうちに攻撃した。
+[330/360] High/ZH/Long 3.37s ✓
+  src: 我们失去了市政厅，正在撤退到桥边的次级防线。
+  dst: 市庁を失い、橋側のセカンダリーラインに撤退中だ。
+[331/360] High/KO/Short 2.76s ✓
+  src: 탄약 필요!
+  dst: 弾切れだ！
+[332/360] High/KO/Short 2.84s ✓
+  src: 잘했어요!
+  dst: すごいね！
+[333/360] High/KO/Short 2.78s ✓
+  src: 적이 왔어!
+  dst: 敵が来たぞ！
+[334/360] High/KO/Short 2.80s ✓
+  src: 후퇴!
+  dst: 後退だ！
+[335/360] High/KO/Short 2.77s ✓
+  src: 측면 주시!
+  dst: 側面を狙って！
+[336/360] High/KO/Short 2.97s ✓
+  src: 보급 왔어.
+  dst: 物資が運ばれてきたよ。
+[337/360] High/KO/Short 2.80s ✓
+  src: 돌격!
+  dst: 突撃だ！
+[338/360] High/KO/Short 2.83s ✓
+  src: 의무병 필요!
+  dst: 医務士が足りない！
+[339/360] High/KO/Short 2.80s ✓
+  src: 진지 사수!
+  dst: 陣地を守りなさい！
+[340/360] High/KO/Short 2.78s ✓
+  src: 수고했어요.
+  dst: お疲れ様でした。
+[341/360] High/KO/Medium 3.37s ✓
+  src: 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해!
+  dst: 北から敵の戦車が押し寄せてるから、すぐに援護してくれ！
+[342/360] High/KO/Medium 3.17s ✓
+  src: 소총과 자재가 부족해, 보급이 필요해.
+  dst: 弾と資材が足りないから、補給が必要だね。
+[343/360] High/KO/Medium 3.11s ✓
+  src: 진지를 지켜, 다리를 건너게 하면 안 돼!
+  dst: 陣地を守って、橋を渡らせないでくれ！
+[344/360] High/KO/Medium 3.12s ✓
+  src: 모든 보급차 운전수는 즉시 본진으로 돌아와.
+  dst: すべての補給車運転手はすぐに本陣に戻ってくれ。
+[345/360] High/KO/Medium 3.02s ✓
+  src: 전방 기지에 건설자들이 지금 당장 필요해.
+  dst: 前線基地に建設部隊がすぐに必要だ。
+[346/360] High/KO/Medium 3.18s ✓
+  src: 근처 숲에서 적 보병 발견, 약 10명.
+  dst: 近くの森に敵歩兵が10名ほど見つかった。
+[347/360] High/KO/Medium 3.10s ✓
+  src: 누가 알파 기지로 트럭 가져다 줄 수 있어?
+  dst: アルファ基地にトラックを運んでくれる人いますか？
+[348/360] High/KO/Medium 3.20s ✓
+  src: 시청이 맹공격을 받고 있어, 도움이 필요해!
+  dst: 市庁が猛攻撃を受けているので、手伝ってくれませんか？
+[349/360] High/KO/Medium 3.05s ✓
+  src: 동쪽으로 밀고 있어, 화력 지원해줘.
+  dst: 東に進んでるから、火力支援してくれ。
+[350/360] High/KO/Medium 3.15s ✓
+  src: 여분 건설재 있어? 여기서 벙커 짓고 있어.
+  dst: 余った建設資材ない？ここでバンカー作ってるよ。
+[351/360] High/KO/Long 3.12s ✓
+  src: 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다.
+  dst: AT砲3門と野砲2門をすぐに持ってきてください。
+[352/360] High/KO/Long 3.42s ✓
+  src: 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어.
+  dst: その丘の狙撃手を警戒しろ、彼はもう20分間も潜伏してるんだ。
+[353/360] High/KO/Long 3.50s ✓
+  src: 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어.
+  dst: 誰か私を連れ出してくれませんか？トラックがなくて国境基地に閉じ込められています。
+[354/360] High/KO/Long 3.42s ✓
+  src: 보급이 심각하게 부족해, 두 참호로 즉시 보급 운송이 필요해.
+  dst: 物資が極端に不足しているので、両陣営にすぐに補給輸送が必要だ。
+[355/360] High/KO/Long 3.54s ✓
+  src: 적이 오른쪽 측면을 강하게 밀고 있어, 가용한 모든 보병이 증원해야 해.
+  dst: 敵が右側を猛烈に攻めてるので、使える兵力は全部増援だ。
+[356/360] High/KO/Long 3.03s ✓
+  src: 수비대가 곧 함락될 것 같아, 즉각적인 지원과 보급을 요청해.
+  dst: すぐに援護と物資を送ってくれ。
+[357/360] High/KO/Long 3.65s ✓
+  src: 10분 후 보급 차량이 오니, 본진 가는 길 정리해 줘.
+  dst: 10分後に補給車両が来るから、本陣への道は整理してくれ。
+[358/360] High/KO/Long 4.04s ✓
+  src: 북쪽 헥스에 대형 벙커 기지 짓고 있어, 건설자들 와서 도와줘.
+  dst: 北のヘクスに大型の벙커基地を建ててるから、建設隊の人たちで手伝ってくれる？
+[359/360] High/KO/Long 3.63s ✓
+  src: 모든 수호자들은 식민지군이 남쪽 전선에서 분산된 동안 북쪽을 밀어.
+  dst: すべての守備隊が、敵が南線で分散している間に、北を押し進めた。
+[360/360] High/KO/Long 3.71s ✓
+  src: 시청을 잃었어, 다리 근처 2차 방어선으로 후퇴하고 있어.
+  dst: 市街地を失ったので、橋の近くの2次防衛線に撤退中です。
+
+
+============================================================
+MARKDOWN OUTPUT
+============================================================
+
+### EN → 日本語
+
+#### Short
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | ah fixed now | 今、修正完了です。 | 修理済みです。 | これで直ったよ。 |
+| 2 | NEED MORTARS TO MARBAN | 今、マランを必要としている。 | 必要な迫撃砲を持っている人がいない。 | ミサイルを投下して、敵陣を制圧したいんだ。 |
+| 3 | GUN IS DEADDDDDDD | Gun is dead. ✗ | ガンは死んだよ。 | 銃が壊滅的な状態だ。 |
+| 4 | 4 PIECES DEAD | ４人死んだ。 | 4個の兵器が死亡しました。 | 4ピースが壊滅した。 |
+| 5 | 15 mins til planes | 15 分の時、飛行機が待っています。 | 15分以内に飛行機が到着します。 | あと15分で飛行機が来ますね。 |
+| 6 | ur not holding KC | 君がKCを抱えてないんだ。 | あなたはKCを保持していません。 | KCを握ってないな。 |
+| 7 | GO BOYS GO | Let’s go, boys! ✗ | ガンバッテリー GO BOYS GO | boys、頑張って！ |
+| 8 | nah game not dead | ゲームはまだ動いてない。 | ゲームはまだ終わっていない。 | ゲームはまだ死んでないな。 |
+| 9 | peko loves charlie players | ペコはチャリープレイヤーが好きです。 | ペコはチャーリープレイヤーが大好きです。 | ペコはチャーリープレイヤーが好きだね。 |
+| 10 | even just a tiny bit | 戦いましょう。 | ちょっとでも少しだけ。 | ほんの少しでもいいよ。 |
+
+#### Medium
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | be sure to build defenses as well. | 防御を築くんだ。 | 確かに防御も建てるよ。 | 防衛線を張るように、しっかり要塞を建ててくれ。 |
+| 2 | i know thats why im annoyed lol | つらいのに、なぜ怒ってるんだ？ | わかってるんだけどな、ちょっとイライラしているよlol | わかったから、マジでイライラしてるんだもんね lol |
+| 3 | how would you even make water wet? | 水は乾かないようにどうすればいいの？ | 水を濡らすなんてどうやってするの？ | どうして水が濡れるのか、理解できないね？ |
+| 4 | why arent we taking the scurry gold? | なぜ、この金稼ぎのくずを奪ってないんだ？ | なぜスクリューゴールドを取っていないの？ | なんでスクリーゴールド取ってないんですか？ |
+| 5 | there's at least 9 wardens up north and 20+ collies | 北の方で9人以上の Wardenがいます。 | 北には少なくとも9人のウォーデンがいて、20人以上のコリンズがいる。 | 北には少なくとも9人のウォーデンと20人以上のコリーがいる。 |
+| 6 | i have aluminum dropping at north scrap in great march! | 私は北のスクラップでアルミニウムを落とす。 | 北のスラッジでアルミニウムが落ちているよ！Great Marchです。 | 北スクラップでアルミが大量に落ちてるぞ！ |
+| 7 | W devs for fixing the small train bug | 開発者、小さな列車の問題を修正してください。 | ゲームの修正に対するW devs。 | W devs、小さな列車バグの修正ありがとうございます。 |
+| 8 | so how's the Saltbrussy front? Ya'll grabbed it yet? | 塩尻の戦い、どうなったの？　まだ掴んだ？ | ソルトブリッジの前線はどう？まだ奪った？ | ソルトブリッシー前線はどうですか？まだ取れてるんですか？ |
+| 9 | losing one slot for a 7,92 is not worth it imo | それはちょっと、惜しいよ。 | 失敗する1つのスロットを交換しても、7.92は価値がないと思う。 | 7,92を落とすのは、明らかに価値がないと思うよ。 |
+| 10 | any active fronts im lazy and dont wanna use live maps | 遅いので、何も使わないよ。 | 活動中の戦線は、私は怠け者であり、リアルマップを使わないことにした。 | アクティブな戦線は面倒で、ライブマップも使いたくないんだ。 |
+
+#### Long
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | one time I drove a bike at the wardens and they just all surrendered immediately out of sheer fear | 自転車で走って、ワンドラーがすぐに全て降伏した。 | 一度、私は自転車でワーデンを見て彼らがすぐに降伏したのはただの恐怖だった。 | 一度、衛兵にバイクで突っ込んで、怖くてすぐに全て降参したんだ。 |
+| 2 | if your field is dropping aluminum let us know so we can melt it down quick! | アルミの降下を知れば、すぐに溶けるぞ。 | もしあなたのフィールドがアルミニウムを落としているなら、私たちに知らせてください。急いで溶かすことができます！ | アルミが落ちてるとしたら教えてください、早く溶かして使います！ |
+| 3 | 10% chance 90% fail, they will have t2 in a couple hours, have to wait for gunboat | 90% fail, they’ll have a T2 in a couple hours, wait for a gunboat. ✗ | 彼らは90％失敗する可能性があり、数時間以内にt2を持つことになるので、待機しなければならない。 | 二桁の確率で9割も失敗するだろうし、2時間もしないうちにT2が来ることになるから、駆逐艦を待つ必要があるね。 |
+| 4 | Returning Veteran looking for people to play the game with .. new bros welcome to hang out too | 新しい仲間を待ってるよ、戦い方を知りたい人を探してるよ。 | 復帰したベテランがゲームをする仲間を探している... 新しい友達も歓迎します。 | ベテランが帰ってきましたので、一緒にゲームをする仲間を探しています。 |
+| 5 | I hate to be the barer of bad news but Able wardens are the same | 私は悪い知らせを伝えるのが嫌だけど、アブル・連邦兵は同じです。 | 嫌がなければ、アブレのウォーデンは同じだよ。 | アブラー・ウォーデンもまた、また残念な知らせですね。 |
+| 6 | is it me or is tech going very fast this war. i feel like i blinked once and were almost to having halftracks | 技術はすごく早く進んでるね、まるで blinked 一度でほぼ終わったみたいだ。 | この戦争で技術が非常に速く進んでいるようだ。1回目の見た目からほぼ半トラックまでになったみたいだ。 | 技術がこの戦争で急激に速い気がするけど、瞬く間にハーフトラックが手に入っちゃったね。 |
+| 7 | any heros want to help bring supplies to blackwatch so we can build it up? | 兵士们想帮忙运送物资给黑瓦特，让我们加起来。 ✗ | ブラックウォッチに物資を運ぶ英雄がいますか？ | ヒーローさん、ブラックウォッチに物資を運ぶのを手伝いませんか？ |
+| 8 | not sure if PIFF is around this war, but Tammi and I are here to give updates | ピフは今この戦争にいるけど、タミと俺はアップデートするよ。 | ピフはここにいるか不明ですが、タミと私は更新を提供します。 | PIFFが来るかどうかわかりませんが、Tammiと私は状況を報告します。 |
+| 9 | I have a Warden RPG gun boat that needs a owner. Already stocked with 30mm and RPGs | 私は Wardenの艦艇の所有者を探しています。すでに30mmとRPGを30個持っています。 | 私はWardenのRPGガンボートを持っていて、所有者が必要です。すでに30mmとRPGが満載されています。 | WardenのRPG駆逐艦がまだオーナーがいなくて、30mmとRPGで積まれてるよ。 |
+| 10 | HEYA! I am currently free to help out any players with questions regarding anything from, naval, logi, planes, tanks, and so on! | やあ、質問に答えるのに自由だよ！ | こんにちは！現在、船舶から補給までのすべてについて質問に答える準備ができています。15分以内です。 | やあ！何か質問があれば、空、艦船、物資、戦車など、何でも手伝うよ！ |
+
+#### 速度 (中央値 s、ウォームキャッシュ)
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low | 2.63 | 2.70 | 2.81 |
+| Medium | 3.04 | 3.35 | 4.14 |
+| High | 2.93 | 3.19 | 3.35 |
+
+
+### RU → 日本語
+
+#### Short
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | Нужны патроны! | Need some bullets! ✗ | 弾薬が必要です！ | 弾切れだ！ |
+| 2 | Хорошая игра! | 良いゲームだよ！ | 素晴らしいゲームです！ | いいゲームだったね！ |
+| 3 | Враг у ворот! | Enemy at the gate! ✗ | 敵が門前にいる！ | 敵が門前にいる！ |
+| 4 | Отступаем! | Let’s go! ✗ | 撤退します！ | 後退だ！ |
+| 5 | Смотри фланги! | 見て、フラグ！ | フランクを見てください！ | 敵の側面を警戒しろ！ |
+| 6 | Лоджи здесь. | Лоджи здесь. ✗ | ここに宿舎があります。 | ロジがこちらです。 |
+| 7 | Вперёд! | आगेへ！ | 前進だ！ | すすめ！ |
+| 8 | Нужен медик! | Need a medic! ✗ | 医者が必要です！ | 医者が必要だ！ |
+| 9 | Держи позицию! | Keep your position! ✗ | 立て直してくれ！ | ポジションキープ！ |
+| 10 | Молодцы, всем. | Good, everyone. ✗ | 頑張って、みんな！ | よくやったみんなさん。 |
+
+#### Medium
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | Вражеские танки с севера, нужна немедленная поддержка! | Enemy tanks from the north need immediate support. ✗ | 北からの敵戦車が来ている、急いで支援を要する！ | 敵の戦車が北から来ているので、すぐに援護してくれ！ |
+| 2 | Запасы оружия и материалов на исходе, нужно пополнение. | 武器と材料の在庫が底をつける、補充が必要だ。 | 武器と材料が尽きた、補充する必要があります。 | 武器と物資が底をつきかけているので、補充が必要だ。 |
+| 3 | Держите позицию, не давайте им перейти мост! | 止めて、橋渡させないで！ | 橋を渡るのを許さないで、位置を保つよ。 | 橋を渡さないように、ポジションを維持して！ |
+| 4 | Все водители лоджи срочно на основную базу. | ドライバー、ロジの運転を急いで、メインの基地へ。 | すべての船長が急いで本部に戻る必要があります。 | ロッジの運転手さんたち、すぐにメインベースへ。 |
+| 5 | Нам нужны строители на форпосте прямо сейчас. | 今すぐ建設者が必要だよ。 | 建設員が必要です。直ちにフォートへ行きましょう。 | 今、要するにフォートレスで建設隊が欲しいんだ。 |
+| 6 | В лесу замечена вражеская пехота, около 10 человек. | 敵兵士在森林里，大约10人。 ✗ | 森で敵の歩兵が約10人いると見つかった。 | 森に敵歩兵が10人くらい見られました。 |
+| 7 | Кто может привезти грузовик на базу альфа? | 誰かアルファの基地にトラックを運ぶ手伝ってもらえますか？ | 誰かが基地αのトラックを運ぶことができますか？ | 誰かアルファ基地にトラックを持ってきてもらえますか？ |
+| 8 | Ратуша под сильным ударом, нужна помощь! | Fighting hard, need help! ✗ | 戦闘中の都市に大きな損害を受けた。助けが必要です！ | 市庁舎に激しい攻撃を受けているので、助けて！ |
+| 9 | Давим на восток, прикройте огнём. | Let’s go east, cover the fire. ✗ | 東へ移動し、火を使ってカバーしてください。 | 東に進んで、銃撃で援護してくれ。 |
+| 10 | Есть лишние стройматериалы? Строим бункер здесь. | Есть лишние стройматериалы? Строим бункер здесь. ✗ | ありますか余剰な建材？ここでバンカーを作っています。 | 余った資材ない？ここで要塞作るよ。 |
+
+#### Long
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | Нам нужны три противотанковых орудия и два полевых орудия на передовой срочно. | Need three anti-tank guns and two field guns on the front line, urgently. ✗ | 前線に3挺対戦車砲と2門の野砲を急いで必要です。 | 前線に迫撃砲３門と歩兵砲２門を急ぎで必要です。 |
+| 2 | Осторожно, на холме снайпер, он уже двадцать минут сидит на одном месте. | 注意、山に射撃手がいる、もう20分ずっと同じ場所に座っている。 | 注意、丘のスナipersはすでに20分間同じ場所に座っている。 | 山の上にはスナイパーが20分ほど座っているぞ。 |
+| 3 | Кто-нибудь может меня подобрать? Застрял на пограничной базе без машины. | 誰か助けてくれる人を見つけたいんだ。辺境の基地に車がない。 | 誰かが拾ってくれる？境界基地に車なしで迷子になった。 | 誰か迎えに来てくれませんか？国境基地で車がないので困っています。 |
+| 4 | Запасы критически низкие, нам срочно нужны рейсы лоджи к обоим лисьим норам. | запасы критически низкие, нам срочно нужны рейсы лоджи к обоим лисьим норам. ✗ | 資源が非常に少なく、急いでロッジ船を両方のリスノームへ送る必要があります。 | 在庫が dangerously 低いので、急いでライオンの穴に荷物を運ぶ飛行機を頼んでください。 |
+| 5 | Враг сильно давит на правый фланг, нужна вся доступная пехота для подкрепления. | Enemy is heavily pressuring the right flank, need all available troops to reinforce. ✗ | 右側のフランクに敵が強く圧力をかけている。必要な歩兵で補強することができる全員出動してほしい。 | 右翼に敵が強く攻めてるので、全歩を援護に送る必要があります。 |
+| 6 | Гарнизон вот-вот падёт, запрашиваю немедленное подкрепление и снаряжение. | 兵舎要撤，急需立刻支援和装备。 ✗ | ガリソンはすぐに陥落するぞ、急な補強と装備を要請します。 | 要するに、要塞が陥る寸前なので、すぐに援軍と物資を頼むよ。 |
+| 7 | Через 10 минут придёт колонна снабжения, расчистите дорогу к основной базе. | 10 分后，运输队将到达，清理道路，前往主基地。 ✗ | 10分以内に補給列が到着します。道を清掃してください、主要基地へ行くためです。 | 10分後に物資輸送隊が到着するので、メインベースへの道を空けてください。 |
+| 8 | Строю большой бункер на северном гексе, приходите помогать, строители. | 作ってる 큰 방어 시설, 건설자들 와주세요. | 大きなバンカーを北のゲクスに建てる中、助けてくれる人たちが来てほしい。 | 北のヘックスに大きな要塞を建ててるから、手伝いに来てくれ、建設員！ |
+| 9 | Все варденцы давите на север, пока колониальные отвлечены на южном фронте. | Warden们压迫着北，而殖民地则分散到南边。 ✗ | 全てのヴァーダンが北を押し進める一方で、コロニアルは南側に忙殺されている。 | 北の敵を、南の動きでつついて潰せ。 |
+| 10 | Потеряли ратушу, отступаем ко вторичной линии обороны у моста. | Lost my shield, retreating to the second defensive line by the bridge. ✗ | 市庁舎を失ったので、橋の第二防衛線に撤退する。 | 市街地を失い、橋の二重防御線へ後退します。 |
+
+#### 速度 (中央値 s、ウォームキャッシュ)
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low | 2.59 | 2.77 | 2.78 |
+| Medium | 3.41 | 3.34 | 4.13 |
+| High | 2.80 | 3.14 | 3.37 |
+
+
+### ZH → 日本語
+
+#### Short
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 需要弹药！ | 弾薬が必要だ。 | 弾薬が必要です！ | 弾切れだ！ |
+| 2 | 打得好！ | Let’s go! ✗ | 勝利だね！ | よくやったね！ |
+| 3 | 敌人到了！ | 敵は来た！ | 敵が来た！ | 敵が来ちゃった！ |
+| 4 | 撤退！ | 退却！ ✗ | 引き返すぞ！ | 退いて！ |
+| 5 | 注意侧翼！ | 注意側翼！ ✗ | 側面に気を付けなさい！ | 敵が側翼に迫っているぞ！ |
+| 6 | 补给到了。 | Supplies are arriving. ✗ | 補給到達しました。 | 物資が届いたよ。 |
+| 7 | 冲！ | 急げ！ | 突進だよ！ | 突撃だ！ |
+| 8 | 需要医疗！ | Need medical! ✗ | 医療が必要です。 | 医療が必要だ！ |
+| 9 | 守住阵地！ | 守るんだ！ | 防御位置を固めてください。 | 陣を固めて守り抜きましょう！ |
+| 10 | 大家辛苦了。 | みんな、大変だ。 | 皆さん疲れてるみたいだね。 | みんな、本当にお疲れ様です。 |
+
+#### Medium
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 敌方坦克从北面推进，需要立即支援！ | 敵チームの戦車が北から押し寄せてくるので、すぐに支援が必要だ。 | 敵のタンクが北から進んでいる、すぐに助けてね！ | 敵が北から戦車で押し寄せてるから、すぐに援護してくれ！ |
+| 2 | 步枪和建材库存告急，请求补给。 | 銃と建材が急いでなくなるので、補給を頼む。 | 歩兵と建材の備蓄が底をついていますので、補給をお願いします。 | 銃器と建材の在庫が底をつきつつあるので、補給を頼みます。 |
+| 3 | 守住阵地，不要让他们过桥！ | Keep the line! Don’t let them cross the bridge! ✗ | 防御位置を固めて、橋を渡らせないでください。 | 橋を渡らせないで、陣地を守りなさい！ |
+| 4 | 所有补给车司机立即返回主基地。 | 給丁车司机立刻返回主基地。 ✗ | すべての補給車運転手は即座に本部へ戻るよう命じられた。 | 補給車の運転手はすぐにメイン基地に戻ってくれ。 |
+| 5 | 我们需要建造者马上去前线基地。 | 私たちは戦士がすぐに前線基地に駆けに行くべきです。 | すぐに建築家を前線基地へ送ってください。 | 前線基地へ、すぐに建設しましょう。 |
+| 6 | 在附近森林发现敌方步兵，约10人。 | 近くの森で敵兵士が見つかり、10人いる。 | 近くの森で敵歩兵を発見、約10名です。 | 近くの森に敵歩兵が10人くらい見られました。 |
+| 7 | 有人能把卡车开到阿尔法基地吗？ | 車をアルファ基地まで運んでくれる人、いますか？ | アルファ基地に車を運ぶ人はいますか？ | アルファ基地までトラックを運んでくれる人いますか？ |
+| 8 | 市政厅正在遭受猛烈攻击，需要支援！ | Wardens are under attack, need help! ✗ | 市庁舎は激しい攻撃を受けている。助けが必要です！ | 市庁舎に激しい攻撃が集中しているので、助けを求めています。 |
+| 9 | 我们在向东推进，请提供火力掩护。 | 向東進軍，请提供火力支援。 ✗ | 東進中、砲撃のカバーをお願いします。 | 東に進んでるから、火力支援をお願いします。 |
+| 10 | 有多余的建材吗？我们在这里建地堡。 | 建材多吗？我们在这里建地堡。 ✗ | はい、たくさんの材料があります。ここで地堡を作りますよ。 | 余った資材があれば、ここで要塞を建てようぜ。 |
+
+#### Long
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 我们需要在前线立即部署三门反坦克炮和两门野战炮。 | 今すぐ前線に三門反坦克砲と二門野戦砲を配置する必要がある。 | 我々は即座に前線で3門の対戦車砲と2門の野砲を配置する必要があります。 | 前線に即座に3門の自走砲と2門の野砲を配置しろ。 |
+| 2 | 注意山上的狙击手，他已经在那个位置潜伏了二十分钟。 | 狙撃手は山の上で20分間潜んでいる。 | その上の狙撃兵に気を付けて、彼は20分間そこに潜んでいるよ。 | 山の上狙撃手、もう二十分も潜んでるよ。 |
+| 3 | 有人能来接我吗？我被困在边境基地，没有卡车。 | 誰能来接我吗？我被困在边境基地，没有卡车。 ✗ | 誰かが来てくれる？辺境基地にいて、車はないんだ。 | 誰か辺境基地に迎えに来てくれませんか？ |
+| 4 | 库存严重不足，我们需要立即向两个狐穴运送补给。 | Supply is running low, we need to quickly transport supplies to both foxholes. ✗ | 物資が大変不足しているので、すぐに2つの狐穴へ補給を運ぶ必要があります。 | 品切れが深刻なので、すぐに両方の穴に物資を運ぶ必要があります。 |
+| 5 | 敌人正在猛烈攻击我们的右翼，需要所有可用步兵增援。 | 敵は右翼に猛烈な攻撃を仕掛けていて、すべての可用兵士を増援する必要がある。 | 敵は我々の右翼を猛攻撃している、全ての歩兵で増援する必要がある。 | 敵が右翼を激しく攻撃してきているので、使える歩兵を全員で応援してくれ。 |
+| 6 | 驻军即将失守，请求立即增援和补给。 | 将要失守的驻军请求立即增援和补给。 ✗ | 駐屯軍がすぐに陥落するぞ、急な増援と補給を要請します！ | すぐに援護と物資を送ってくれ！ |
+| 7 | 十分钟后补给车队到来，请清理通往主基地的道路。 | 十分鐘後、補給車隊が到着するので、主基地的道順を整理してください。 | 10分後補給車隊が到着するので、主要基地への道を掃除してください。 | あと15分で補給車隊が到着するので、メイン基地への道を片付けてください。 |
+| 8 | 我正在北部六边形建造大型地堡基地，建造者们来帮忙。 | 私は北部の六角形に巨大な要塞基地を建設しています。 | 私は北の6角形で大規模な防御施設を構築中、助けてくれる仲間たちがいます。 | 北部六辺で大規模な要塞を建てているので、建設隊の人たち、手伝いに来てください。 |
+| 9 | 所有督卫军向北推进，趁殖民军在南线被牵制时行动。 | Warden forces advance north, moving while colonists are being held back in the south. ✗ | 全てのウォーデン軍は北に進み、植民軍が南線で縛られている間に行動する。 | 衛軍は北に進み、殖民軍が南線で動きづらいうちに攻撃した。 |
+| 10 | 我们失去了市政厅，正在撤退到桥边的次级防线。 | 私たちは市庁舎を失い、橋の斜面にある次善の防御線に撤退しています。 | 都市庁舎を失い、橋辺の二次防線に撤退中です。 | 市庁を失い、橋側のセカンダリーラインに撤退中だ。 |
+
+#### 速度 (中央値 s、ウォームキャッシュ)
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low | 2.62 | 2.76 | 2.78 |
+| Medium | 3.33 | 3.40 | 3.79 |
+| High | 2.85 | 3.16 | 3.36 |
+
+
+### KO → 日本語
+
+#### Short
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 탄약 필요! | 弾薬が必要だ。 | タムラキが必要です！ | 弾切れだ！ |
+| 2 | 잘했어요! | 頑張ったよ！ | 素晴らしい！ | すごいね！ |
+| 3 | 적이 왔어! | 敵が来たぞ！ | 敵が来たよ！ | 敵が来たぞ！ |
+| 4 | 후퇴! | 退却！ ✗ | 後退しろ！ | 後退だ！ |
+| 5 | 측면 주시! | Listen carefully! ✗ | 視界を保て！ | 側面を狙って！ |
+| 6 | 보급 왔어. | Supply arrived. ✗ | 配備完了。 ✗ | 物資が運ばれてきたよ。 |
+| 7 | 돌격! | Let’s go! ✗ | 突撃！ ✗ | 突撃だ！ |
+| 8 | 의무병 필요! | Need a medic! ✗ | 必要な兵士を呼んでいます！ | 医務士が足りない！ |
+| 9 | 진지 사수! | Let’s go, Warden! ✗ | 進撃しろ！ | 陣地を守りなさい！ |
+| 10 | 수고했어요. | 頑張ってね。 | 疲れました。 | お疲れ様でした。 |
+
+#### Medium
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 북쪽에서 적 탱크가 밀려오고 있어, 즉각 지원이 필요해! | 北から敵戦車が押し寄せてるから、すぐに支援が必要だ！ | 北側で敵のタンクが進んできたので、すぐに支援を要請しています！ | 北から敵の戦車が押し寄せてるから、すぐに援護してくれ！ |
+| 2 | 소총과 자재가 부족해, 보급이 필요해. | 弾と弾薬が足りないから、物資が必要だ。 | 弾薬と資材が不足しているので、補給が必要です。 | 弾と資材が足りないから、補給が必要だね。 |
+| 3 | 진지를 지켜, 다리를 건너게 하면 안 돼! | Keep watch, crossing the path isn’t allowed! ✗ | 守備をしろ、渡河は許さない！ | 陣地を守って、橋を渡らせないでくれ！ |
+| 4 | 모든 보급차 운전수는 즉시 본진으로 돌아와. | Supply runners must immediately return to base. ✗ | すべてのアップグレード車両を即座に本部へ戻る。 | すべての補給車運転手はすぐに本陣に戻ってくれ。 |
+| 5 | 전방 기지에 건설자들이 지금 당장 필요해. | 建設者たちが今すぐ戦場にいる。 | 建設者たちは今すぐ前線基地に必要です。 | 前線基地に建設部隊がすぐに必要だ。 |
+| 6 | 근처 숲에서 적 보병 발견, 약 10명. | 近くの森で敵歩兵を見つけた、10人だよ。 | 近くの森で敵兵士を見つけた、約10人。 | 近くの森に敵歩兵が10名ほど見つかった。 |
+| 7 | 누가 알파 기지로 트럭 가져다 줄 수 있어? | 誰がアルファ基地にトラックを持ってくる？ | 誰かアルファ基地にトラックを運ぶ手伝いができる？ | アルファ基地にトラックを運んでくれる人いますか？ |
+| 8 | 시청이 맹공격을 받고 있어, 도움이 필요해! | Warden is under heavy attack, need help! ✗ | 視聴室が猛攻撃を受けているんだ、助けてもらえない？ | 市庁が猛攻撃を受けているので、手伝ってくれませんか？ |
+| 9 | 동쪽으로 밀고 있어, 화력 지원해줘. | Eastward, pushing, please give me some firepower support. ✗ | 東側に押し込んでいるよ、火力支援してくれ。 | 東に進んでるから、火力支援してくれ。 |
+| 10 | 여분 건설재 있어? 여기서 벙커 짓고 있어. | 何建てる？ ここで벙カー作ってる 거야? | 建設資材がある？ここでブレイクしているよ。 | 余った建設資材ない？ここでバンカー作ってるよ。 |
+
+#### Long
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| 1 | 전선에 AT포 3문과 야전포 2문이 즉시 필요합니다. | 兵士가 3문과 2문이 즉시 필요해요. ✗ | 前線にAT弾3発と野戦砲2門が必要です。 | AT砲3門と野砲2門をすぐに持ってきてください。 |
+| 2 | 언덕 위의 저격수를 조심해, 그는 20분째 거기서 잠복하고 있어. | 敵の射撃注意、彼は20分間、そこから隠れているんだ。 | 丘の上にいる狙撃手を見張って、彼はそこに20分間隠れている。 | その丘の狙撃手を警戒しろ、彼はもう20分間も潜伏してるんだ。 |
+| 3 | 누가 나 좀 데려다 줄 수 있어? 트럭 없이 국경 기지에 갇혀 있어. | 誰か私を連れてきてくれる？トラックを使わずに国境の地にいるんだ。 | 誰かが私を助けてくれる？トラックなしで国境基地に閉じ込められている。 | 誰か私を連れ出してくれませんか？トラックがなくて国境基地に閉じ込められています。 |
+| 4 | 보급이 심각하게 부족해, 두 참호로 즉시 보급 운송이 필요해. | Supply is seriously lacking, we need to move the troops immediately by trenches. ✗ | ボギングが非常に不足しているため、直ちに二つの真剣なボギング輸送を必要としています。 | 物資が極端に不足しているので、両陣営にすぐに補給輸送が必要だ。 |
+| 5 | 적이 오른쪽 측면을 강하게 밀고 있어, 가용한 모든 보병이 증원해야 해. | 敵が右側を強く押し付けていて、兵士が援護が必要だ。 | 右側を強く押しているので、すべての歩兵が増援する必要があります。 | 敵が右側を猛烈に攻めてるので、使える兵力は全部増援だ。 |
+| 6 | 수비대가 곧 함락될 것 같아, 즉각적인 지원과 보급을 요청해. | 守備隊がすぐに崩される予感がするから、すぐに支援と物資を要求する。 | 守備隊がすぐに陥落するようだ、即座の支援と補給を要請します。 | すぐに援護と物資を送ってくれ。 |
+| 7 | 10분 후 보급 차량이 오니, 본진 가는 길 정리해 줘. | 10分後、輸送車が到着したら、本陣へ向かう道順を教えて。 | 10分後に補給車が来たら、本陣へ向かう道を整えよう。 | 10分後に補給車両が来るから、本陣への道は整理してくれ。 |
+| 8 | 북쪽 헥스에 대형 벙커 기지 짓고 있어, 건설자들 와서 도와줘. | 北のヘックスに大規模なシェルター基地を建設中、建設者たちが来て手伝ってくれる。 | 北部のヘクスに大規模なバンカーを建設中です。建築家と協力して助けてください。 | 北のヘクスに大型の벙커基地を建ててるから、建設隊の人たちで手伝ってくれる？ |
+| 9 | 모든 수호자들은 식민지군이 남쪽 전선에서 분산된 동안 북쪽을 밀어. | Wardens are pushing the Colonials south from the north front. ✗ | すべての守護者たちは南側で分散している間、北部を圧倒する。 | すべての守備隊が、敵が南線で分散している間に、北を押し進めた。 |
+| 10 | 시청을 잃었어, 다리 근처 2차 방어선으로 후퇴하고 있어. | 敵の시청을 잃었어, 다리 근처 방어선으로 후퇴하고 있어. | 視聴を失った、近くの橋で2次防衛線に後退中。 | 市街地を失ったので、橋の近くの2次防衛線に撤退中です。 |
+
+#### 速度 (中央値 s、ウォームキャッシュ)
+
+| プリセット | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| Low | 2.61 | 2.67 | 2.79 |
+| Medium | 3.31 | 3.44 | 3.98 |
+| High | 2.80 | 3.13 | 3.52 |
+

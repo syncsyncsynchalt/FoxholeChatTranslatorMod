@@ -45,7 +45,7 @@ void config::Load(const char* baseDir) {
     g_config.demoMode         = GetPrivateProfileIntA("General", "DemoMode",     1,    configPath.c_str()) != 0;
 
     g_config.ollamaEndpoint   = ReadIniStr(configPath.c_str(), "Translation", "OllamaEndpoint",   "http://localhost:11435/api/generate");
-    g_config.performancePreset = ReadIniStr(configPath.c_str(), "Translation", "PerformancePreset", "Medium");
+    g_config.performancePreset = ReadIniStr(configPath.c_str(), "Translation", "PerformancePreset", "High");
 
     std::string transMode = ReadIniStr(configPath.c_str(), "Translation", "Mode", "Japanese");
     g_translationMode.store(static_cast<int>(ParseTranslationMode(transMode)));
