@@ -18,9 +18,6 @@ void SetLatest(const char* textUtf8);
 // 現在発話中のテキストを返す (overlay ハイライト用。発話中でなければ空文字)
 std::string GetSpeakingText();
 
-// 現在の読み上げを中断
-void Stop();
-
 // シャットダウン (スレッド終了)
 void Shutdown();
 

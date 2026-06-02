@@ -479,7 +479,7 @@ static bool InitVoicevox(const std::string& ttsDir) {
     // Synthesizer 作成
     VoicevoxInitializeOptions initOpts = g_vvDefInitOpt ? g_vvDefInitOpt()
                                                         : VoicevoxInitializeOptions{1, 0};
-    initOpts.acceleration_mode = 1; // CPU
+    initOpts.acceleration_mode = 0; // AUTO: GPU 優先 (CUDA)、なければ CPU
     initOpts.cpu_num_threads   = 1;
     rc = g_vvSynthNew(g_vvOnnxruntime, g_vvOpenJtalk, initOpts, &g_vvSynthesizer);
     if (rc != VOICEVOX_RESULT_OK) {
@@ -660,6 +660,20 @@ struct LangModel {
 static std::mutex              g_modelMutex;
 static std::map<Lang, LangModel> g_models;
 static std::string             g_ttsDir;
+static std::string             g_sherpaProvider; // 初回検出後キャッシュ ("cuda" or "cpu")
+
+// nvcuda.dll の存在で NVIDIA GPU を検出し、最適プロバイダーを返す
+static const char* SelectSherpaProvider() {
+    if (!g_sherpaProvider.empty()) return g_sherpaProvider.c_str();
+    HMODULE hCuda = LoadLibraryA("nvcuda.dll");
+    if (hCuda) {
+        FreeLibrary(hCuda);
+        g_sherpaProvider = "cuda";
+    } else {
+        g_sherpaProvider = "cpu";
+    }
+    return g_sherpaProvider.c_str();
+}
 
 // 15.vvm (青山龍星) をシンセサイザーに追加ロード — ダウンロード完了後の hot-reload 用
 static void TryLoadVvm15() {
@@ -713,18 +727,26 @@ static SherpaOnnxOfflineTts* CreateSupertonicModel(const std::string& modelDir) 
     cfg.model.supertonic.voice_style        = vs.c_str();
     cfg.model.num_threads   = 1;
     cfg.model.debug         = 0;
-    cfg.model.provider      = "cpu";
     cfg.max_num_sentences   = 1;
 
+    cfg.model.provider = SelectSherpaProvider();
     DWORD excCode = 0;
     SherpaOnnxOfflineTts* handle = TryCreateModel(&cfg, &excCode);
+    if ((excCode || !handle) && g_sherpaProvider != "cpu") {
+        logging::Debug("[TTS] Supertonic: %s 利用不可、CPU にフォールバック", g_sherpaProvider.c_str());
+        g_sherpaProvider = "cpu";
+        cfg.model.provider = "cpu";
+        excCode = 0;
+        handle = TryCreateModel(&cfg, &excCode);
+    }
     if (excCode)
         logging::Debug("[TTS] Supertonic モデル作成例外 code=0x%08X: %s",
                        excCode, modelDir.c_str());
     else if (!handle)
         logging::Debug("[TTS] Supertonic モデル作成失敗: %s", modelDir.c_str());
     else
-        logging::Debug("[TTS] Supertonic モデル作成完了: %s", modelDir.c_str());
+        logging::Debug("[TTS] Supertonic モデル作成完了 (provider=%s): %s",
+                       cfg.model.provider, modelDir.c_str());
     return handle;
 }
 
@@ -782,18 +804,25 @@ static SherpaOnnxOfflineTts* CreateModel(Lang lang) {
     cfg.model.vits.length_scale  = 1.0f;
     cfg.model.num_threads        = 1;
     cfg.model.debug              = 0;
-    cfg.model.provider           = "cpu";
     cfg.max_num_sentences        = 5;
 
+    cfg.model.provider = SelectSherpaProvider();
     DWORD excCode = 0;
     SherpaOnnxOfflineTts* handle = TryCreateModel(&cfg, &excCode);
+    if ((excCode || !handle) && g_sherpaProvider != "cpu") {
+        logging::Debug("[TTS] VITS: %s 利用不可、CPU にフォールバック", g_sherpaProvider.c_str());
+        g_sherpaProvider = "cpu";
+        cfg.model.provider = "cpu";
+        excCode = 0;
+        handle = TryCreateModel(&cfg, &excCode);
+    }
     if (excCode)
         logging::Debug("[TTS] VITS モデル作成例外 code=0x%08X lang=%s",
                        excCode, LangSubdir(lang));
     else if (!handle)
         logging::Debug("[TTS] モデル作成失敗 (lang=%s)", LangSubdir(lang));
     else
-        logging::Debug("[TTS] モデル作成完了 (lang=%s)", LangSubdir(lang));
+        logging::Debug("[TTS] モデル作成完了 (lang=%s provider=%s)", LangSubdir(lang), cfg.model.provider);
     return handle;
 }
 
@@ -813,33 +842,121 @@ static SherpaOnnxOfflineTts* GetModel(Lang lang) {
 
 static constexpr float  kPlaybackSpeed = 1.05f;  // 再生速度 (1.0=等速)
 
-static std::thread             g_ttsThread;
+// 合成入力キュー (最新上書き)
+static std::thread             g_synthThread;
 static std::mutex              g_ttsMutex;      // g_latestText 保護
 static std::condition_variable g_ttsCv;
 static std::string             g_latestText;    // 次の発話テキスト (上書き最新)
 static std::atomic<bool>       g_ttsRunning{false};
-static std::atomic<bool>       g_ttsStop{false};
 static std::string             g_ttsLanguage = "auto";
+
+// 合成済みキュー (SynthWorker → PlayWorker)
+struct ReadyItem { std::string text; PcmData pcm; };
+static constexpr size_t        kReadyQueueMax = 2;
+static std::queue<ReadyItem>   g_readyQueue;
+static std::mutex              g_readyMutex;
+static std::condition_variable g_readyCv;
+static std::thread             g_playThread;
 
 static std::mutex  g_speakingMutex;             // g_currentSpeakingText 保護
 static std::string g_currentSpeakingText;        // 現在発話中テキスト (overlay ハイライト用)
 
-static void TtsWorker() {
+// ============================================================
+// XAudio2 再生ヘルパー (PlayWorker 専用)
+// ============================================================
+
+static void PlayPcmXAudio2(IXAudio2* xaudio, const PcmData& pcm) {
+    WAVEFORMATEX wfx = {};
+    wfx.wFormatTag      = WAVE_FORMAT_PCM;
+    wfx.nChannels       = 1;
+    wfx.nSamplesPerSec  = static_cast<DWORD>(pcm.sampleRate);
+    wfx.wBitsPerSample  = 16;
+    wfx.nBlockAlign     = 2;
+    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * 2;
+
+    IXAudio2SourceVoice* sv = nullptr;
+    HRESULT hr = xaudio->CreateSourceVoice(&sv, &wfx);
+    if (FAILED(hr) || !sv) {
+        logging::Debug("[TTS] CreateSourceVoice 失敗: hr=0x%08X", hr);
+        return;
+    }
+
+    XAUDIO2_BUFFER buf = {};
+    buf.AudioBytes = static_cast<DWORD>(pcm.samples.size() * 2);
+    buf.pAudioData = reinterpret_cast<const BYTE*>(pcm.samples.data());
+    buf.Flags      = XAUDIO2_END_OF_STREAM;
+
+    sv->SubmitSourceBuffer(&buf);
+    sv->SetVolume(config::Get().ttsVolume);
+    sv->SetFrequencyRatio(kPlaybackSpeed);
+    sv->Start(0);
+
+    for (;;) {
+        if (!g_ttsRunning.load()) { sv->Stop(0); break; }
+        XAUDIO2_VOICE_STATE state;
+        sv->GetState(&state);
+        if (state.BuffersQueued == 0) break;
+        Sleep(50);
+    }
+    sv->DestroyVoice();
+}
+
+// ============================================================
+// PlayWorker: 合成済み PCM を受け取り XAudio2 で再生する
+// ============================================================
+
+static void PlayWorker() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
     IXAudio2* xaudio = nullptr;
     HRESULT hr = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
     if (FAILED(hr)) {
-        logging::Debug("[TTS] XAudio2Create 失敗: 0x%08X", hr);
-        g_ttsRunning.store(false);
+        logging::Debug("[TTS] PlayWorker XAudio2Create 失敗: 0x%08X", hr);
+        CoUninitialize();
         return;
     }
 
     IXAudio2MasteringVoice* masterVoice = nullptr;
     xaudio->CreateMasteringVoice(&masterVoice);
+    logging::Debug("[TTS] PlayWorker 起動");
 
-    logging::Debug("[TTS] ワーカー起動");
+    while (g_ttsRunning.load()) {
+        ReadyItem item;
+        {
+            std::unique_lock<std::mutex> lk(g_readyMutex);
+            g_readyCv.wait(lk, [] { return !g_readyQueue.empty() || !g_ttsRunning.load(); });
+            if (!g_ttsRunning.load() && g_readyQueue.empty()) break;
+            if (g_readyQueue.empty()) continue;
+            item = std::move(g_readyQueue.front());
+            g_readyQueue.pop();
+            g_readyCv.notify_one(); // SynthWorker にキュー空きを通知
+        }
+
+        // ハイライト ON → PCM は合成済みなのでこの直後に音が出る
+        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText = item.text; }
+
+        logging::Debug("[TTS] 再生開始: bytes=%zu text=%.60s",
+                       item.pcm.samples.size() * 2, item.text.c_str());
+        PlayPcmXAudio2(xaudio, item.pcm);
+
+        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText.clear(); }
+    }
+
+    if (masterVoice) masterVoice->DestroyVoice();
+    if (xaudio)      xaudio->Release();
+    logging::Debug("[TTS] PlayWorker 終了");
+    CoUninitialize();
+}
+
+// ============================================================
+// SynthWorker: テキストを合成し ReadyQueue に積む
+// ============================================================
+
+static void SynthWorker() {
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+
+    logging::Debug("[TTS] SynthWorker 起動");
 
     // Init() から移動: ゲーム起動後にローダーロック競合なしでロード
     if (!g_sherpaLib) LoadSherpaLib(g_ttsDir);
@@ -863,16 +980,14 @@ static void TtsWorker() {
                     if (InitVoicevox(g_ttsDir))
                         logging::Debug("[TTS] VOICEVOX 初期化完了、ずんだもんに切り替えます");
                 }
-                TryLoadVvm15();  // 15.vvm ダウンロード完了後に青山龍星を hot-load
+                TryLoadVvm15();
                 continue;
             }
             text = std::move(g_latestText);
             g_latestText.clear();
         }
 
-        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText = text; }
-        g_ttsStop.store(false);
-        logging::Debug("[TTS] 処理開始: bytes=%zu text=%.60s",
+        logging::Debug("[TTS] 合成開始: bytes=%zu text=%.60s",
                        text.size(), text.c_str());
 
         // 言語判定
@@ -910,169 +1025,89 @@ static void TtsWorker() {
             logging::Debug("[TTS] エンジン選択: %s (lang=%s vvReady=%d tlMode=%d)",
                            useVoicevox ? "VOICEVOX" : "Sherpa-ONNX",
                            langStr, (int)g_vvReady, (int)tlMode);
+
+        PcmData pcm;
         if (useVoicevox) {
-            PcmData vvPcm;
             // JAZ=ずんだもん / JA=青山龍星 (15.vvm 未ロード時はずんだもんにフォールバック)
             uint32_t vvStyle = (tlMode == TranslationMode::JAZ || !g_vv15Ready) ? g_vvStyleId : g_vvJaStyleId;
-            if (!SynthesizeVoicevox(processedText, vvPcm, vvStyle)) continue;
-            if (g_ttsStop.load()) continue;
-
-            WAVEFORMATEX wfx = {};
-            wfx.wFormatTag      = WAVE_FORMAT_PCM;
-            wfx.nChannels       = 1;
-            wfx.nSamplesPerSec  = static_cast<DWORD>(vvPcm.sampleRate);
-            wfx.wBitsPerSample  = 16;
-            wfx.nBlockAlign     = 2;
-            wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * 2;
-
-            DWORD dataSize = static_cast<DWORD>(vvPcm.samples.size() * 2);
-
-            IXAudio2SourceVoice* sourceVoice = nullptr;
-            hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
-            if (FAILED(hr) || !sourceVoice) {
-                logging::Debug("[TTS-VV] CreateSourceVoice 失敗: hr=0x%08X", hr);
+            if (!SynthesizeVoicevox(processedText, pcm, vvStyle)) continue;
+        } else {
+            // モデル取得 (遅延初期化)
+            SherpaOnnxOfflineTts* model = GetModel(lang);
+            if (!model) {
+                // espeak-ng VITS (EN/RU/KO) がスキップ済みの場合、JA Supertonic-3 で代替する
+                logging::Debug("[TTS] lang=%s モデルなし、JA Supertonic-3 (多言語) でフォールバック", langStr);
+                model = GetModel(Lang::JA);
+            }
+            if (!model) {
+                logging::Debug("[TTS] 利用可能なモデルなし");
                 continue;
             }
 
-            XAUDIO2_BUFFER buf = {};
-            buf.AudioBytes = dataSize;
-            buf.pAudioData = reinterpret_cast<const BYTE*>(vvPcm.samples.data());
-            buf.Flags      = XAUDIO2_END_OF_STREAM;
-
-            sourceVoice->SubmitSourceBuffer(&buf);
-            sourceVoice->SetVolume(config::Get().ttsVolume);
-            sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
-            sourceVoice->Start(0);
-            logging::Debug("[TTS-VV] 再生開始: %u bytes", dataSize);
-
-            for (;;) {
-                if (g_ttsStop.load() || !g_ttsRunning.load()) {
-                    sourceVoice->Stop(0);
-                    break;
+            // VITS モデルはアテンション機構の限界を超えた長文で同一箇所ループが発生する
+            // 文境界を優先して 180 文字以内に切り詰める
+            static const size_t kMaxTtsChars = 180;
+            std::string ttsText = processedText;
+            if (ttsText.size() > kMaxTtsChars) {
+                static const char kBoundary[] = ".!?;,\n";
+                size_t cut = std::string::npos;
+                for (size_t i = kMaxTtsChars; i > kMaxTtsChars / 2; --i) {
+                    if (strchr(kBoundary, ttsText[i])) { cut = i + 1; break; }
                 }
-                XAUDIO2_VOICE_STATE state;
-                sourceVoice->GetState(&state);
-                if (state.BuffersQueued == 0) break;
-                Sleep(50);
+                ttsText = ttsText.substr(0, cut != std::string::npos ? cut : kMaxTtsChars);
+                logging::Debug("[TTS] テキスト切り詰め: %zu -> %zu bytes",
+                               text.size(), ttsText.size());
             }
-            sourceVoice->DestroyVoice();
-            { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText.clear(); }
-            continue;
-        }
 
-        // モデル取得 (遅延初期化)
-        SherpaOnnxOfflineTts* model = GetModel(lang);
-        if (!model) {
-            // espeak-ng VITS (EN/RU/KO) がスキップ済みの場合、JA Supertonic-3 で代替する。
-            // tts.json の "split":"opensource-multilingual" が示すとおり多言語対応済み。
-            logging::Debug("[TTS] lang=%s モデルなし、JA Supertonic-3 (多言語) でフォールバック", langStr);
-            model = GetModel(Lang::JA);
-        }
-        if (!model) {
-            logging::Debug("[TTS] 利用可能なモデルなし");
-            continue;
-        }
+            if (config::Get().ttsVerboseLog)
+                logging::Debug("[TTS] Sherpa合成開始: bytes=%zu lang=%s",
+                               ttsText.size(), langStr);
 
-        if (g_ttsStop.load()) continue;
-
-        // VITS モデルはアテンション機構の限界を超えた長文で同一箇所ループが発生する
-        // 文境界を優先して 180 文字以内に切り詰める
-        static const size_t kMaxTtsChars = 180;
-        std::string ttsText = processedText;
-        if (ttsText.size() > kMaxTtsChars) {
-            static const char kBoundary[] = ".!?;,\n";
-            size_t cut = std::string::npos;
-            for (size_t i = kMaxTtsChars; i > kMaxTtsChars / 2; --i) {
-                if (strchr(kBoundary, ttsText[i])) { cut = i + 1; break; }
+            DWORD tGenStart = GetTickCount();
+            DWORD excCode2  = 0;
+            const SherpaOnnxGeneratedAudio* audio = TryGenerate(model, ttsText.c_str(), &excCode2);
+            DWORD tGenMs = GetTickCount() - tGenStart;
+            if (excCode2) {
+                logging::Debug("[TTS] Sherpa合成例外 code=0x%08X lang=%s text=%.40s",
+                               excCode2, langStr, ttsText.c_str());
+                continue;
             }
-            ttsText = ttsText.substr(0, cut != std::string::npos ? cut : kMaxTtsChars);
-            logging::Debug("[TTS] テキスト切り詰め: %zu -> %zu bytes",
-                           text.size(), ttsText.size());
-        }
+            if (!audio || audio->n <= 0) {
+                if (audio) g_fnFreeAudio(audio);
+                logging::Debug("[TTS] 合成失敗またはサンプルなし (lang=%s)", langStr);
+                continue;
+            }
+            if (config::Get().ttsVerboseLog)
+                logging::Debug("[TTS] Sherpa合成完了: samples=%d rate=%d time=%lums",
+                               audio->n, audio->sample_rate, (unsigned long)tGenMs);
 
-        if (config::Get().ttsVerboseLog)
-            logging::Debug("[TTS] Sherpa合成開始: bytes=%zu lang=%s",
-                           ttsText.size(), langStr);
-
-        DWORD tGenStart = GetTickCount();
-        DWORD excCode2  = 0;
-        const SherpaOnnxGeneratedAudio* audio = TryGenerate(model, ttsText.c_str(), &excCode2);
-        DWORD tGenMs = GetTickCount() - tGenStart;
-        if (excCode2) {
-            logging::Debug("[TTS] Sherpa合成例外 code=0x%08X lang=%s text=%.40s",
-                           excCode2, langStr, ttsText.c_str());
-            continue;
-        }
-        if (!audio || audio->n <= 0) {
-            if (audio) g_fnFreeAudio(audio);
-            logging::Debug("[TTS] 合成失敗またはサンプルなし (lang=%s)", langStr);
-            continue;
-        }
-        if (config::Get().ttsVerboseLog)
-            logging::Debug("[TTS] Sherpa合成完了: samples=%d rate=%d time=%lums",
-                           audio->n, audio->sample_rate, (unsigned long)tGenMs);
-
-        if (g_ttsStop.load()) {
+            // float32 PCM [-1,1] → int16
+            pcm.sampleRate = audio->sample_rate;
+            pcm.samples.resize(audio->n);
+            for (int i = 0; i < audio->n; i++) {
+                float v = audio->samples[i];
+                if (v >  1.0f) v =  1.0f;
+                if (v < -1.0f) v = -1.0f;
+                pcm.samples[i] = static_cast<int16_t>(v * 32767.0f);
+            }
             g_fnFreeAudio(audio);
-            continue;
         }
 
-        // float32 PCM [-1,1] → int16
-        int32_t sampleRate = audio->sample_rate;
-        int     numSamples = audio->n;
-        std::vector<int16_t> pcm16(numSamples);
-        for (int i = 0; i < numSamples; i++) {
-            float v = audio->samples[i];
-            if (v >  1.0f) v =  1.0f;
-            if (v < -1.0f) v = -1.0f;
-            pcm16[i] = static_cast<int16_t>(v * 32767.0f);
+        if (!g_ttsRunning.load()) break;
+
+        // ReadyQueue が満杯なら PlayWorker がひとつ消化するまで待機
+        {
+            std::unique_lock<std::mutex> lk(g_readyMutex);
+            g_readyCv.wait(lk, [] {
+                return g_readyQueue.size() < kReadyQueueMax || !g_ttsRunning.load();
+            });
+            if (!g_ttsRunning.load()) break;
+            g_readyQueue.push({text, std::move(pcm)});
+            g_readyCv.notify_one();
         }
-        g_fnFreeAudio(audio);
-
-        WAVEFORMATEX wfx = {};
-        wfx.wFormatTag      = WAVE_FORMAT_PCM;
-        wfx.nChannels       = 1;
-        wfx.nSamplesPerSec  = static_cast<DWORD>(sampleRate);
-        wfx.wBitsPerSample  = 16;
-        wfx.nBlockAlign     = 2; // 1ch * 16bit / 8
-        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
-
-        DWORD dataSize = static_cast<DWORD>(pcm16.size() * 2);
-
-        // XAudio2 再生
-        IXAudio2SourceVoice* sourceVoice = nullptr;
-        hr = xaudio->CreateSourceVoice(&sourceVoice, &wfx);
-        if (FAILED(hr) || !sourceVoice) continue;
-
-        XAUDIO2_BUFFER buf = {};
-        buf.AudioBytes = dataSize;
-        buf.pAudioData = reinterpret_cast<const BYTE*>(pcm16.data());
-        buf.Flags      = XAUDIO2_END_OF_STREAM;
-
-        sourceVoice->SubmitSourceBuffer(&buf);
-        sourceVoice->SetVolume(config::Get().ttsVolume);
-        sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
-        sourceVoice->Start(0);
-
-        for (;;) {
-            if (g_ttsStop.load() || !g_ttsRunning.load()) {
-                sourceVoice->Stop(0);
-                break;
-            }
-            XAUDIO2_VOICE_STATE state;
-            sourceVoice->GetState(&state);
-            if (state.BuffersQueued == 0) break;
-            Sleep(50);
-        }
-
-        sourceVoice->DestroyVoice();
-        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText.clear(); }
     }
 
-    if (masterVoice) masterVoice->DestroyVoice();
-    if (xaudio)      xaudio->Release();
-    logging::Debug("[TTS] ワーカー終了");
-    CoUninitialize();
+    logging::Debug("[TTS] SynthWorker 終了");
 }
 
 // ============================================================
@@ -1098,9 +1133,10 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevox
         baseDir.resize(baseDir.size() - (sizeof(kSuffix) - 1));
     LoadTtsReadings(baseDir + "tts_readings.txt");
 
-    // DLL ロードは TtsWorker 内で行う（ゲーム起動のローダーロック競合を避けるため）
+    // DLL ロードは SynthWorker 内で行う（ゲーム起動のローダーロック競合を避けるため）
     g_ttsRunning.store(true);
-    g_ttsThread = std::thread(TtsWorker);
+    g_synthThread = std::thread(SynthWorker);
+    g_playThread  = std::thread(PlayWorker);
 }
 
 void tts::SetLatest(const char* textUtf8) {
@@ -1115,20 +1151,19 @@ std::string tts::GetSpeakingText() {
     return g_currentSpeakingText;
 }
 
-void tts::Stop() {
-    g_ttsStop.store(true);
-}
-
 void tts::DetachThread() {
     // DLL_PROCESS_DETACH (プロセス終了) 専用: ~std::thread が std::terminate を呼ばないよう detach する
-    if (g_ttsThread.joinable()) g_ttsThread.detach();
+    if (g_synthThread.joinable()) g_synthThread.detach();
+    if (g_playThread.joinable())  g_playThread.detach();
 }
 
 void tts::Shutdown() {
     if (!g_ttsRunning.load()) return;
     g_ttsRunning.store(false);
-    g_ttsCv.notify_one();
-    if (g_ttsThread.joinable()) g_ttsThread.join();
+    g_ttsCv.notify_one();    // SynthWorker を起床
+    g_readyCv.notify_all();  // PlayWorker を起床
+    if (g_synthThread.joinable()) g_synthThread.join();
+    if (g_playThread.joinable())  g_playThread.join();
 
     // モデル解放
     {
