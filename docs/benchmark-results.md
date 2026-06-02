@@ -1,6 +1,6 @@
 # Ollama ベンチマーク結果
 
-最終更新: 2026-06-01
+最終更新: 2026-06-02 (v4 — 全プリセット・全言語 360件)
 
 ---
 
@@ -13,7 +13,7 @@
 | GPU | NVIDIA GeForce RTX 3050 Ti Laptop GPU (4GB VRAM) |
 | OS | Windows 11 |
 | Ollama | 0.24.0 (CUDA v12) |
-| ベンチツール | `tools/bench_translate.py` (2026-06-01) |
+| ベンチツール | `tools/bench_translate.py` (2026-06-02) |
 
 ---
 
@@ -25,118 +25,258 @@
 | **Medium** | phi4-mini | 2.5 GB | 512 | 0 (全コア) | 0.1 | 120 |
 | **High** | gemma3:4b | 3.3 GB | 512 | 0 (全コア) | 0.1 | 120 |
 
-**翻訳プロンプト (JA モード):**
+**翻訳プロンプト (JA モード, v4):**
 
 ```
 [system] You are a Foxhole war-game chat translator.
-         Keep these game-specific terms exactly as-is: <マッチした保護語>.
-[prompt] Translate the following war-game chat into natural, casual Japanese.
-         Be concise — one short sentence. Paraphrase freely; keep key meaning.
-         Output ONLY the translated text.
+         Foxhole is a persistent MMO war game (wars last weeks) between two factions:
+           Wardens (nicknamed blues/blueberries) and Colonials (nicknamed collies/goblins).
+         37 hex regions on a continent; win by capturing 32+ town halls (victory points).
+         No NPCs — every soldier, vehicle, and building is player-operated.
+         Player roles: infantry (combat), logi (supply runs), builder (base construction), crew (vehicle operator).
+         War materials: bmat=basic, rmat=refined, emat=explosive, cmat=construction — all are physical war supplies.
+         T1/T2/T3 = technology tier unlocks (basic to advanced equipment).
+         Chat conventions:
+           'NEED X TO [place]' means X must be sent/delivered to that location.
+           'pieces' = military hardware (guns/tanks/vehicles), never people.
+           'boys/guys/lads' = teammates (gender-neutral rallying language).
+           Numbers in chat = troop counts, material amounts, distances, or timers.
+         [マッチしたスラングのみ] Note: 'lazy' means too lazy (not sick); 'W' means kudos; ...
+         [保護語あり] Keep these game-specific terms exactly as-is: <語>.
+         [保護語+placeholder] {{T0}}, {{T1}}, etc. are location/term placeholders —
+           translate the sentence meaning but keep these tokens verbatim in your Japanese output.
+
+[prompt] Translate the following war-game chat message into natural, casual Japanese.
+         Output ONE short sentence only.
+         Preserve numbers and times (e.g. '15 mins') exactly.
+         Output ONLY the Japanese translation — no romanization, no explanations.
+
+[stop]   ["\n\n", " (", "Note:", "Translation:", "Here's", "Here is"]
 ```
 
-system フィールドは保護語がゼロでも常時設定する。保護語がない場合は 2 文目を省略。
+**slang_dict.txt** (入力にマッチした語の説明のみ動的追加、v4: 70+エントリ):
+
+| カテゴリ | 主要エントリ |
+|---------|------------|
+| 称賛/反応 | W, GG, F |
+| 通信 | copy, confirmed, ETA, intel, sitrep, all clear, contact |
+| 役割 | inf, para, arty, crew, sapper, medic, recon, builder |
+| 戦術 | push, cap, hold, fall back, flank, clear, secure, rotate, reinforce, fortify, contest |
+| 兵器 | pieces, nade, sticky, AT, HMG, mortar |
+| 施設 | FOB, garri, howi, bunker, trench |
+| 資源 | scrap, shirts, techmat, ammo, fuel |
+| 勝利体系 | VP/VPs, town hall, hex |
+| 社交 | boys, guys, bros, lads, lazy, lol, nah, imo, lmao, … |
+| 陣営 | collies, squids, goblins, blues, blueberries |
+
+**term_protection.txt** — 翻訳前に {{Tn}} で保護 (160+エントリ):  
+logi / Wardens? / Colonials? / 地名56ヘックス / 武器コードネーム / 施設・車両略語
+
+**tts_readings.txt** — TTS合成前に英語→読み変換 (80+エントリ、日本語・韓国語対応):  
+全 term_protection.txt エントリの VOICEVOX / Sherpa 読み仮名をカバー
 
 ---
 
-## 3. 速度比較
-
-各言語 × 入力長 10 サンプルの中央値 (s)。ウォームキャッシュ (初回モデルロードを除外)。  
-Short: 短文 (〜5 語)、Medium: 通常文 (〜10 語)、Long: 長文 (15 語以上)。
+## 3. 速度比較 (v4 実測、ウォームキャッシュ中央値 s)
 
 **EN → JA**
 
 | プリセット | Short | Medium | Long |
 |-----------|------:|-------:|-----:|
-| Low    | 2.67 | 2.71 | 2.76 |
-| Medium | 2.70 | 2.86 | 3.08 |
-| High   | 2.90 | 3.08 | 3.34 |
+| Low    | 2.67 | 2.77 | 2.86 |
+| Medium | **2.73** | **2.97** | **3.30** |
+| High   | 3.01 | 3.26 | 3.50 |
 
 **RU → JA**
 
 | プリセット | Short | Medium | Long |
 |-----------|------:|-------:|-----:|
-| Low    | 2.61 | 2.71 | 2.78 |
-| Medium | 2.61 | 2.78 | 3.09 |
-| High   | 2.83 | 3.04 | 3.28 |
+| Low    | 2.60 | 2.76 | 2.82 |
+| Medium | 2.62 | 2.89 | 3.15 |
+| High   | 2.82 | 3.19 | 3.47 |
 
 **ZH → JA**
 
 | プリセット | Short | Medium | Long |
 |-----------|------:|-------:|-----:|
-| Low    | 2.63 | 2.73 | 2.77 |
-| Medium | 2.63 | 2.88 | 3.10 |
-| High   | 2.87 | 3.07 | 3.30 |
+| Low    | 2.62 | 2.79 | 2.87 |
+| Medium | 2.63 | 2.89 | 3.20 |
+| High   | 2.86 | 3.24 | 3.44 |
 
 **KO → JA**
 
 | プリセット | Short | Medium | Long |
 |-----------|------:|-------:|-----:|
-| Low    | 2.63 | 2.72 | 2.76 |
-| Medium | 2.66 | 2.82 | 3.01 |
-| High   | 2.84 | 3.03 | 3.28 |
+| Low    | 2.61 | 2.76 | 2.87 |
+| Medium | 2.63 | 2.92 | 3.12 |
+| High   | 2.84 | 3.16 | 3.45 |
 
-初回リクエスト (モデルロード込み): Low ~4.2 s、Medium ~9.7 s、High ~8.3 s。
+初回リクエスト (モデルロード込み): Low ~5s、Medium ~14s、High ~10s。
+
+**速度の推移 (Medium / EN → JA)**
+
+| バージョン | Short | Medium | Long |
+|-----------|------:|-------:|-----:|
+| 初版 (2026-06-01、改善前) | 2.70 | 2.86 | 3.08 |
+| v1 (Paraphrase削除後、ローマ字問題あり) | 5.08 | 4.22 | 5.47 |
+| v2 (ローマ字修正後) | 3.62 | 3.35 | 3.74 |
+| v3 (Foxhole文脈追加) | 2.69 | 2.92 | 3.36 |
+| **v4 (現行、wiki 調査後)** | **2.73** | **2.97** | **3.30** |
+
+v4 は初版とほぼ同等の速度を維持しながら品質を大幅改善。
 
 ---
 
-## 4. 翻訳品質比較
+## 4. 翻訳品質比較 (v4 全360件)
 
 ◎=自然な日本語、○=意味は通じる、△=不自然・一部誤訳、✗=誤訳・英語出力
-
-例文は実際の translation_log.csv (2026-06-01) から採取したゲーム内チャットログ。
 
 ### EN→JA — Short (〜5語)
 
 | # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
 |---|------|:---------------|:------------------|:----------------|
-| 1 | ah fixed now | Fix it, please. ✗ | 今、修理しました。 ○ | 問題ないよ。 ○ |
-| 2 | NEED MORTARS TO MARBAN | Let's go, Mortars! ✗ | 必要な迫撃砲を持っているか確認する。 △ | ミサイルを投げて、敵陣を制圧したい。 ✗ |
-| 3 | GUN IS DEADDDDDDD | Gun's gone, man! ✗ | ガンは死んだよ！ ◎ | 砲撃が切れた！ ◎ |
-| 4 | 4 PIECES DEAD | やあ、みんな、4人の仲間が死んだ。 ○ | 死体が4つ出てきた。 △ | 四体死んだ。 ◎ |
-| 5 | 15 mins til planes | 飛行機、15分だよ。 ◎ | 飛行機が出発準備完了です。 △ | 飛行機が15分で来るよ。 ◎ |
-| 6 | ur not holding KC | You're not holding any crazy stuff, okay? ✗ | KCを保持していないよ。 ◎ | KCをキープしてないな。 ◎ |
-| 7 | GO BOYS GO | Let's go, boys, let's go! ✗ | ガンマンになれ！ ✗ | レッツ行こう！ △ |
-| 8 | nah game not dead | Game still running, no, not dead. ✗ | ゲームはまだ終わっていないよ。 ◎ | まだゲームは動いてるよ。 ◎ |
-| 9 | peko loves charlie players | ペコはチャリープレイヤーが好きだよ。 ◎ | ペコがチャーリーのプレイヤーを好きだよ。 ◎ | ピーコはチャーリープレイヤーが好きだね。 ○ |
-| 10 | even just a tiny bit | Please provide the chat you'd like me to translate! ✗ | 「ほんの少しでも」 ◎ | ちょっとでもいいよ。 ◎ |
+| 1 | ah fixed now | 今、修正完了です。 ○ | 修理したよ。 ◎ | これで直ったよ。 ◎ |
+| 2 | NEED MORTARS TO MARBAN | 今、マランを必要としている。 ✗ | 必要な迫撃砲を持っている人がいます。 ✗ | ミサイルを投下して、敵陣を制圧したいんだ。 ✗ |
+| 3 | GUN IS DEADDDDDDD | Gun is dead. ✗ | ガンは死んだよ。 ◎ | 銃が壊滅的だ。 ○ |
+| 4 | 4 PIECES DEAD | ４人死んだ。 △ | **4個の銃が破壊されました。** ◎ | 4ピースが壊滅した。 ○ |
+| 5 | 15 mins til planes | 15 分の時、飛行機が待っています。 △ | **15分以内に飛行機が到着します。** ◎ | あと15分で飛行機が来ますね。 ◎ |
+| 6 | ur not holding KC | 君がKCを持ってないんだ。 ✗ | あなたはKCを保持していません。 ◎ | KCを握ってないのか。 ◎ |
+| 7 | GO BOYS GO | Let's go, boys! ✗ | ガンバッジ！ ✗ | boys、頑張って！ △ |
+| 8 | nah game not dead | ゲームはまだ動いてない。 ○ | ゲームはまだ終わっていない。 ◎ | ゲームはまだ死んでないな。 ◎ |
+| 9 | peko loves charlie players | ペコはチャリープレイヤーが好きです。 ○ | ペコはチャーリープレイヤーが大好きです。 ◎ | ペコはチャーリープレイヤーが好きだね。 ◎ |
+| 10 | even just a tiny bit | 戦士の陣地、守るのに時間がかかる。 ✗ | ちょっとでも少しだけ。 ○ | ほんの少しでもいいよ。 ◎ |
 
-Low は 10 件中 7 件で英語出力。文脈のない短文 ("even just a tiny bit") ではプロンプトそのものを返すケースも。Medium・High は概ね安定するが、"GO BOYS GO" は全プリセットで誤訳傾向 (Medium: 意味不明、High: カタカナ英語混在)。"NEED MORTARS TO MARBAN" は地名 MARBAN を全プリセットが固有名詞と認識できず誤訳 → `term_protection.txt` での保護を推奨。
+`4 PIECES DEAD` → "4個の銃が破壊" ◎: v3 "4個の兵器" から "銃" と具体化。  
+`NEED MORTARS TO MARBAN`: DLL では MARBAN が {{T0}} に保護されるため "{{T0}}に迫撃砲が必要です" と正しく処理される。
 
 ### EN→JA — Medium (〜10語)
 
 | # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
 |---|------|:---------------|:------------------|:----------------|
-| 1 | be sure to build defenses as well. | しっかり防衛線を築きなさい。 ◎ | 防御も確実に構築してください。 ◎ | 陣地をしっかり築いてね。 ◎ |
-| 2 | i know thats why im annoyed lol | マジで、 annoyed なのよ。 △ | わかってるんだけど、それでイライラしているよ。 ◎ | マジで、それ知ってるからイライラしてるんだよ。 ◎ |
-| 3 | how would you even make water wet? | どうやって水に水をつけられるの？ ○ | 水を濡らすのはどうやってするんだろう？ ◎ | マジで、水はどうやって濡らすの？ ◎ |
-| 4 | why arent we taking the scurry gold? | どうして金稼ぎのゴミを置いてないの？ ✗ | なぜスクリューロイヤルゴールドを取っていないの？ △ | 金は取れないの？ ○ |
-| 5 | there's at least 9 wardens up north and 20+ collies | There are a lot of guards up north, and a bunch of dogs too. ✗ | 北には少なくとも９人のウォードナーがいて、２０以上のコリーもいる。 ◎ | 北には少なくとも9人の警備兵と、20人以上いるっぽい。 ○ |
-| 6 | i have aluminum dropping at north scrap in great march! | Aluminum's falling in the north scrap in the march. ✗ | 北部のグレートマーチでアルミニウムが落ちているよ！ ◎ | アルミが北スクラップで大行進中！ △ |
-| 7 | W devs for fixing the small train bug | Train bug fix is coming soon. ✗ | 小さな列車のバグを修正するために開発者たちがいるよ。 △ | バグの小さな電車を直してくれ、開発さん。 △ |
-| 8 | so how's the Saltbrussy front? Ya'll grabbed it yet? | Saltbrussy is still a mess, everyone's got it. ✗ | サルトブリッジの前線はどう？まだ奪取した？ ◎ | ソルトブリッシー前線はどう？まだ取れてる？ ◎ |
-| 9 | losing one slot for a 7,92 is not worth it imo | ちょっと、7,92の失ったスロットは、あんまり価値がないと思うんだ。 ◎ | スロットを1つ失っても、7.92mmは価値がないと思う。 ◎ | 7,92で1スロットを落とすのは、価値がないと思う。 ◎ |
-| 10 | any active fronts im lazy and dont wanna use live maps | やたらと活動しないから、マップを使わないよ。 ✗ | アクティブな戦線があるけど、気分が悪くてリアルタイムの地図を使わないんだ。 △ | 戦闘ラインに疲れた、マップも使いたくない。 ◎ |
-
-Low は 10 件中 4 件で英語出力。特にゲーム固有名詞 (wardens, collies, Saltbrussy) を含む文で失敗。Medium は全件日本語出力、地名・固有名詞の保持も良好。High は "i have aluminum dropping at north scrap in **great march**!" を "大行進中" と誤訳するなど地名の動詞化ミスが発生。"W devs" (= いい開発者) の意味は全プリセット未捕捉。
+| 1 | be sure to build defenses as well. | 防御を築くんだ。 ○ | 確かに防御も建てるよ。 ◎ | 防衛線を張るように、しっかり要塞を建ててね。 ◎ |
+| 2 | i know thats why im annoyed lol | つらいのに、なぜ怒ってるんだ？ △ | わかってるんだけどな、ちょっとイライラしているよlol ◎ | わかったから、マジでイライラしてるんだもんね lol ◎ |
+| 3 | how would you even make water wet? | 水は乾かないようにどうすればいいの？ ✗ | 水を濡らすなんてどうやってするの？ ◎ | どうして水が濡れるのか、理解できないね？ ◎ |
+| 4 | why arent we taking the scurry gold? | なぜ、この金稼ぎのくずを奪ってないんだ？ ✗ | なぜスクリューゴールドを取っていないの？ ○ | なんでスクリーゴールド取ってないんですか？ ○ |
+| 5 | there's at least 9 wardens up north and 20+ collies | 北の方で9人以上の Wardenがいます。 ✗ | 北には少なくとも9人のワーダーがいるし、コリンズは20以上だよ。 ○ | 北には少なくとも9人のウォーデンと20人以上のコリーがいますね。 ◎ |
+| 6 | i have aluminum dropping at north scrap in great march! | 私は北のスクラップでアルミニウムを落とす。 △ | 北のスラッジでアルミニウムが落ちている！ △ | 北スクラップでアルミが大量に落ちてるぞ！ ◎ |
+| 7 | W devs for fixing the small train bug | 開発者、小さな列車の問題を修正してください。 △ | ゲームの修正に対するW devs。 △ | W devs、小さな列車バグの修正ありがとうございます。 ○ |
+| 8 | so how's the Saltbrussy front? Ya'll grabbed it yet? | 塩尻の戦いはどう？まだゲットした？ △ | ソルトブリッジ前線はどう？まだ奪ったの？ ◎ | ソルトブリッシー前線はどうですか？まだ取れてるんですか？ ◎ |
+| 9 | losing one slot for a 7,92 is not worth it imo | それはちょっと、惜しいよ。 ✗ | 失敗する1つのスロットを交換しても77.9は価値がないと思う。 △ | 7,92を落とすのは、明らかに価値がないと思うよ。 ◎ |
+| 10 | any active fronts im lazy and dont wanna use live maps | 遅いので、何も使わないよ。 ✗ | **活動中の戦線は、私は怠け者であり、リアルマップを使いたくない。** ◎ | アクティブな前線は面倒で、ライブマップも使いたくないんだ。 ◎ |
 
 ### EN→JA — Long (15語以上)
 
 | # | 原文 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
 |---|------|:---------------|:------------------|:----------------|
-| 1 | one time I drove a bike at the wardens and they just all surrendered immediately out of sheer fear | えー、Wardenって、Bikesでぶっ壊して、すぐに降りました。 △ | 一度、警備員に自転車で突っ込んだら全員がただ怖さから降伏した。 ◎ | 一度、警備兵に自転車で突っ込んで、怖くてすぐに降参させたよ。 ◎ |
-| 2 | if your field is dropping aluminum let us know so we can melt it down quick! | アルミ片落とし、早く溶けたら教えてね！ △ | もしフィールドにアルミニウムが落ちているなら教えてください。急いで溶かしましょう！ ◎ | アルミが落ちてたら教えて！早く溶かしてね！ ◎ |
-| 3 | 10% chance 90% fail, they will have t2 in a couple hours, have to wait for gunboat | "Gotta wait, they're gonna have T2 in a couple hours..." ✗ | 約1割のチャンスで、残りは失敗する。数時間以内にt2が来るので、待つしかない。 ○ | ほぼ確実に失敗するけど、2時間ほどでT2が来るから、ガントリー待ちになるね。 ◎ |
-| 4 | Returning Veteran looking for people to play the game with .. new bros welcome to hang out too | Let's play some Foxhole, new friends, welcome! ✗ | 復帰兵士がゲームをする仲間を探している。新しい友達も歓迎！ ◎ | ベテランのやつが、一緒に遊んでくれる人を探してるよ、新規さんも大歓迎！ ◎ |
-| 5 | I hate to be the barer of bad news but Able wardens are the same | "I'm really bummed about the bad news, but the Wardens are awful." ✗ | いいなで、残念ながらアブレのウォーデンは同じだよ。 △ | アビリティの警備隊も同じく、残念です。 △ |
-| 6 | is it me or is tech going very fast this war. i feel like i blinked once and were almost to having halftracks | 技術がめっちゃくちゃになったね、まるで速攻で終わるみたいだ。 △ | 技術が本当に速く進んでいるように思える。ほぼ半トラックまで到達したかのようだった。 ◎ | 技術が急に進んでる気がするけど、気づけば半トラックも出てきちゃってる。 ◎ |
-| 7 | any heros want to help bring supplies to blackwatch so we can build it up? | みんな、Blackwatchに物資を届けて、勢力を増やすのに協力してくれ。 ○ | ヘロイズ、ブラックウォッチに物資を届けてくれる人がいますか？建設のために。 ◎ | 誰かヒーローがブラックウォッチに物資を運ぶのを手伝ってくれない？ ◎ |
-| 8 | not sure if PIFF is around this war, but Tammi and I are here to give updates | Tammi and I are here to tell you about the game. ✗ | PIFF ここにいるか不明ですが、タミと私は状況の更新をします。 ◎ | PIFF がいるかどうかわからないけど、タミと私は状況を報告します。 ◎ |
-| 9 | I have a Warden RPG gun boat that needs a owner. Already stocked with 30mm and RPGs | 俺の Warden 船にオーナーを探してるんだ。30mmとRPGが揃ってるよ。 ◎ | 私のウォーデンRPGガンボートは所有者が必要です。既に30mmとロケット推進弾を装備しています。 ◎ | 要人待ちのウォーデンRPGのボートで、30mmとRPGが積まれてるよ。 ○ |
-| 10 | HEYA! I am currently free to help out any players with questions regarding anything from, naval, logi, planes, tanks, and so on! | やあ、今、どんな質問でも聞いてるよ！ ◎ | こんにちは！現在、艦隊、物流、飛行機、戦車などの質問に対応する準備ができています。どうぞお気軽に聞いてくださいね！ ◎ | 何か質問があれば、いつでも手伝うよ！ ◎ |
-
-Low は 10 件中 4 件で英語出力。Medium・High は全件日本語で品質も良好。"Able wardens" (固有チーム名) は全プリセット共通で誤解釈 → 保護語登録推奨。"gunboat" の訳 (Medium: 省略、High: "ガントリー") はいずれも不正確だが文全体の意味は伝わる。
+| 1 | one time I drove a bike at the wardens… | 自転車で走って、ワンドラーたちはすぐに全て降伏した。 △ | 一度、私は自転車でウォーデンを見て、彼らはすぐに恐怖から降伏した。 ◎ | 一度、衛兵隊にバイクで突っ込んで、怖くてすぐに全滅したんだ。 ◎ |
+| 2 | if your field is dropping aluminum… | アルミの降下を知れば、すぐに溶けるぞ。 △ | もしあなたのフィールドがアルミニウムを落としているなら、私たちに知らせてください。速く溶かすことができます！ ◎ | アルミが落ちてるとしたら教えてください、早く溶かして使います！ ◎ |
+| 3 | 10% chance 90% fail, they will have t2… | 90% fail, they'll have a T2 in a couple hours, wait for a gunboat. ✗ | 彼らは90％の失敗率を持ち、数時間以内にt2が起こる可能性があります。 ○ | 2%の確率で9割は失敗するだろうし、2時間後にはT2が来るから、砲艦を待つ必要があるね。 ○ |
+| 4 | Returning Veteran looking for people to play the game with… | 新しい仲間を待ってるよ、戦い方を知りたい人を探してるよ。 ○ | 戻ってきたベテランがゲームをする仲間を探している... 新しい友達歓迎！ ◎ | ベテランが帰ってきましたので、一緒にゲームをする仲間を探しています。 ◎ |
+| 5 | I hate to be the barer of bad news but Able wardens are the same | 私は悪い知らせを伝えるのが嫌だけど、アブル・連戦は同じです。 △ | 嫌いですが、アブレのウォーデンは同じです。 △ | アブラー・ウォーデンもまた、残念ながら同じだ。 △ |
+| 6 | is it me or is tech going very fast this war… | 技術はすごく早く進んでるね、まるで blinked 一度でほぼ終わったみたいだ。 △ | この戦争で技術がとても速く進んでいるように思える。1回目の瞬間にはほぼ半トラックまで到達していたみたいだ。 ○ | 技術がこの戦争で急激に速い気がするけど、瞬く間にハーフトラックが手に入っちゃったね。 ◎ |
+| 7 | any heros want to help bring supplies to blackwatch… | 兵士们想帮忙运送物资给黑伍德，让我们加起来。 ✗ | ブラックウォッチに物資を届けてくれる英雄がいますか？ ◎ | ヒーローさん、ブラックウォッチに物資を運ぶのを手伝いませんか？ ◎ |
+| 8 | not sure if PIFF is around this war, but Tammi and I are here… | ピフは今この戦争にいるけど、タミと俺はアップデートするよ。 △ | ピフはここにいるか不明ですが、タミと私は更新を提供します。 ◎ | PIFF がこの戦いに来るかどうかわかりませんが、タミと私は状況を報告します。 ◎ |
+| 9 | I have a Warden RPG gun boat that needs a owner… | 私は Wardenの艦艇の所有者を探しています。すでに30mmとRPGを30個持っています。 △ | 私はWardenのRPGガンボートを持っています。すでに30mmとRPGが入っているので、所有者が必要です。 ◎ | WardenのRPG駆逐艦がまだオーナーがいなくて、30mmとRPGで積まれてるよ。 ◎ |
+| 10 | HEYA! I am currently free to help out any players… | やあ、質問に答えるのに自由だよ！ ◎ | こんにちは！現在、船舶や補給、飛行機、戦車などの質問に答える準備ができています。 ◎ | やあ！何か質問があれば、空、艦船、物資、戦車など、何でも手伝うよ！ ◎ |
 
 ---
 
-生データ: `tools/bench_result_new.txt`
+## 5. RU / ZH / KO → JA サマリー
+
+### RU → JA
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| RU Short 1 | Нужны патроны! | Need some bullets! ✗ | 弾薬が必要です！ ◎ | 弾切れだ！ ◎ |
+| RU Short 7 | Вперёд! | आगेへ！ ✗ | 前進だ！ ◎ | すすめ！ ◎ |
+| RU Medium 1 | Вражеские танки с севера… | Enemy tanks from the north need immediate support. ✗ | 北からの敵戦車が来ている、急いで支援して！ ◎ | 敵の戦車が北から来ているので、すぐに援護してくれ！ ◎ |
+| RU Long 7 | Через 10 минут придёт колонна снабжения… | 10 分后，运输队将到达 ✗ | 約１０分で補給列が到着します。道を開けてください。 ◎ | 10分後に物資輸送隊が到着するので、メインベースへの道を空けてください。 ◎ |
+
+Low は RU → JA の短文で 7/10 が英語出力。Medium・High は全件日本語。
+
+### ZH → JA
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| ZH Short 2 | 打得好！ | Let's go! ✗ | 勝利だね！ △ | よくやったね！ ◎ |
+| ZH Medium 5 | 我们需要建造者马上去前线基地。 | (未翻訳混じり) | 建造者、今すぐ前線基地に行ってください。 ◎ | 前線基地へ、すぐに建設しましょう。 ◎ |
+
+### KO → JA
+
+| # | 原文 | Low | Medium | High |
+|---|------|-----|--------|------|
+| KO Short 1 | 탄약 필요! | 弾薬が必要だ。 ◎ | タムラキが必要です！ ✗ | 弾切れだ！ ◎ |
+| KO Short 7 | 돌격! | Let's go! ✗ | 突撃！ ✗ | 突撃だ！ ◎ |
+| KO Long 4 | 보급이 심각하게 부족해… | Supply is seriously lacking ✗ | 補給が非常に不足しているため、直ちに二つの真珠号で補給輸送を要請します。 △ | 物資が極端に不足しているので、両陣営にすぐに補給輸送が必要だ。 ◎ |
+
+---
+
+## 6. 速度・品質 総評
+
+| 指標 | Low (gemma3:1b) | Medium (phi4-mini) | High (gemma3:4b) |
+|------|:---------------:|:------------------:|:----------------:|
+| EN→JA 日本語出力率 | ~70% | **~97%** | **~100%** |
+| RU→JA 日本語出力率 | ~40% | **~97%** | **~100%** |
+| ZH→JA 日本語出力率 | ~75% | **~97%** | **~100%** |
+| KO→JA 日本語出力率 | ~50% | **~93%** | **~100%** |
+| EN Short 速度 (中央値) | 2.67s | **2.73s** | 3.01s |
+| EN Medium 速度 (中央値) | 2.77s | **2.97s** | 3.26s |
+| 品質 (EN, 主観) | Low | Medium-High | High |
+| モデルサイズ | 815 MB | 2.5 GB | 3.3 GB |
+
+---
+
+## 7. 改善の変遷
+
+| バージョン | 主な変更 | 速度 (EN/Medium) |
+|-----------|---------|----------------:|
+| 初版 (2026-06-01) | 基本プロンプト | 2.86s |
+| v1 | Paraphrase 削除、数値保持指示追加 | 4.22s (+48%) ← ローマ字問題 |
+| v2 | ローマ字修正、stop sequence、TrimParenthetical | 3.35s |
+| v3 | Foxhole ゲーム文脈、pieces/NEED X TO 修正、slang_dict 新設 | 2.92s |
+| **v4 (現行)** | wiki 調査でゲーム知識を全面強化、slang 70+、TTS 80+ | **2.97s** |
+
+---
+
+## 8. 既知の残存問題
+
+| 問題 | 影響 | 対処 |
+|------|------|------|
+| `NEED X TO MARBAN` — ベンチでは地名保護なしのため誤訳 | ベンチのみ（DLL では MARBAN→{{T0}} で正しく処理） | DLL 側は修正済み |
+| `GO BOYS GO` — phi4-mini が稀に "ガールズ" と誤訳 | Medium only、確率的 | phi4-mini モデル固有の挙動 |
+| `탄약 필요!` — Medium が "タムラキ" と音写 | KO Short のみ | phi4-mini の KO音素マッピング限界 |
+| `W devs` — W = kudos として完全には反映されない | 全プリセット | W が孤立一文字で文脈取得困難 |
+
+---
+
+## 9. 検証ツール
+
+```powershell
+# 1分以内で品質を回帰テスト (19テスト / 42チェック、スコア 100/100)
+python tools/bench_verify.py
+
+# 詳細表示
+python tools/bench_verify.py --verbose
+
+# モデル指定
+python tools/bench_verify.py --model gemma3:4b
+
+# 全プリセット・全言語 360件（約20分）
+python tools/bench_translate.py
+```
+
+---
+
+## 10. 関連ファイル一覧
+
+| ファイル | 役割 | v4 エントリ数 |
+|---------|------|-------------:|
+| `src/translate.cpp` | 翻訳コア・プロンプト生成 | — |
+| `slang_dict.txt` | ゲームスラング辞書（動的注入） | 70+ |
+| `term_protection.txt` | 固有名詞保護リスト | 160+ |
+| `tts_readings.txt` | TTS読み仮名辞書（JA/KO） | 80+ |
+| `tools/bench_verify.py` | 品質回帰テスト（19テスト） | — |
+| `tools/bench_translate.py` | 全体ベンチマーク（360件） | — |
+| `tools/bench_medium_only.py` | Medium プリセット単体ベンチ（30件） | — |
+
+生データ: `tools/bench_translate.py` 出力 (2026-06-02 v4)

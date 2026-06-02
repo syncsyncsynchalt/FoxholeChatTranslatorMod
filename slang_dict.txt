@@ -1,0 +1,110 @@
+# Foxhole game slang dictionary
+# Format: term = explanation
+# term is matched case-insensitively with \b word boundaries
+# Regex syntax is supported
+
+# ── Reactions / praise ──────────────────────────────────────────
+W = expression of praise before a noun (e.g. "W devs" = kudos to the devs; translate as praising whoever follows)
+GG = good game/well played
+F = paying respects (informal acknowledgment of a loss or death)
+
+# ── Communication (radio/military) ──────────────────────────────
+copy = understood/roger that (military radio acknowledgment)
+copy that = understood/roger that (radio acknowledgment)
+confirmed = confirmed/verified
+ETA = estimated time of arrival (到着予定時刻)
+intel = enemy intelligence or information about enemy positions
+sitrep = situation report (状況報告)
+all clear = area is safe, no enemies
+contact = enemy spotted/engaged
+
+# ── Player roles ────────────────────────────────────────────────
+# logi / logi run は term_protection.txt で保護済み → ここには不要
+inf = infantry soldier
+para = paratrooper (落下傘兵)
+arty = artillery operator
+crew = vehicle crew member
+sapper = engineer/demolitions specialist
+medic = field medic (衛生兵)
+recon = reconnaissance soldier (偵察)
+builder = base construction player
+
+# ── Actions / tactics ───────────────────────────────────────────
+push = attack/advance toward the enemy
+pushing = currently attacking/advancing
+cap = capture (seize an objective or town)
+capping = currently capturing an objective
+hold = defend and do not retreat
+holding = currently defending a position
+fall back = retreat/withdraw to safer position
+fall back to = retreat to a specific location
+rush = attack quickly without full preparation
+flank = attack from the side or rear
+clear = eliminate all enemies from an area
+secure = fully capture and defend an area
+rotate = move forces to a different position
+reinforce = send additional troops or supplies to a location
+fortify = build defenses at a location
+contest = fight over a partially-captured objective
+
+# ── Military hardware ────────────────────────────────────────────
+pieces = military equipment or vehicles (artillery pieces or tanks; NOT people — "4 pieces dead" = 4 guns/vehicles destroyed)
+nade = grenade (手榴弾)
+sticky = anti-tank sticky bomb (粘着対戦車爆弾)
+AT = anti-tank (対戦車)
+HMG = heavy machine gun (重機関銃)
+mortar = mortar launcher (迫撃砲)
+rail gun = large railway-mounted artillery (列車砲)
+
+# ── Vehicles (term_protection.txt で保護されているものを補足) ────
+flat = flatbed truck for transporting cargo (荷台式トラック)
+tanker = fuel truck (燃料タンカー)
+runner = supply transport vehicle (輸送車)
+
+# ── Structures / facilities ─────────────────────────────────────
+FOB = forward operating base (前線基地・前哨基地)
+garri = garrison (defensive gun emplacement) (防衛砲台)
+howi = howitzer garrison (榴弾砲台)
+bunker = defensive bunker structure (防衛バンカー)
+trench = trench fortification (塹壕)
+
+# ── Resources / supplies ────────────────────────────────────────
+scrap = salvage — raw resource gathered from the field (スクラップ資源)
+shirts = soldier supplies (personal equipment for infantry) (兵士補給品)
+techmat = technology materials for research (技術研究材料)
+ammo = ammunition (弾薬)
+fuel = vehicle fuel (燃料)
+
+# ── Social / rallying ───────────────────────────────────────────
+boys = teammates (gender-neutral; "GO BOYS GO" = rallying cry to the team)
+guys = teammates (gender-neutral)
+bros = teammates/comrades
+lads = teammates (British-style, gender-neutral)
+go boys go = rallying cry to charge/advance as a team (行くぞ/行け/進め); translate as enthusiastic rally
+
+# ── Victory / war system ─────────────────────────────────────────
+VP = victory point (勝利ポイント; earned by holding town halls)
+VPs = victory points
+town hall = the main building in a hex region; controlling it gives a VP (勝利地点の建物)
+hex = one map region (37 hexes make up the full war map) (ヘックス/地域)
+
+# ── Internet / general slang ────────────────────────────────────
+lazy = too lazy (not sick or ill)
+nah = no
+gonna = going to
+wanna = want to
+gotta = got to/have to
+imo = in my opinion
+tbh = to be honest
+rn = right now
+atm = at the moment
+lmao = laughing hard (expression of amusement)
+lol = laughing (expression of amusement)
+ngl = not going to lie
+
+# ── Faction nicknames (補足: term_protection.txt でも保護済み) ──
+collies = Colonials (faction)
+squids = Colonials (faction)
+goblins = Wardens (faction)
+blues = Wardens (faction)
+blueberries = Wardens (faction)

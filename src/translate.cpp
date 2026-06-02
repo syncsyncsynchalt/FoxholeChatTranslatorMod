@@ -184,6 +184,13 @@ using ReplacementMap = std::vector<std::pair<std::string, std::string>>;
 
 static std::vector<std::regex> g_termRegexes;
 
+struct SlangEntry {
+    std::regex  pattern;
+    std::string term;
+    std::string meaning;
+};
+static std::vector<SlangEntry> g_slangEntries;
+
 static std::string GetDllBaseDir() {
     char dllPath[MAX_PATH];
     HMODULE hSelf;
@@ -237,6 +244,46 @@ static void InitTermRegexes(const std::string& baseDir) {
     }
     fclose(f);
     logging::Debug("[Translate] term_protection.txt: %d 件読み込み (%s)", count, path.c_str());
+}
+
+static void InitSlangDict(const std::string& baseDir) {
+    std::string path = baseDir + "slang_dict.txt";
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) {
+        logging::Debug("[Translate] slang_dict.txt が見つかりません: %s", path.c_str());
+        return;
+    }
+    char line[512];
+    int count = 0;
+    while (fgets(line, sizeof(line), f)) {
+        int len = static_cast<int>(strlen(line));
+        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'
+                           || line[len-1] == ' ' || line[len-1] == '\t'))
+            line[--len] = '\0';
+        if (len == 0 || line[0] == '#') continue;
+        char* eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        int tlen = static_cast<int>(eq - line);
+        while (tlen > 0 && (line[tlen-1] == ' ' || line[tlen-1] == '\t')) line[--tlen] = '\0';
+        if (tlen == 0) continue;
+        const char* meaning = eq + 1;
+        while (*meaning == ' ' || *meaning == '\t') meaning++;
+        if (*meaning == '\0') continue;
+        std::string fullPat = std::string("\\b") + line + "\\b";
+        try {
+            SlangEntry e;
+            e.pattern = std::regex(fullPat, std::regex::ECMAScript | std::regex::icase);
+            e.term    = line;
+            e.meaning = meaning;
+            g_slangEntries.push_back(std::move(e));
+            count++;
+        } catch (const std::regex_error& ex) {
+            logging::Debug("[Translate] スラング正規表現エラー '%s': %s", line, ex.what());
+        }
+    }
+    fclose(f);
+    logging::Debug("[Translate] slang_dict.txt: %d 件読み込み (%s)", count, path.c_str());
 }
 
 static std::string ProtectTerms(const std::string& text, ReplacementMap& out) {
@@ -315,52 +362,115 @@ static std::string RestoreTerms(std::string translated, const ReplacementMap& re
 }
 
 // ============================================================
+// 入力正規化
+// ============================================================
+
+// 3回以上連続する同一 ASCII 文字を最大2文字に圧縮する
+// UTF-8 マルチバイト (0x80以上) はそのままパスし破壊しない
+static std::string NormalizeRepetition(const std::string& text) {
+    if (text.size() < 3) return text;
+    std::string result;
+    result.reserve(text.size());
+    size_t i = 0;
+    while (i < text.size()) {
+        unsigned char c = (unsigned char)text[i];
+        if (c >= 0x80) { result += text[i++]; continue; }
+        size_t j = i + 1;
+        while (j < text.size() && text[j] == text[i]) ++j;
+        size_t run = j - i;
+        result += text[i];
+        if (run >= 3)      result += text[i]; // 3+連続 → 最大2文字
+        else if (run == 2) result += text[i]; // 2連続: そのまま
+        i = j;
+    }
+    return result;
+}
+
+// ============================================================
 // 翻訳コア
 // ============================================================
 
-// system プロンプトを組み立てる (固有名詞があれば追記)
-static std::string BuildSystemPrompt(const ReplacementMap& replacements) {
-    std::string s = "You are a Foxhole war-game chat translator.";
-    if (replacements.empty()) return s;
-    s += " Keep these game-specific terms exactly as-is: ";
-    for (size_t i = 0; i < replacements.size(); ++i) {
-        if (i > 0) s += ", ";
-        s += replacements[i].second;
+// system プロンプトを組み立てる (スラングマッチ + 固有名詞があれば追記)
+static std::string BuildSystemPrompt(const std::string& inputText, const ReplacementMap& replacements) {
+    std::string s =
+        "You are a Foxhole war-game chat translator."
+        " Foxhole is a persistent MMO war game (wars last weeks) between two factions:"
+        " Wardens (nicknamed blues/blueberries) and Colonials (nicknamed collies/goblins)."
+        " 37 hex regions on a continent; win by capturing 32+ town halls (victory points)."
+        " No NPCs — every soldier, vehicle, and building is player-operated."
+        " Player roles: infantry (combat), logi (supply runs), builder (base construction), crew (vehicle operator)."
+        " War materials: bmat=basic, rmat=refined, emat=explosive, cmat=construction — all are physical war supplies."
+        " T1/T2/T3 = technology tier unlocks (basic to advanced equipment)."
+        " Chat conventions:"
+        " 'NEED X TO [place]' means X must be sent/delivered to that location."
+        " 'pieces' = military hardware (guns/tanks/vehicles), never people."
+        " 'boys/guys/lads' = teammates (gender-neutral rallying language)."
+        " Numbers in chat = troop counts, material amounts, distances, or timers.";
+
+    // 入力テキストにマッチしたスラングの説明のみ追加
+    std::vector<std::string> matched;
+    for (const auto& e : g_slangEntries) {
+        if (std::regex_search(inputText, e.pattern)) {
+            matched.push_back("'" + e.term + "' means " + e.meaning);
+        }
     }
-    return s + ".";
+    if (!matched.empty()) {
+        s += " Note: ";
+        for (size_t i = 0; i < matched.size(); ++i) {
+            if (i > 0) s += "; ";
+            s += matched[i];
+        }
+        s += ".";
+    }
+
+    if (!replacements.empty()) {
+        s += " Keep these game-specific terms exactly as-is: ";
+        for (size_t i = 0; i < replacements.size(); ++i) {
+            if (i > 0) s += ", ";
+            s += replacements[i].second;
+        }
+        s += ".";
+    }
+    return s;
 }
 
 static std::string BuildPrompt(TranslationMode mode) {
     switch (mode) {
     case TranslationMode::JA:
-        return "Translate the following war-game chat into natural, casual Japanese."
-               " Be concise — one short sentence. Paraphrase freely; keep key meaning."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into natural, casual Japanese."
+               " Output ONE short sentence only."
+               " Preserve numbers and times (e.g. '15 mins') exactly."
+               " Output ONLY the Japanese translation — no romanization, no explanations.";
     case TranslationMode::JAZ:
-        return "Translate the following war-game chat into Japanese."
+        return "Translate the following war-game chat message into Japanese."
                " Use Zundamon's speech style: end sentences with なのだ or のだ occasionally."
-               " Be concise. Paraphrase freely."
-               " Output ONLY the translated text.";
+               " Preserve numbers and times exactly."
+               " Output ONLY the Japanese translation — no romanization, no explanations.";
     case TranslationMode::EN:
-        return "Translate the following war-game chat into concise, casual English."
-               " One short sentence. Paraphrase freely; keep key meaning."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into concise, casual English."
+               " Output ONE short sentence only."
+               " Preserve numbers and times exactly."
+               " Output ONLY the English translation, no explanations.";
     case TranslationMode::RU:
-        return "Translate the following war-game chat into natural, concise Russian."
-               " One short sentence. Paraphrase freely; keep key meaning."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into natural, concise Russian."
+               " Output ONE short sentence only."
+               " Preserve numbers and times exactly."
+               " Output ONLY the Russian translation, no explanations.";
     case TranslationMode::ZH:
-        return "Translate the following war-game chat into concise Simplified Chinese."
-               " One short sentence. Paraphrase freely; keep key meaning."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into concise Simplified Chinese."
+               " Output ONE short sentence only."
+               " Preserve numbers and times exactly."
+               " Output ONLY the Chinese translation, no explanations.";
     case TranslationMode::KO:
-        return "Translate the following war-game chat into natural, concise Korean."
-               " One short sentence. Paraphrase freely; keep key meaning."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into natural, concise Korean."
+               " Output ONE short sentence only."
+               " Preserve numbers and times exactly."
+               " Output ONLY the Korean translation, no explanations.";
     default:
-        return "Translate the following war-game chat into natural, casual Japanese."
-               " Be concise — one short sentence."
-               " Output ONLY the translated text.";
+        return "Translate the following war-game chat message into natural, casual Japanese."
+               " Output ONE short sentence only."
+               " Preserve numbers and times exactly."
+               " Output ONLY the Japanese translation — no romanization, no explanations.";
     }
 }
 
@@ -368,7 +478,8 @@ static std::string BuildRequestBody(const std::string& text, const std::string& 
                                     bool hasPlaceholders, TranslationMode translationMode) {
     std::string prompt = BuildPrompt(translationMode);
     if (hasPlaceholders)
-        prompt += " IMPORTANT: Keep all {{T0}}, {{T1}}, {{T2}} etc. tokens exactly as-is in your output.";
+        prompt += " IMPORTANT: {{T0}}, {{T1}}, etc. are location/term placeholders —"
+                  " translate the sentence meaning but keep these tokens verbatim in your Japanese output.";
     prompt += "\n\n" + text;
 
     nlohmann::json opts;
@@ -383,7 +494,8 @@ static std::string BuildRequestBody(const std::string& text, const std::string& 
         {"prompt",  prompt},
         {"system",  systemPrompt},
         {"stream",  false},
-        {"options", opts}
+        {"options", opts},
+        {"stop",    nlohmann::json::array({"\n\n", " (", "Note:", "Translation:", "Here's", "Here is"})}
     };
     return req.dump();
 }
@@ -446,16 +558,20 @@ static int CountFoundTerms(const std::string& result, const ReplacementMap& repl
 }
 
 static std::string DoTranslate(const std::string& text, TranslationMode translationMode) {
+    std::string normalized = NormalizeRepetition(text);
+    if (normalized != text)
+        logging::Debug("[Translate] 正規化: '%s' -> '%s'", text.c_str(), normalized.c_str());
+
     ReplacementMap replacements;
-    std::string protected_text = ProtectTerms(text, replacements);
+    std::string protected_text = ProtectTerms(normalized, replacements);
 
     // メッセージ全体が1つの保護語だけなら翻訳不要 (LLM が無意味な訳を返すのを防ぐ)
     if (!replacements.empty() && IsSinglePlaceholder(protected_text)) {
         return replacements[0].second;
     }
 
-    // このメッセージに出現した語だけで system プロンプトを組む
-    std::string systemPrompt = BuildSystemPrompt(replacements);
+    // このメッセージに出現した語 + スラング辞書マッチ で system プロンプトを組む
+    std::string systemPrompt = BuildSystemPrompt(normalized, replacements);
     bool hasPlaceholders = !replacements.empty();
 
     // 1st try: プレースホルダー保護あり
@@ -471,7 +587,7 @@ static std::string DoTranslate(const std::string& text, TranslationMode translat
         int expected = static_cast<int>(replacements.size());
         if (found * 2 < expected) {
             logging::Debug("[Translate] 保護語失落 (%d/%d) - 保護なしで再翻訳", found, expected);
-            std::string fallback = RawTranslate(text, translationMode, systemPrompt, false);
+            std::string fallback = RawTranslate(normalized, translationMode, systemPrompt, false);
             if (!fallback.empty()) result = fallback;
         }
     }
@@ -490,6 +606,19 @@ static void TrimTrailing(std::string& s) {
         } else {
             break;
         }
+    }
+}
+
+// 文末記号の後に続く " (説明/転写)" を除去する
+// 例: "翻訳文。 (しっぱいする...)" → "翻訳文。"
+static void TrimParenthetical(std::string& s) {
+    size_t pos = s.find(" (");
+    if (pos == std::string::npos || pos == 0) return;
+    // 直前が文末記号のバイト列か確認 (。! ? . の末尾バイト)
+    // 。= E3 80 82, ! = 21, ? = 3F, . = 2E, ！= EF BC 81, ？= EF BC 9F
+    unsigned char prev = (unsigned char)s[pos - 1];
+    if (prev == 0x82 || prev == '!' || prev == '?' || prev == '.') {
+        s.erase(pos);
     }
 }
 
@@ -513,6 +642,7 @@ static void WorkerThread() {
         g_activeWork.store(true);
         std::string translated = DoTranslate(item.message, item.translationMode);
         TrimTrailing(translated);
+        TrimParenthetical(translated);
 
         logging::Debug("[Translate] [%s] %s: %s -> %s",
             item.channel.c_str(), item.sender.c_str(),
@@ -715,7 +845,9 @@ static void ApplyPreset(const std::string& preset) {
 // ============================================================
 
 bool translate::Init(const TranslateConfig& cfg) {
-    InitTermRegexes(GetDllBaseDir());
+    std::string baseDir = GetDllBaseDir();
+    InitTermRegexes(baseDir);
+    InitSlangDict(baseDir);
     if (!ParseUrl(cfg.endpoint)) {
         logging::Debug("[Translate] URL パース失敗: %s", cfg.endpoint.c_str());
         return false;
@@ -767,6 +899,7 @@ void translate::SetResultCallback(translate::ResultCallback cb) {
 std::string translate::Sync(const std::string& text) {
     std::string result = DoTranslate(text, config::GetTranslationMode());
     TrimTrailing(result);
+    TrimParenthetical(result);
     return result;
 }
 

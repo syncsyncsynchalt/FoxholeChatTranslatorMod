@@ -7,21 +7,17 @@
 # ===========================================================
 # 日本語 (VOICEVOX / OpenJTalk)
 # ===========================================================
+
+# ── 陣営・派閥ニックネーム ──────────────────────────────────
 Wardens? ja=ウォーデン i
 Colonials? ja=コロニアル i
 Collies? ja=コロニアル i
-QRF ja=キューアールエフ
-SPG ja=エスピージー
-GBs? ja=ジービー i
-AA ja=エーエー
-BTs? ja=ビーティー i
-logi ja=ロジ i
-inf ja=インフ i
-msups? ja=エムサップ i
-bsups? ja=ビーサップ i
-stockpile ja=ストックパイル i
-seaport ja=シーポート i
-garrison ja=ガリソン i
+Goblins? ja=ゴブリン i
+Squids? ja=スクイッド i
+Blues? ja=ブルーズ i
+Blueberries? ja=ブルーベリー i
+
+# ── 資源・素材略語 ──────────────────────────────────────────
 bmat ja=ビーマット i
 cmat ja=シーマット i
 rmat ja=アールマット i
@@ -29,30 +25,95 @@ emat ja=イーマット i
 smat ja=エスマット i
 amat ja=エーマット i
 conc ja=コンク i
-ssups? ja=エスサップ i
-arty ja=アーティ i
+
+# ── 燃料 ────────────────────────────────────────────────────
+diesel ja=ディーゼル i
+petrol ja=ペトロール i
+
+# ── 軍事・車両略語 ──────────────────────────────────────────
+QRF ja=キューアールエフ
+SPG ja=エスピージー
+GBs? ja=ジービー i
+gunboats? ja=ガンボート i
+AA ja=エーエー
+BTs? ja=ビーティー i
+APC ja=エーピーシー
+APCs? ja=エーピーシー i
+LTs? ja=エルティー i
+HTs? ja=エイチティー i
+halftracks? ja=ハーフトラック i
 HTDs? ja=エイチティーディー i
 WTDs? ja=ダブリューティーディー i
 LUV ja=エルユーブイ
+MPT ja=エムピーティー
+FOB ja=エフオービー
+
+# ── 武器固有コードネーム ─────────────────────────────────────
+Bonesaw ja=ボーンソー i
+Ignifist ja=イグニフィスト i
+Cutler ja=カトラー i
+Mammon ja=マンモン i
+Lamentum ja=ラメンタム i
+Cremari ja=クレマリ i
+Bomastone ja=ボーマストーン i
+Tremola ja=トレモーラ i
+Carnyx ja=カーニックス i
+Nukes? ja=ニューク i
+
+# ── 構造物・施設略語 ─────────────────────────────────────────
+BBs? ja=ビービー i
+SCs? ja=エスシー i
+ATGs? ja=エーティージー i
+MGGs? ja=エムジージー i
+UGFs? ja=ユージーエフ i
+FBs? ja=エフビー i
+ICs? ja=アイシー i
 MPF ja=エムピーエフ
+HMG ja=エイチエムジー
+
+# ── 施設フルネーム ───────────────────────────────────────────
+stockpile ja=ストックパイル i
+seaport ja=シーポート i
+garrison ja=ガリソン i
+garri ja=ガリ i
+
+# ── 補給・役職略語 ───────────────────────────────────────────
+logi ja=ロジ i
+inf ja=インフ i
+msups? ja=エムサップ i
+bsups? ja=ビーサップ i
+ssups? ja=エスサップ i
+arty ja=アーティ i
 ATR ja=エーティーアール
 Para ja=パラ i
+
+# ── 戦術・ゲームシステム用語 ─────────────────────────────────
+VPs? ja=ブイピー i
+RDZ ja=アールディーゼット
 WC ja=ダブリューシー
-Nukes? ja=ニューク i
+Partisans? ja=パルチザン i
+Satchels? ja=サチェル i
+Hexes? ja=ヘックス i
+ETA ja=エーティーエー
+
+# ── マップ略称・頻出地名 ─────────────────────────────────────
+KC ja=ケーシー
+Marban ja=マルバン i
 
 # ===========================================================
 # 韓国語 (Sherpa vits-mimic3-ko_KO-kss_low)
 # ===========================================================
+
+# ── 陣営・派閥ニックネーム ──────────────────────────────────
 Wardens? ko=워든 i
 Colonials? ko=코로니얼 i
 Collies? ko=코로니얼 i
-QRF ko=큐알에프
-SPG ko=에스피지
-GBs? ko=지비 i
-AA ko=에이에이
-BTs? ko=비티 i
-logi ko=로지 i
-inf ko=인프 i
+Goblins? ko=고블린 i
+Squids? ko=스퀴드 i
+Blues? ko=블루스 i
+Blueberries? ko=블루베리 i
+
+# ── 資源・素材略語 ──────────────────────────────────────────
 bmat ko=비맷 i
 cmat ko=씨맷 i
 rmat ko=알맷 i
@@ -60,21 +121,80 @@ emat ko=이맷 i
 smat ko=에스맷 i
 amat ko=에이맷 i
 conc ko=콩크 i
+
+# ── 燃料 ────────────────────────────────────────────────────
+diesel ko=디젤 i
+petrol ko=페트롤 i
+
+# ── 軍事・車両略語 ──────────────────────────────────────────
+QRF ko=큐알에프
+SPG ko=에스피지
+GBs? ko=지비 i
+gunboats? ko=건보트 i
+AA ko=에이에이
+BTs? ko=비티 i
+APC ko=에이피씨
+APCs? ko=에이피씨 i
+LTs? ko=엘티 i
+HTs? ko=에이치티 i
+halftracks? ko=하프트랙 i
+HTDs? ko=에이치티디 i
+WTDs? ko=더블유티디 i
+LUV ko=엘유브이
+MPT ko=엠피티
+FOB ko=에프오비
+
+# ── 武器固有コードネーム ─────────────────────────────────────
+Bonesaw ko=본쏘 i
+Ignifist ko=이그니피스트 i
+Cutler ko=커틀러 i
+Mammon ko=맘몬 i
+Lamentum ko=라멘텀 i
+Cremari ko=크레마리 i
+Bomastone ko=보마스톤 i
+Tremola ko=트레몰라 i
+Carnyx ko=카닉스 i
+Nukes? ko=뉴크 i
+
+# ── 構造物・施設略語 ─────────────────────────────────────────
+BBs? ko=비비 i
+SCs? ko=에스씨 i
+ATGs? ko=에이티지 i
+MGGs? ko=엠지지 i
+UGFs? ko=유지에프 i
+FBs? ko=에프비 i
+ICs? ko=아이씨 i
+MPF ko=엠피에프
+HMG ko=에이치엠지
+
+# ── 施設フルネーム ───────────────────────────────────────────
+stockpile ko=스톡파일 i
+seaport ko=시포트 i
+garrison ko=개리슨 i
+garri ko=개리 i
+
+# ── 補給・役職略語 ───────────────────────────────────────────
+logi ko=로지 i
+inf ko=인프 i
 msups? ko=엠섭 i
 bsups? ko=비섭 i
 ssups? ko=에스섭 i
 arty ko=아티 i
-stockpile ko=스톡파일 i
-seaport ko=시포트 i
-garrison ko=개리슨 i
-HTDs? ko=에이치티디 i
-WTDs? ko=더블유티디 i
-LUV ko=엘유브이
-MPF ko=엠피에프
 ATR ko=에이티알
 Para ko=파라 i
+
+# ── 戦術・ゲームシステム用語 ─────────────────────────────────
+VPs? ko=브이피 i
+RDZ ko=알디지
 WC ko=더블유씨
-Nukes? ko=뉴크 i
+Partisans? ko=파르티잔 i
+Satchels? ko=새첼 i
+Hexes? ko=헥스 i
+ETA ko=이티에이
+
+# ── マップ略称・頻出地名 ─────────────────────────────────────
+KC ko=케이씨
+Marban ko=마르반 i
 
 # ===========================================================
 # 中国語・ロシア語: espeak-ng が英語フォールバックを処理できるため初期は省略

@@ -5,6 +5,7 @@ Foxhole翻訳品質ベンチマーク
 """
 
 import json
+import re
 import time
 import statistics
 import sys
@@ -14,12 +15,65 @@ import urllib.request
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-SYSTEM_PROMPT = "You are a Foxhole war-game chat translator."
-TRANSLATE_PROMPT = (
-    "Translate the following war-game chat into natural, casual Japanese."
-    " Be concise — one short sentence. Paraphrase freely; keep key meaning."
-    " Output ONLY the translated text."
+SYSTEM_PROMPT_BASE = (
+    "You are a Foxhole war-game chat translator."
+    " Foxhole is a massively multiplayer persistent war game"
+    " with two factions: Wardens and Colonials."
 )
+TRANSLATE_PROMPT = (
+    "Translate the following war-game chat message into natural, casual Japanese."
+    " Output ONE short sentence only."
+    " Preserve numbers and times (e.g. '15 mins') exactly."
+    " Output ONLY the Japanese translation — no romanization, no explanations."
+)
+STOP_SEQUENCES = ["\n\n", " (", "Note:", "Translation:", "Here's", "Here is"]
+
+# slang_dict.txt と同等の辞書 (per-message マッチング用)
+SLANG_DICT = {
+    "W":          "expression of praise before a noun (e.g. 'W devs' = kudos to the devs; translate as praising whoever follows)",
+    "GG":         "good game/well played",
+    "F":          "paying respects (informal acknowledgment of a loss)",
+    "logi":       "補給 (Foxhole supply delivery; always translate logi as 補給 in Japanese, never as リソース or ログイン)",
+    "logi run":   "補給任務 (Foxhole supply delivery mission; translate as 補給任務 in Japanese)",
+    "inf":        "infantry",
+    "para":       "paratrooper",
+    "arty":       "artillery",
+    "lazy":       "too lazy (not sick or ill)",
+    "nah":        "no",
+    "gonna":      "going to",
+    "wanna":      "want to",
+    "gotta":      "got to/have to",
+    "imo":        "in my opinion",
+    "tbh":        "to be honest",
+    "rn":         "right now",
+    "atm":        "at the moment",
+    "lmao":       "laughing hard",
+    "lol":        "laughing",
+    "ngl":        "not going to lie",
+    "push":       "attack/advance toward the enemy",
+    "cap":        "capture (seize an objective)",
+    "hold":       "defend and not retreat",
+    "rush":       "attack quickly without preparation",
+    "pieces":     "military equipment or vehicles (artillery, tanks; NOT people — '4 pieces dead' = 4 guns/vehicles destroyed)",
+    "boys":       "teammates (gender-neutral; 'GO BOYS GO' = rallying cry to the team)",
+    "guys":       "teammates (gender-neutral)",
+    "bros":       "teammates",
+    "collies":    "Colonials (faction)",
+    "squids":     "Colonials (faction)",
+    "goblins":    "Wardens (faction)",
+    "blues":      "Wardens (faction)",
+    "blueberries":"Wardens (faction)",
+}
+
+def build_system_prompt(text):
+    matched = []
+    for term, meaning in SLANG_DICT.items():
+        if re.search(r'\b' + re.escape(term) + r'\b', text, re.IGNORECASE):
+            matched.append(f"'{term}' means {meaning}")
+    s = SYSTEM_PROMPT_BASE
+    if matched:
+        s += " Note: " + "; ".join(matched) + "."
+    return s
 
 PRESETS = [
     ("Low",    "gemma3:1b",        128, 2),
@@ -199,8 +253,9 @@ def post(model, num_ctx, num_thread, text):
     payload = {
         "model":  model,
         "prompt": TRANSLATE_PROMPT + "\n\n" + text,
-        "system": SYSTEM_PROMPT,
+        "system": build_system_prompt(text),
         "stream": False,
+        "stop":   STOP_SEQUENCES,
         "options": {
             "num_ctx":     num_ctx,
             "num_predict": 120,
