@@ -811,22 +811,18 @@ static SherpaOnnxOfflineTts* GetModel(Lang lang) {
 // TTS ワーカースレッド
 // ============================================================
 
-struct TtsRequest {
-    std::string           text;
-    std::function<void()> onSynthesisReady; // 合成完了・再生開始直前コールバック
-};
-
-static constexpr size_t MAX_TTS_QUEUE_SIZE = 2;
-static constexpr float  kPlaybackSpeed     = 1.05f;  // 再生速度 (1.0=等速)
+static constexpr float  kPlaybackSpeed = 1.05f;  // 再生速度 (1.0=等速)
 
 static std::thread             g_ttsThread;
-static std::mutex              g_ttsMutex;
+static std::mutex              g_ttsMutex;      // g_latestText 保護
 static std::condition_variable g_ttsCv;
-static std::queue<TtsRequest>  g_ttsQueue;
+static std::string             g_latestText;    // 次の発話テキスト (上書き最新)
 static std::atomic<bool>       g_ttsRunning{false};
 static std::atomic<bool>       g_ttsStop{false};
-static std::atomic<bool>       g_ttsPlaying{false};
 static std::string             g_ttsLanguage = "auto";
+
+static std::mutex  g_speakingMutex;             // g_currentSpeakingText 保護
+static std::string g_currentSpeakingText;        // 現在発話中テキスト (overlay ハイライト用)
 
 static void TtsWorker() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -851,13 +847,13 @@ static void TtsWorker() {
     tts_install::StartIfNeeded(g_ttsDir, g_ttsLanguage);
 
     while (g_ttsRunning.load()) {
-        TtsRequest req;
+        std::string text;
         {
             std::unique_lock<std::mutex> lock(g_ttsMutex);
-            bool hasReq = g_ttsCv.wait_for(lock, std::chrono::seconds(30),
-                [] { return !g_ttsQueue.empty() || !g_ttsRunning.load(); });
+            bool hasText = g_ttsCv.wait_for(lock, std::chrono::seconds(30),
+                [] { return !g_latestText.empty() || !g_ttsRunning.load(); });
             if (!g_ttsRunning.load()) break;
-            if (!hasReq) {
+            if (!hasText) {
                 // タイムアウト: インストール完了後に各エンジンを再試行
                 if (!g_sherpaLib) {
                     if (LoadSherpaLib(g_ttsDir))
@@ -870,37 +866,26 @@ static void TtsWorker() {
                 TryLoadVvm15();  // 15.vvm ダウンロード完了後に青山龍星を hot-load
                 continue;
             }
-            req = g_ttsQueue.front();
-            g_ttsQueue.pop();
+            text = std::move(g_latestText);
+            g_latestText.clear();
         }
 
-        g_ttsPlaying.store(true);
-        struct PlayGuard { ~PlayGuard() { g_ttsPlaying.store(false); } } _guard;
+        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText = text; }
         g_ttsStop.store(false);
         logging::Debug("[TTS] 処理開始: bytes=%zu text=%.60s",
-                       req.text.size(), req.text.c_str());
-
-        // 合成完了コールバックを確実に1回だけ呼ぶ RAII ガード
-        // 合成成功 → fire() で明示呼び出し後に再生開始
-        // 合成失敗 → continue でデストラクタが自動呼び出し (表示が止まったまま残らない)
-        struct SynthReadyGuard {
-            std::function<void()> fn;
-            bool fired = false;
-            void fire() { if (!fired && fn) { fired = true; fn(); } }
-            ~SynthReadyGuard() { fire(); }
-        } synthGuard{std::move(req.onSynthesisReady)};
+                       text.size(), text.c_str());
 
         // 言語判定
         Lang lang = Lang::EN;
         if (g_ttsLanguage == "auto") {
-            lang = DetectLanguage(req.text.c_str());
+            lang = DetectLanguage(text.c_str());
         } else if (g_ttsLanguage == "ja") { lang = Lang::JA;
         } else if (g_ttsLanguage == "en") { lang = Lang::EN;
         } else if (g_ttsLanguage == "ru") { lang = Lang::RU;
         } else if (g_ttsLanguage == "zh") { lang = Lang::ZH;
         } else if (g_ttsLanguage == "ko") { lang = Lang::KO;
         } else {
-            lang = DetectLanguage(req.text.c_str());
+            lang = DetectLanguage(text.c_str());
         }
 
         static const char* kLangName[] = {"EN", "RU", "KO", "ZH", "JA"};
@@ -916,9 +901,9 @@ static void TtsWorker() {
         // TTS 読み辞書を適用 (英単語 → 各言語の読み)
         static const char* kLangKey[] = {"en", "ru", "ko", "zh", "ja"};
         const char* langKey = kLangKey[static_cast<int>(lang)];
-        std::string processedText = ApplyTtsReadings(req.text, langKey);
-        if (processedText != req.text)
-            logging::Debug("[TTS] 読み辞書適用: %s → %s", req.text.c_str(), processedText.c_str());
+        std::string processedText = ApplyTtsReadings(text, langKey);
+        if (processedText != text)
+            logging::Debug("[TTS] 読み辞書適用: %s → %s", text.c_str(), processedText.c_str());
 
         bool useVoicevox = (lang == Lang::JA && g_vvReady);
         if (config::Get().ttsVerboseLog)
@@ -957,7 +942,6 @@ static void TtsWorker() {
             sourceVoice->SubmitSourceBuffer(&buf);
             sourceVoice->SetVolume(config::Get().ttsVolume);
             sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
-            synthGuard.fire(); // 合成完了: オーバーレイ表示更新と再生開始を同期
             sourceVoice->Start(0);
             logging::Debug("[TTS-VV] 再生開始: %u bytes", dataSize);
 
@@ -972,6 +956,7 @@ static void TtsWorker() {
                 Sleep(50);
             }
             sourceVoice->DestroyVoice();
+            { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText.clear(); }
             continue;
         }
 
@@ -1002,7 +987,7 @@ static void TtsWorker() {
             }
             ttsText = ttsText.substr(0, cut != std::string::npos ? cut : kMaxTtsChars);
             logging::Debug("[TTS] テキスト切り詰め: %zu -> %zu bytes",
-                           req.text.size(), ttsText.size());
+                           text.size(), ttsText.size());
         }
 
         if (config::Get().ttsVerboseLog)
@@ -1067,7 +1052,6 @@ static void TtsWorker() {
         sourceVoice->SubmitSourceBuffer(&buf);
         sourceVoice->SetVolume(config::Get().ttsVolume);
         sourceVoice->SetFrequencyRatio(kPlaybackSpeed);
-        synthGuard.fire(); // 合成完了: オーバーレイ表示更新と再生開始を同期
         sourceVoice->Start(0);
 
         for (;;) {
@@ -1082,6 +1066,7 @@ static void TtsWorker() {
         }
 
         sourceVoice->DestroyVoice();
+        { std::lock_guard<std::mutex> lk(g_speakingMutex); g_currentSpeakingText.clear(); }
     }
 
     if (masterVoice) masterVoice->DestroyVoice();
@@ -1118,24 +1103,16 @@ void tts::Init(const char* language, uint32_t voicevoxStyleId, uint32_t voicevox
     g_ttsThread = std::thread(TtsWorker);
 }
 
-void tts::Speak(const char* textUtf8, const char* /*senderUtf8*/,
-                std::function<void()> onSynthesisReady) {
+void tts::SetLatest(const char* textUtf8) {
     if (!textUtf8 || !*textUtf8 || !g_ttsRunning.load()) return;
-    logging::Debug("[TTS] Speak: bytes=%zu text=%.60s", strlen(textUtf8), textUtf8);
-    {
-        std::lock_guard<std::mutex> lock(g_ttsMutex);
-        if (g_ttsQueue.size() >= MAX_TTS_QUEUE_SIZE) {
-            logging::Debug("[TTS] キュー満杯: 最古を破棄");
-            g_ttsQueue.pop();
-        }
-        g_ttsQueue.push({textUtf8, std::move(onSynthesisReady)});
-    }
+    logging::Debug("[TTS] SetLatest: bytes=%zu text=%.60s", strlen(textUtf8), textUtf8);
+    { std::lock_guard<std::mutex> lk(g_ttsMutex); g_latestText = textUtf8; }
     g_ttsCv.notify_one();
 }
 
-bool tts::IsBusy() {
-    std::lock_guard<std::mutex> lock(g_ttsMutex);
-    return g_ttsPlaying.load() || !g_ttsQueue.empty();
+std::string tts::GetSpeakingText() {
+    std::lock_guard<std::mutex> lk(g_speakingMutex);
+    return g_currentSpeakingText;
 }
 
 void tts::Stop() {

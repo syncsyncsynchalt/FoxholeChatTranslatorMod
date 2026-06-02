@@ -59,7 +59,7 @@ static std::queue<QueueItem>   g_queue;
 static bool                    g_running = false;
 static std::atomic<bool>       g_activeWork{false};
 
-static constexpr size_t MAX_QUEUE_SIZE = 4;
+static constexpr size_t MAX_QUEUE_SIZE = 30;
 
 static translate::ResultCallback g_resultCallback;
 

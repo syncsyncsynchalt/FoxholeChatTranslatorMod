@@ -41,6 +41,7 @@ static const ImWchar g_cjkGlyphRanges[] = {
     0x0020, 0x00FF,
     0x0400, 0x04FF,
     0x2000, 0x206F,
+    0x2190, 0x21FF,  // 矢印 (↓ 等)
     0x3000, 0x30FF,
     0x31F0, 0x31FF,
     0x4E00, 0x9FFF,
@@ -59,15 +60,13 @@ struct MessageEntry {
 
 static std::mutex               g_textMutex;
 static std::deque<MessageEntry> g_entries;
-static const size_t             kMaxEntries = 5;
-
-// TTS 再生中に届いたメッセージを一時保留するキュー (g_textMutex で保護)
-struct PendingMsg { std::string sender; std::string message; };
-static std::deque<PendingMsg> g_pendingMessages;
-static const size_t kMaxPending = 8;
+static const size_t             kMaxEntries = 30;  // 保持件数
+static const size_t             kMaxVisible = 10;  // 一度に表示する最大件数
 
 static float g_scrollOrig  = 0.0f; // 最新エントリの原文スクロール
 static float g_scrollTrans = 0.0f; // 最新エントリの訳文スクロール
+
+static std::atomic<bool> g_scrollToBottom{false}; // 新規メッセージ到着時の自動スクロールフラグ
 
 // デモモード: 5言語自動切替
 static const char* g_demoMessages[] = {
@@ -232,7 +231,7 @@ static void RenderFrame() {
     // レイアウト定数
     static float       s_textWidth = 270.0f; // リサイズハンドルで変更可能
     static const float kGap       = 4.0f;
-    static const float kPadX      = 6.0f;
+    static const float kPadX      = 0.0f;
     static const float kPadY      = 3.0f;
     static const float kMargin    = 12.0f;
     static const float kFPX       = 4.0f;  // FramePadding.x
@@ -268,37 +267,6 @@ static void RenderFrame() {
 
     bool changed = g_textChanged.exchange(false);
 
-    // TTS + 翻訳パイプラインが空いたら pending キューの次メッセージを処理する
-    // (描画スレッドで呼ぶが translate::Queue / tts::IsBusy はスレッドセーフ)
-    if (config::GetTtsMode() != TtsMode::Off && !translate::IsBusy() && !tts::IsBusy()) {
-        PendingMsg next;
-        bool hasPending = false;
-        {
-            std::lock_guard<std::mutex> lock(g_textMutex);
-            if (!g_pendingMessages.empty()) {
-                next = std::move(g_pendingMessages.front());
-                g_pendingMessages.pop_front();
-                hasPending = true;
-            }
-        }
-        if (hasPending) {
-            TranslationMode mode = config::GetTranslationMode();
-            {
-                std::lock_guard<std::mutex> lock(g_textMutex);
-                if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-                g_entries.push_back({next.sender, next.message, "", mode != TranslationMode::Off,
-                                     std::chrono::steady_clock::now()});
-                g_scrollOrig  = 0.0f;
-                g_scrollTrans = 0.0f;
-            }
-            g_textChanged.store(true);
-            if (mode != TranslationMode::Off) {
-                translate::Queue("", next.sender, next.message, mode, config::GetTtsMode());
-            }
-            logging::Debug("[Overlay] pending -> 処理: %s", next.message.c_str());
-        }
-    }
-
     // デモモード: タイマー駆動でメッセージを切り替え
     if (config::Get().demoMode) {
         g_demoTimer += io.DeltaTime;
@@ -306,16 +274,16 @@ static void RenderFrame() {
             g_demoTimer = 0.0f;
             g_demoIndex = (g_demoIndex + 1) % g_demoCount;
             TranslationMode mode = config::GetTranslationMode();
-            {
+            if (mode == TranslationMode::Off) {
                 std::lock_guard<std::mutex> lock(g_textMutex);
                 if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-                g_entries.push_back({"", g_demoMessages[g_demoIndex], "", mode != TranslationMode::Off,
+                g_entries.push_back({"", g_demoMessages[g_demoIndex], g_demoMessages[g_demoIndex], false,
                                      std::chrono::steady_clock::now()});
                 g_scrollOrig  = 0.0f;
                 g_scrollTrans = 0.0f;
-            }
-            g_textChanged.store(true);
-            if (mode != TranslationMode::Off) {
+                g_textChanged.store(true);
+                g_scrollToBottom.store(true);
+            } else {
                 translate::Queue("", "", g_demoMessages[g_demoIndex], mode, config::GetTtsMode());
             }
         }
@@ -357,7 +325,8 @@ static void RenderFrame() {
     static bool s_historyExpanded = false;
     if (numPast == 0) s_historyExpanded = false;
 
-    float historyH = (s_historyExpanded && numPast > 0) ? numPast * 2.0f * lineHWS : 0.0f;
+    size_t numVisible = std::min(numPast, kMaxVisible - 1);  // 最大 kMaxVisible-1 件
+    float historyH = (s_historyExpanded && numPast > 0) ? numVisible * 2.0f * lineHWS : 0.0f;
     totalH = kPadY + historyH + lineHWS + lineHWS + kPadY;
 
     // 初回のみデフォルト位置 (右下) に配置。以降はドラッグで移動した位置を維持
@@ -440,34 +409,93 @@ static void RenderFrame() {
     const float kBtnH = lineH + 2.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(kFPX, 1.0f));
 
-    // --- 過去エントリ (ボタンなし、薄い色で表示) ---
+    // --- 過去エントリ (ボタンなし、BeginChild でスクロール対応) ---
     float pastTextX = toggleColW + kBtnWidth + kGap;
     float pastTextW = s_textWidth;
-    if (s_historyExpanded) for (size_t i = 0; i + 1 < entries.size(); ++i) {
-        const auto& e = entries[i];
-        float rowY = ImGui::GetCursorPosY();
+    static bool s_jumpToBottom = false;
+    bool isAtBottom = true;  // BeginChild の外で使うため宣言
+    if (s_historyExpanded && numPast > 0) {
+        float childH = numVisible * 2.0f * lineHWS;
+        ImVec2 childScreenPos = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorPos(ImVec2(0.0f, ImGui::GetCursorPosY()));
+        ImGui::BeginChild("##hist_scroll", ImVec2(totalW - 2.0f * kPadX, childH), false);
 
-        // 原文行 (sender: original)
-        std::string line1 = e.sender.empty() ? e.original : e.sender + u8": " + e.original;
-        ImGui::SetCursorPos(ImVec2(pastTextX, rowY));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 0.85f));
-        char origId[32]; snprintf(origId, sizeof(origId), "##pq_o%zu", i);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-        RenderClippedText(origId, line1.c_str(), pastTextW);
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
+        // GetContentRegionAvail().x = スクロールバー有無を自動考慮した実際の使用可能幅
+        float contentW   = ImGui::GetContentRegionAvail().x;
+        float leftMargin = ImGui::GetTextLineHeight() * 0.3f;  // 約0.5文字分の左余白
+        float histTextW  = contentW - leftMargin;
 
-        // 訳文行
-        std::string line2 = e.translating ? TranslatingLabel(e) : e.translated;
-        ImGui::SetCursorPos(ImVec2(pastTextX, rowY + lineHWS));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.85f, 0.65f, 0.75f));
-        char transId[32]; snprintf(transId, sizeof(transId), "##pq_t%zu", i);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-        RenderClippedText(transId, line2.c_str(), pastTextW);
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
+        ImDrawList* histDraw = ImGui::GetWindowDrawList();
+        std::string speaking = tts::GetSpeakingText();
 
-        ImGui::SetCursorPos(ImVec2(0.0f, rowY + 2.0f * lineHWS));
+        for (size_t i = 0; i + 1 < entries.size(); ++i) {
+            const auto& e = entries[i];
+            float rowY = ImGui::GetCursorPosY();
+
+            // 発話中ハイライト (左余白なしでフル幅)
+            if (!speaking.empty() &&
+                (e.translated == speaking || e.original == speaking)) {
+                ImVec2 p = ImGui::GetCursorScreenPos();
+                histDraw->AddRectFilled(p, ImVec2(p.x + contentW, p.y + 2.0f * lineHWS),
+                                        IM_COL32(60, 140, 60, 90));
+            }
+
+            // 原文行 (sender: original)
+            std::string line1 = e.sender.empty() ? e.original : e.sender + u8": " + e.original;
+            ImGui::SetCursorPos(ImVec2(leftMargin, rowY));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 0.85f));
+            char origId[32]; snprintf(origId, sizeof(origId), "##pq_o%zu", i);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+            RenderClippedText(origId, line1.c_str(), histTextW);
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+
+            // 訳文行
+            std::string line2 = e.translating ? TranslatingLabel(e) : e.translated;
+            ImGui::SetCursorPos(ImVec2(leftMargin, rowY + lineHWS));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.85f, 0.65f, 0.75f));
+            char transId[32]; snprintf(transId, sizeof(transId), "##pq_t%zu", i);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+            RenderClippedText(transId, line2.c_str(), histTextW);
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+
+            ImGui::SetCursorPos(ImVec2(0.0f, rowY + 2.0f * lineHWS));
+        }
+
+        // コンテンツ描画後にスクロール処理 (内容高が確定してから SetScrollHereY を呼ぶ)
+        isAtBottom = ImGui::GetScrollMaxY() <= 0.0f ||
+                     ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f;
+        bool shouldScroll = (g_scrollToBottom.exchange(false) && isAtBottom) || s_jumpToBottom;
+        if (shouldScroll) {
+            ImGui::SetScrollHereY(1.0f);
+            s_jumpToBottom = false;
+        }
+
+        // ↓ 最新ボタン: DrawList で直接描画してレイアウト/コンテンツサイズに影響させない
+        if (!isAtBottom) {
+            static const char* kBtnLabel = u8"↓ 最新";
+            float padX = ImGui::GetStyle().FramePadding.x;
+            float btnW = ImGui::CalcTextSize(kBtnLabel).x + 2.0f * padX;
+            float btnH = ImGui::GetTextLineHeight();
+            ImVec2 bMin = ImVec2(childScreenPos.x + contentW - btnW - 4.0f,
+                                 childScreenPos.y + childH - btnH - 4.0f);
+            ImVec2 bMax = ImVec2(bMin.x + btnW, bMin.y + btnH);
+            ImVec2 mpos = ImGui::GetIO().MousePos;
+            bool hov = mpos.x >= bMin.x && mpos.x <= bMax.x &&
+                       mpos.y >= bMin.y && mpos.y <= bMax.y;
+            histDraw->AddRectFilled(bMin, bMax,
+                hov ? IM_COL32(80, 110, 80, 230) : IM_COL32(40, 60, 40, 190), 3.0f);
+            histDraw->AddText(ImVec2(bMin.x + padX, bMin.y),
+                IM_COL32(200, 255, 200, 255), kBtnLabel);
+            if (hov && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                s_jumpToBottom = true;
+        }
+
+        ImGui::EndChild();
+    } else {
+        // 展開していない場合も g_scrollToBottom フラグを消費する
+        g_scrollToBottom.store(false);
     }
 
     // --- 展開/折りたたみトグルボタン (最新2行の左端に2行スパン、常に表示) ---
@@ -511,6 +539,18 @@ static void RenderFrame() {
         // 次行の先頭へ
         ImGui::SetCursorPos(ImVec2(0.0f, rowTopY + lineHWS));
     };
+
+    // --- 最新エントリ: 発話中ハイライト ---
+    {
+        std::string latestText = latest.translated.empty() ? latest.original : latest.translated;
+        std::string spk = tts::GetSpeakingText();
+        if (!spk.empty() && (latestText == spk || latest.original == spk)) {
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                p, ImVec2(p.x + totalW - 2.0f * kPadX, p.y + 2.0f * lineHWS),
+                IM_COL32(60, 140, 60, 90));
+        }
+    }
 
     // --- 最新エントリ: TTS ボタン + 原文 ---
     RenderRow("##mq_orig", latestOrig.c_str(), g_scrollOrig,
@@ -564,52 +604,35 @@ bool overlay::Init() {
     g_assetsDir = dir + "assets\\";
 
     translate::SetResultCallback([](const translate::TranslateResult& r) {
-        // 表示更新ロジックをラムダとして定義
-        // TTS オン: 合成完了コールバックで呼び出し → 表示と発話開始を同時に行う
-        // TTS オフ: 翻訳完了直後に呼び出し (従来動作)
-        std::string channel = r.channel, sender = r.sender,
-                    original = r.original, translated = r.translated;
-        bool ok = r.ok;
-
-        auto doDisplay = [=]() {
-            {
-                std::lock_guard<std::mutex> lock(g_textMutex);
-                for (auto it = g_entries.rbegin(); it != g_entries.rend(); ++it) {
-                    if (it->translating && it->sender == sender && it->original == original) {
-                        it->translated  = ok ? translated : original;
-                        it->translating = false;
-                        if (it == g_entries.rbegin()) {
-                            g_scrollOrig  = 0.0f;
-                            g_scrollTrans = 0.0f;
-                        }
-                        break;
-                    }
-                }
-            }
+        // 翻訳完了で新規エントリ追加 (翻訳中表示なし、完成したものだけ表示)
+        std::string displayTranslated = r.ok ? r.translated : r.original;
+        {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+            g_entries.push_back({r.sender, r.original, displayTranslated, false,
+                                 std::chrono::steady_clock::now()});
+            g_scrollOrig  = 0.0f;
+            g_scrollTrans = 0.0f;
             g_textChanged.store(true);
-            logging::Translation(channel.c_str(), sender.c_str(),
-                                 original.c_str(), translated.c_str());
-        };
+            g_scrollToBottom.store(true);
+        }
+        logging::Translation(r.channel.c_str(), r.sender.c_str(),
+                             r.original.c_str(), r.translated.c_str());
 
+        // TTS: 次の発話テキストを設定 (現在の発話完了後に読み上げる)
         if (r.ttsMode != TtsMode::Off) {
-            // 翻訳失敗 (Ollama 接続不可) のエラー文字列は読み上げない
             bool useTranslated = (r.ttsMode == TtsMode::Translated) && r.ok;
-            std::string ttsText = useTranslated ? r.translated : r.original;
-            // doDisplay は合成完了・再生直前 (synthGuard.fire()) で呼ばれる
-            tts::Speak(ttsText.c_str(),
-                       sender.empty() ? nullptr : sender.c_str(),
-                       std::move(doDisplay));
-        } else {
-            doDisplay(); // TTS オフ: 翻訳完了直後に即時表示
+            tts::SetLatest((useTranslated ? r.translated : r.original).c_str());
         }
     });
 
     if (config::Get().demoMode) {
-        std::lock_guard<std::mutex> lock(g_textMutex);
         TranslationMode mode = config::GetTranslationMode();
-        g_entries.push_back({"", g_demoMessages[0], "", mode != TranslationMode::Off,
-                             std::chrono::steady_clock::now()});
-        if (mode != TranslationMode::Off) {
+        if (mode == TranslationMode::Off) {
+            std::lock_guard<std::mutex> lock(g_textMutex);
+            g_entries.push_back({"", g_demoMessages[0], g_demoMessages[0], false,
+                                 std::chrono::steady_clock::now()});
+        } else {
             translate::Queue("", "", g_demoMessages[0], mode, config::GetTtsMode());
         }
     }
@@ -672,11 +695,15 @@ bool overlay::IsRadioOn() {
 }
 
 void overlay::SetDisplayText(const char* original, const char* translated) {
-    std::lock_guard<std::mutex> lock(g_textMutex);
-    if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-    g_entries.push_back({"", original ? original : "", translated ? translated : "", false});
-    g_scrollOrig  = 0.0f;
-    g_scrollTrans = 0.0f;
+    {
+        std::lock_guard<std::mutex> lock(g_textMutex);
+        if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
+        g_entries.push_back({"", original ? original : "", translated ? translated : "", false});
+        g_scrollOrig  = 0.0f;
+        g_scrollTrans = 0.0f;
+    }
+    g_textChanged.store(true);
+    g_scrollToBottom.store(true);
 }
 
 void overlay::OnChatMessage(const std::string& sender, const std::string& message) {
@@ -699,32 +726,20 @@ void overlay::OnChatMessage(const std::string& sender, const std::string& messag
         }
     }
 
-    // TTS オンかつ翻訳/TTS パイプライン処理中は pending バッファへ退避し、
-    // パイプラインが空いたタイミング (RenderFrame) で順番に処理する
-    if (config::GetTtsMode() != TtsMode::Off &&
-        (translate::IsBusy() || tts::IsBusy())) {
-        std::lock_guard<std::mutex> lock(g_textMutex);
-        if (g_pendingMessages.size() >= kMaxPending)
-            g_pendingMessages.pop_front();
-        g_pendingMessages.push_back({sender, message});
-        logging::Debug("[Overlay] TTS 再生中につき pending (%zu件): %s",
-                       g_pendingMessages.size(), message.c_str());
-        return;
-    }
-
     TranslationMode mode = config::GetTranslationMode();
 
-    {
+    if (mode == TranslationMode::Off) {
+        // 翻訳なし: 原文を即時表示
         std::lock_guard<std::mutex> lock(g_textMutex);
         if (g_entries.size() >= kMaxEntries) g_entries.pop_front();
-        g_entries.push_back({sender, message, "", mode != TranslationMode::Off,
+        g_entries.push_back({sender, message, message, false,
                              std::chrono::steady_clock::now()});
         g_scrollOrig  = 0.0f;
         g_scrollTrans = 0.0f;
-    }
-    g_textChanged.store(true);
-
-    if (mode != TranslationMode::Off) {
+        g_textChanged.store(true);
+        g_scrollToBottom.store(true);
+    } else {
+        // 翻訳モード: 翻訳完了時にコールバックでエントリ追加。翻訳中表示なし
         translate::Queue("", sender, message, mode, config::GetTtsMode());
     }
 }

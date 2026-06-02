@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // overlay_test.cpp - オーバーレイ UI テストホスト
 // ゲームなしで chat_translator.dll のオーバーレイを確認する
 //
@@ -126,6 +126,66 @@ static const struct { const char* sender; const char* message; } kTestMessages[]
     { "KobayashiHaru",   "WEATHERED全面プッシュ!! BT6両+APCがcrows nest通過中 AT QRF重ロジ全部必要 foxcatcher防衛ライン全員集合!! 修理ステ空なのでRMAT持ってきて" },
     { "WatanabeKo",      "necropolis fob落とされた BT3両とシャツ全部ロスト huntsfort集合 ロジbmat conc 20mm SC frostmarchに砲撃転換 後ろ取られる前に!!" },
     { "OtaNoboru",       "戦況: wardenがsolas gorgeから突入しwhite chapel強化中, BBラインcrumbling postがやばい, cord SC生きてるけどATマイン枯渇, ロジ3台7.62 rmat fob 02:00まで" },
+    // ---- EN Short (set 2) ----
+    { "SafePass",        "storm cannon firing wightwalk!!" },
+    { "BootlegLogi",     "need 68mm at foxcatcher pronto" },
+    { "RifleGhost",      "wardens pushing north bb!!" },
+    // ---- EN Medium (set 2) ----
+    { "HeavyArmor11",    "2 BTs from crows nest AT QRF now!! infantry push to bridge hold the line" },
+    { "ForwardFOB",      "fob midrock down!! logi bring bmat + rmat rebuild asap defenders hold east" },
+    { "SupplyDrop",      "facility needs diesel + components 200+ each who can haul??" },
+    // ---- EN Long (set 2) ----
+    { "OverwatchAlpha",  "colonial push 3-lane all fronts BTs APCs infantry flanking east thru overlook get AT teams now!! bunker bb falling fast need bmat conc repairs" },
+    { "RegimentCO",      "warden assault took latch!! SC battery neutralized reinforcing 2 BT squads logi convoy bmat rmat conc 20mm 7.62 enroute" },
+    { "LogiKing99",      "full stockpile run foxcatcher done 300mm 40mm bmat rmat conc delivered bb repair team on site AT mines north approach placed next run frostmarch" },
+    // ---- RU Short (set 2) ----
+    { u8"ГришаТанкист",   u8"штурмовая пушка бьёт по wightwalk!!" },
+    { u8"ЛоджиБрат",      u8"нужен 68мм на foxcatcher срочно" },
+    { u8"РядовойВаська",  u8"варданы давят северный BB!!" },
+    // ---- RU Medium (set 2) ----
+    { u8"ТяжелаяБроня",   u8"2 БТ с crows nest AT отряд срочно!! пехота к мосту держать линию" },
+    { u8"ФОБмейкер",      u8"фоб midrock уничтожен!! лоджи bmat rmat на восстановление защитники держат восток" },
+    { u8"КладовщикМакс",  u8"объект нуждается в дизеле и компонентах 200+ каждого кто может довезти??" },
+    // ---- RU Long (set 2) ----
+    { u8"НаблюдательА",   u8"колониальный удар 3 направления BT APC пехота фланг восток через overlook AT команды сейчас!! BB рушится быстро нужен bmat conc ремонт" },
+    { u8"КомполкаРогов",  u8"отряд варданов взял latch!! SC нейтрализован усиливаем 2 отряда BT конвой лоджи bmat rmat conc 20мм 7.62" },
+    { u8"КоролеВоз",      u8"полный рейс foxcatcher завершён 300мм 40мм bmat rmat conc доставлено ремонт BB на месте AT мины северный подход следующий рейс frostmarch" },
+    // ---- KO Short (set 2) ----
+    { u8"사령관철수",      u8"와이트워크에 폭풍대포 사격중!!" },
+    { u8"보급병민준",      u8"foxcatcher에 68mm 빨리 필요" },
+    { u8"전선병사",        u8"워든 북쪽 BB 밀고있어!!" },
+    // ---- KO Medium (set 2) ----
+    { u8"중전차부대",      u8"crows nest에서 BT 2대 AT 지금 필요!! 보병 다리까지 선 유지해" },
+    { u8"전방기지장",      u8"midrock fob 뚫렸어!! 로지 bmat rmat 재건 빨리 동쪽 방어자 버텨" },
+    { u8"보급왕",          u8"시설 디젤 부품 각 200+ 필요 운반 가능한 사람??" },
+    // ---- KO Long (set 2) ----
+    { u8"감시초소알파",    u8"식민지군 3방향 전면 푸쉬 BT APC 보병 동쪽 overlook 통해 플랭크 AT팀 지금!! BB 빠르게 무너지고 있어 bmat conc 수리 필요" },
+    { u8"연대장김",        u8"워든 돌격대 latch 점령!! SC 포대 무력화 BT 2개 소대 강화 로지 호송 bmat rmat conc 20mm 7.62" },
+    { u8"보급왕99",        u8"foxcatcher 보급 완료 300mm 40mm bmat rmat conc 납품완료 BB 수리팀 현장 AT 지뢰 북쪽 배치 다음은 frostmarch" },
+    // ---- ZH Short (set 2) ----
+    { u8"战场指挥",        u8"暴风炮正在打wightwalk!!" },
+    { u8"补给兵小李",      u8"foxcatcher急需68mm" },
+    { u8"前线步兵",        u8"瓦登在推北BB!!" },
+    // ---- ZH Medium (set 2) ----
+    { u8"重装部队",        u8"crows nest来了2辆BT 要AT支援!! 步兵守住桥头防线" },
+    { u8"前哨站长",        u8"midrock前哨被端了!! 补给带bmat rmat重建 东面防守者顶住" },
+    { u8"仓库管理员",      u8"设施急需柴油和零件各200+ 谁能跑一趟??" },
+    // ---- ZH Long (set 2) ----
+    { u8"前哨观察哨",      u8"殖民军三线全面推进 BT APC步兵东侧overlook侧翼 AT小队立刻集合!! BB正在快速崩溃 bmat conc 修复" },
+    { u8"团长老王",        u8"瓦登突击队拿下latch!! SC炮台被压制 增援2个BT小队 补给车队出发 bmat rmat conc 20mm 7.62" },
+    { u8"补给王99",        u8"foxcatcher补给完成 300mm 40mm bmat rmat conc已到位 BB修复队在场 AT地雷北侧布置完成 下次跑frostmarch" },
+    // ---- JA Short (set 2) ----
+    { u8"司令部オオタ",    u8"wightwalkにストームキャノン砲撃中!!" },
+    { u8"補給兵ハナ",      u8"foxcatcherに68mm緊急で" },
+    { u8"前線兵イシ",      u8"ワーデン北BBを押してる!!" },
+    // ---- JA Medium (set 2) ----
+    { u8"重装甲部隊",      u8"crows nestからBT2両来てるAT急いで!! 歩兵は橋まで防衛ライン維持" },
+    { u8"前哨基地長",      u8"midrock fob落とされた!! ロジbmat rmat再建急いで東の守備者踏ん張って" },
+    { u8"倉庫番タカ",      u8"施設にディーゼルと部品各200+必要誰か運べる??" },
+    // ---- JA Long (set 2) ----
+    { u8"監視所アルファ",  u8"コロニアル3方面全面プッシュ BT APC歩兵東からoverlookでフランク ATチーム今すぐ!! BBが速攻崩れてる bmat conc修理必要" },
+    { u8"連隊長ミヤモト",  u8"ワーデン突撃部隊がlatch制圧!! SCバッテリー無力化 BT2個小隊増援 ロジ車列出発 bmat rmat conc 20mm 7.62" },
+    { u8"補給王99",        u8"foxcatcher補給ラン完了 300mm 40mm bmat rmat conc納品 BB修理チーム現地入り ATマイン北アプローチ配置完了 次はfrostmarch" },
 };
 static const int kTestMessageCount = sizeof(kTestMessages) / sizeof(kTestMessages[0]);
 static int g_msgIndex = 0;
@@ -229,7 +289,7 @@ static void StartReplayThread() {
                    idx + 1, total, e.sender.c_str(), e.message.c_str());
             fflush(stdout);
 
-            // TTS 再生完了待機: 翻訳パイプライン開始を待つ最低 500ms + IsBusy ポーリング
+            // 翻訳完了待機: パイプライン開始を待つ最低 500ms + IsBusy ポーリング
             // IsBusy 未取得時はフォールバックとして固定インターバルを使う
             if (g_fnIsBusy) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -319,6 +379,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             printf("[F1] メッセージ送信 (%s): %s\n", tm.sender, tm.message);
             g_msgIndex++;
 
+        } else if (wp == VK_F2 && g_fnChatMsg) {
+            for (int k = 0; k < 10; k++) {
+                const auto& tm = kTestMessages[(g_msgIndex + k) % kTestMessageCount];
+                g_fnChatMsg(tm.sender, tm.message);
+            }
+            printf("[F2] 10件連続送信 (index %d..%d)\n", g_msgIndex, g_msgIndex + 9);
+            g_msgIndex += 10;
+
         } else if (wp == 'L') {
             if (g_logEntries.empty()) {
                 printf("[Replay] ログが読み込まれていません\n");
@@ -395,7 +463,7 @@ int main(int argc, char* argv[]) {
 
     g_hwnd = CreateWindowExA(
         0, "OverlayTestHost",
-        "Overlay Test Host  [F1: test msg]  [L: pause/resume]  [R: restart]  [ESC: exit]",
+        "Overlay Test Host  [F1: send 1msg]  [F2: send 10msgs]  [L: pause/resume]  [R: restart]  [ESC: exit]",
         WS_OVERLAPPEDWINDOW,
         100, 100, 1280, 720,
         nullptr, nullptr, wc.hInstance, nullptr);
