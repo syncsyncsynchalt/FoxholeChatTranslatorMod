@@ -89,13 +89,11 @@ UGFs? ja=ユージーエフ i
 FBs? ja=エフビー i
 ICs? ja=アイシー i
 MPF ja=エムピーエフ
-HMG ja=エイチエムジー
 
 # ── 施設フルネーム ───────────────────────────────────────────
 stockpile ja=ストックパイル i
 seaport ja=シーポート i
 garrison ja=ガリソン i
-garri ja=ガリ i
 
 # ── 補給・役職略語 ───────────────────────────────────────────
 logi ja=ロジ i
@@ -114,7 +112,6 @@ WC ja=ダブリューシー
 Partisans? ja=パルチザン i
 Satchels? ja=サチェル i
 Hexes? ja=ヘックス i
-ETA ja=エーティーエー
 
 # ── マップ略称・頻出地名 ─────────────────────────────────────
 KC ja=ケーシー
@@ -205,13 +202,11 @@ UGFs? ko=유지에프 i
 FBs? ko=에프비 i
 ICs? ko=아이씨 i
 MPF ko=엠피에프
-HMG ko=에이치엠지
 
 # ── 施設フルネーム ───────────────────────────────────────────
 stockpile ko=스톡파일 i
 seaport ko=시포트 i
 garrison ko=개리슨 i
-garri ko=개리 i
 
 # ── 補給・役職略語 ───────────────────────────────────────────
 logi ko=로지 i
@@ -230,7 +225,6 @@ WC ko=더블유씨
 Partisans? ko=파르티잔 i
 Satchels? ko=새첼 i
 Hexes? ko=헥스 i
-ETA ko=이티에이
 
 # ── マップ略称・頻出地名 ─────────────────────────────────────
 KC ko=케이씨
