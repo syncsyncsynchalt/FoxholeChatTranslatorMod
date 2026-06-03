@@ -47,6 +47,7 @@ WTDs? ja=ダブリューティーディー i
 LUV ja=エルユーブイ
 MPT ja=エムピーティー
 FOB ja=エフオービー
+CV ja=シーブイ
 
 # ── 武器固有コードネーム ─────────────────────────────────────
 Bonesaw ja=ボーンソー i
@@ -59,6 +60,25 @@ Bomastone ja=ボーマストーン i
 Tremola ja=トレモーラ i
 Carnyx ja=カーニックス i
 Nukes? ja=ニューク i
+
+# ── 車両シャシー名 ───────────────────────────────────────────
+# Warden
+Devitt ja=デビット i
+Silverhand ja=シルバーハンド i
+Flood ja=フラッド i
+Gallagher ja=ギャラガー i
+Niska ja=ニスカ i
+Cullen ja=カレン i
+# Colonial
+Spatha ja=スパータ i
+Falchion ja=ファルチオン i
+Bardiche ja=バルディッシュ i
+Ranseur ja=ランサー i
+Nemesis ja=ネメシス i
+Talos ja=タロス i
+Ballista ja=バリスタ i
+Scorpion ja=スコーピオン i
+Ares ja=アレス i
 
 # ── 構造物・施設略語 ─────────────────────────────────────────
 BBs? ja=ビービー i
@@ -143,6 +163,7 @@ WTDs? ko=더블유티디 i
 LUV ko=엘유브이
 MPT ko=엠피티
 FOB ko=에프오비
+CV ko=씨브이
 
 # ── 武器固有コードネーム ─────────────────────────────────────
 Bonesaw ko=본쏘 i
@@ -155,6 +176,25 @@ Bomastone ko=보마스톤 i
 Tremola ko=트레몰라 i
 Carnyx ko=카닉스 i
 Nukes? ko=뉴크 i
+
+# ── 車両シャシー名 ───────────────────────────────────────────
+# Warden
+Devitt ko=데빗 i
+Silverhand ko=실버핸드 i
+Flood ko=플러드 i
+Gallagher ko=갤러거 i
+Niska ko=니스카 i
+Cullen ko=컬렌 i
+# Colonial
+Spatha ko=스파타 i
+Falchion ko=팔치온 i
+Bardiche ko=바르디시 i
+Ranseur ko=랜서 i
+Nemesis ko=네메시스 i
+Talos ko=탈로스 i
+Ballista ko=발리스타 i
+Scorpion ko=스코피온 i
+Ares ko=아레스 i
 
 # ── 構造物・施設略語 ─────────────────────────────────────────
 BBs? ko=비비 i
