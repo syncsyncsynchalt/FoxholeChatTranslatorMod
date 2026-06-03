@@ -27,6 +27,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <random>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -188,7 +189,34 @@ static const struct { const char* sender; const char* message; } kTestMessages[]
     { u8"補給王99",        u8"foxcatcher補給ラン完了 300mm 40mm bmat rmat conc納品 BB修理チーム現地入り ATマイン北アプローチ配置完了 次はfrostmarch" },
 };
 static const int kTestMessageCount = sizeof(kTestMessages) / sizeof(kTestMessages[0]);
-static int g_msgIndex = 0;
+
+// 言語 EN50%/RU30%/ZH10%/KO5%/JA5%、長さ 短80%/中15%/長5% でランダム選択
+static int PickRandomTestMessage() {
+    static std::mt19937 rng{std::random_device{}()};
+    static std::uniform_int_distribution<int> d100{0, 99};
+    static std::uniform_int_distribution<int> dSet{0, 1};   // 2セット
+    static std::uniform_int_distribution<int> dSlot{0, 2};  // カテゴリ内3件
+
+    // 言語選択 (グループ基底: EN=0,5 RU=1,6 ZH=3,8 KO=2,7 JA=4,9)
+    static const int kLangBase[5] = {0, 1, 3, 2, 4};  // EN, RU, ZH, KO, JA
+    int r = d100(rng);
+    int lang;
+    if      (r < 50) lang = 0;  // EN
+    else if (r < 80) lang = 1;  // RU
+    else if (r < 90) lang = 2;  // ZH
+    else if (r < 95) lang = 3;  // KO
+    else             lang = 4;  // JA
+
+    // 長さ選択
+    r = d100(rng);
+    int slot;
+    if      (r < 80) slot = dSlot(rng);      // Short: 0-2
+    else if (r < 95) slot = 3 + dSlot(rng);  // Medium: 3-5
+    else             slot = 6 + dSlot(rng);  // Long: 6-8
+
+    int group = kLangBase[lang] + dSet(rng) * 5;
+    return group * 9 + slot;
+}
 
 // ============================================================
 // ログ再生
@@ -374,18 +402,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             PostQuitMessage(0);
 
         } else if (wp == VK_F1 && g_fnChatMsg) {
-            const auto& tm = kTestMessages[g_msgIndex % kTestMessageCount];
-            g_fnChatMsg(tm.sender, tm.message);
-            printf("[F1] メッセージ送信 (%s): %s\n", tm.sender, tm.message);
-            g_msgIndex++;
+            int idx = PickRandomTestMessage();
+            g_fnChatMsg(kTestMessages[idx].sender, kTestMessages[idx].message);
+            printf("[F1] メッセージ送信 (%s): %s\n", kTestMessages[idx].sender, kTestMessages[idx].message);
 
         } else if (wp == VK_F2 && g_fnChatMsg) {
             for (int k = 0; k < 10; k++) {
-                const auto& tm = kTestMessages[(g_msgIndex + k) % kTestMessageCount];
-                g_fnChatMsg(tm.sender, tm.message);
+                int idx = PickRandomTestMessage();
+                g_fnChatMsg(kTestMessages[idx].sender, kTestMessages[idx].message);
             }
-            printf("[F2] 10件連続送信 (index %d..%d)\n", g_msgIndex, g_msgIndex + 9);
-            g_msgIndex += 10;
+            printf("[F2] 10件ランダム送信\n");
 
         } else if (wp == 'L') {
             if (g_logEntries.empty()) {
@@ -533,17 +559,21 @@ int main(int argc, char* argv[]) {
         printf("OK: ログ読み込み完了: %s (%d件, 間隔=%dms)\n",
                logPath.c_str(), loaded, g_replayIntervalMs);
     } else {
-        // ログなし → デモメッセージをデフォルトエントリとして使用
-        for (int i = 0; i < kTestMessageCount; i++) {
-            LogEntry e;
-            e.sender  = kTestMessages[i].sender;
-            e.message = kTestMessages[i].message;
-            g_logEntries.push_back(e);
+        // ログなし → ランダム比率でデモメッセージ生成してループ再生
+        {
+            const int kDemoCount = 200;
+            for (int i = 0; i < kDemoCount; i++) {
+                int idx = PickRandomTestMessage();
+                LogEntry e;
+                e.sender  = kTestMessages[idx].sender;
+                e.message = kTestMessages[idx].message;
+                g_logEntries.push_back(e);
+            }
+            g_replayLoop = true;
+            printf("INFO: ログファイルなし (%s)\n", logPath.c_str());
+            printf("INFO: デモメッセージ %d件をランダム生成 (短80%%/中15%%/長5%%) ループ再生します\n", kDemoCount);
+            printf("      --log <path> でログファイルを指定できます\n");
         }
-        g_replayLoop = true;
-        printf("INFO: ログファイルなし (%s)\n", logPath.c_str());
-        printf("INFO: デモメッセージ %d件をループ再生します\n", kTestMessageCount);
-        printf("      --log <path> でログファイルを指定できます\n");
     }
     printf("操作: L=一時停止/再開  R=先頭から再開  F1=手動送信\n");
 
